@@ -14,6 +14,7 @@ use serde::{
     Serializer,
 };
 
+
 /// This struct serves as a transparent wrapper around other sealed types to allow for blanket
 /// implementations of `Serialize`.
 pub struct Ser<T>(T);

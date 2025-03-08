@@ -10,6 +10,15 @@ use std::{
 
 use crate::tag::{NbtCompound, NbtList, NbtTag};
 
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum SnbtVersion {
+    /// For Java 1.21.5 and later. Not yet implemented.
+    UpdatedJava,
+    /// For Java before 1.21.5, or Bedrock
+    Other
+}
+
 /// Parses the given string into an NBT tag compound.
 pub fn parse<T: AsRef<str> + ?Sized>(string_nbt: &T) -> Result<NbtCompound, SnbtError> {
     parse_and_size(string_nbt).map(|(tag, _)| tag)

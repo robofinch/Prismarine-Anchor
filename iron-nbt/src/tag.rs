@@ -12,6 +12,7 @@ use crate::{
     repr::{NbtReprError, NbtStructureError},
 };
 
+
 /// The hash map type utilized in this crate. If the feature `preserve_order` is enabled, then this
 /// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
 /// Otherwise, this type defaults to `std`'s `HashMap`.
@@ -23,6 +24,7 @@ pub type Map<T> = indexmap::IndexMap<String, T>;
 /// Otherwise, this type defaults to `std`'s `HashMap`.
 #[cfg(not(feature = "preserve_order"))]
 pub type Map<T> = std::collections::HashMap<String, T>;
+
 
 /// The generic NBT tag type, containing all supported tag variants which wrap around a corresponding
 /// rust type.

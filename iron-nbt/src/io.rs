@@ -17,38 +17,32 @@ use crate::{
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct Options {
+pub struct IoOptions {
+    // Note for possible improvement / change:
+    // It might end up better for performance to leave Endianness in the type system
+    // instead of having it be an enum; however, that would monomorphize most or all of the looooong
+    // serde impl and raw.rs functions into two copies
     pub endianness: Endianness, // Bedrock edition is LittleEndian, Java is BigEndian
     pub compression: NBTCompression,
     pub string_encoding: StringEncoding, // Java is CESU-8, Bedrock is probably UTF-8
-    pub snbt_version: SnbtVersion // Java 1.21.5 changes SNBT, though NBT remains unchanged
 }
 
-impl Options {
-    pub fn java_old() -> Self {
+impl IoOptions {
+    /// Default Java encoding for NBT
+    pub fn java() -> Self {
         Self {
             endianness: Endianness::BigEndian,
             compression: NBTCompression::GzCompressed,
             string_encoding: StringEncoding::Cesu8,
-            snbt_version: SnbtVersion::Other
         }
     }
 
-    pub fn java_new() -> Self {
-        Self {
-            endianness: Endianness::BigEndian,
-            compression: NBTCompression::GzCompressed,
-            string_encoding: StringEncoding::Cesu8,
-            snbt_version: SnbtVersion::UpdatedJava
-        }
-    }
-
+    /// Default Bedrock encoding for NBT
     pub fn bedrock() -> Self {
         Self {
             endianness: Endianness::LittleEndian,
             compression: NBTCompression::GzCompressed,
             string_encoding: StringEncoding::Utf8,
-            snbt_version: SnbtVersion::Other
         }
     }
 }
@@ -102,19 +96,11 @@ pub enum StringEncoding {
     Cesu8
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum SnbtVersion {
-    /// For Java 1.21.5 and later
-    UpdatedJava,
-    /// For Java before 1.21.5, or Bedrock
-    Other
-}
-
 /// Reads the given flavor of NBT data from the given reader, returning the resulting NBT
 /// compound and associated root name.
 pub fn read_nbt<R: Read>(
     reader: &mut R,
-    opts: Options
+    opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     match opts.compression {
@@ -127,7 +113,7 @@ pub fn read_nbt<R: Read>(
 }
 
 fn read_nbt_uncompressed<R: Read>(
-    reader: &mut R, opts: Options
+    reader: &mut R, opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -147,7 +133,7 @@ fn read_nbt_uncompressed<R: Read>(
 }
 
 fn read_tag_body_dyn<R: Read>(
-    reader: &mut R, opts: Options, tag_id: u8
+    reader: &mut R, opts: IoOptions, tag_id: u8
 ) -> Result<NbtTag, NbtIoError> {
 
     macro_rules! drive_reader {
@@ -164,7 +150,7 @@ fn read_tag_body_dyn<R: Read>(
 
 #[inline]
 fn read_tag_body_const<R: Read, const TAG_ID: u8>(
-    reader: &mut R, opts: Options
+    reader: &mut R, opts: IoOptions
 ) -> Result<NbtTag, NbtIoError> {
 
     let tag = match TAG_ID {
@@ -249,7 +235,7 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
 /// string is used.
 pub fn write_nbt<W: Write>(
     writer: &mut W,
-    opts: Options,
+    opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
     flavor: NBTCompression,
@@ -276,7 +262,7 @@ pub fn write_nbt<W: Write>(
 /// NBT data without any compression.
 fn write_nbt_uncompressed<W>(
     writer: &mut W,
-    opts: Options,
+    opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
 ) -> Result<(), NbtIoError>
@@ -295,7 +281,7 @@ where
     Ok(())
 }
 
-fn write_tag_body<W: Write>(writer: &mut W, opts: Options, tag: &NbtTag) -> Result<(), NbtIoError> {
+fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
     match tag {
         &NbtTag::Byte  (value) => raw::write_i8 (writer, opts, value)?,
         &NbtTag::Short (value) => raw::write_i16(writer, opts, value)?,

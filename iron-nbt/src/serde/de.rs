@@ -21,14 +21,14 @@ use serde::{
     forward_to_deserialize_any,
 };
 
-use crate::{io::{NbtIoError, Options}, raw::{self, string_from_bytes}};
+use crate::{io::{NbtIoError, IoOptions}, raw::{self, string_from_bytes}};
 use super::TYPE_HINT_NICHE;
 
 
 /// The deserializer type for reading binary NBT data.
 pub struct Deserializer<'a, R, B> {
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -36,7 +36,7 @@ impl<'a, R: Read> Deserializer<'a, R, Unbuffered> {
     /// Attempts to construct a new deserializer with the given reader. If the data in the reader
     /// does not start with a valid compound tag, an error is returned. Otherwise, the root name
     /// is returned along with the deserializer.
-    pub fn new(reader: &'a mut R, opts: Options) -> Result<(Self, String), NbtIoError> {
+    pub fn new(reader: &'a mut R, opts: IoOptions) -> Result<(Self, String), NbtIoError> {
         if raw::read_u8(reader, opts)? != 0xA {
             return Err(NbtIoError::MissingRootTag);
         }
@@ -67,7 +67,7 @@ where
     /// [`new`]: crate::serde::Deserializer::new
     pub fn from_cursor(
         reader: &'a mut Cursor<&'buffer [u8]>,
-        opts: Options,
+        opts: IoOptions,
     ) -> Result<(Self, Cow<'buffer, str>), NbtIoError> {
         if raw::read_u8(reader, opts)? != 0xA {
             return Err(NbtIoError::MissingRootTag);
@@ -151,7 +151,7 @@ where
 #[inline]
 fn drive_visitor_seq_const<'de, 'a, 'buffer, R, V, B, const TAG_ID: u8>(
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -190,7 +190,7 @@ where
 
 fn drive_visitor_seq_tag<'de, 'a, 'buffer, R, V, B>(
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -224,14 +224,14 @@ where
 
 struct DeserializeEnum<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     variant: Cow<'a, str>,
     _buffered: PhantomData<B>,
 }
 
 impl<'a, R, B, const TAG_ID: u8> DeserializeEnum<'a, R, B, TAG_ID> {
     #[inline]
-    fn new(reader: &'a mut R, opts: Options, variant: Cow<'a, str>) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions, variant: Cow<'a, str>) -> Self {
         DeserializeEnum {
             reader,
             opts,
@@ -261,7 +261,7 @@ where
 
 struct DeserializeVariant<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -271,7 +271,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: Options) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
         DeserializeVariant {
             reader,
             opts,
@@ -421,7 +421,7 @@ enum TypeHintDispatchState {
 
 struct DeserializeMap<'a, R, B> {
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     tag_id: u8,
     _buffered: PhantomData<B>,
 }
@@ -432,7 +432,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: Options) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
         DeserializeMap {
             reader,
             opts,
@@ -495,7 +495,7 @@ where
 
 pub struct DeserializeTag<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: Options,
+    opts: IoOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -505,7 +505,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: Options) -> DeserializeTag<'a, R, B, TAG_ID> {
+    fn new(reader: &'a mut R, opts: IoOptions) -> DeserializeTag<'a, R, B, TAG_ID> {
         DeserializeTag {
             reader,
             opts,
