@@ -3,13 +3,10 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
     ops::{Deref, DerefMut, Index, IndexMut},
-    str::FromStr,
 };
 
 use crate::{
-    raw,
-    snbt::{self, SnbtError},
-    repr::{NbtReprError, NbtStructureError},
+    raw, repr::{NbtReprError, NbtStructureError}, snbt::{self, SnbtError, SnbtVersion}
 };
 
 
@@ -124,7 +121,13 @@ impl NbtTag {
         }
 
         if let Some(first) = string.chars().next() {
-            if first.is_whitespace() || first.is_ascii_digit() || first == '-' {
+            if first.is_whitespace() || first.is_ascii_digit()
+                || first == '-'
+                // The older SNBT versions allow + or . to be unquoted, but it's best
+                // to be conservative with output.
+                || first == '+'
+                || first == '.'
+            {
                 return true;
             }
         }
@@ -144,6 +147,7 @@ impl NbtTag {
                 || ch == '}'
                 || ch == '['
                 || ch == ']'
+                // Note that all escape sequences in Java 1.21.5 use \, so this also catches those.
                 || ch == '\\'
                 || ch == '\n'
                 || ch == '\r'
@@ -176,6 +180,9 @@ impl NbtTag {
         // Construct the string accounting for escape sequences
         for ch in string.chars() {
             match ch {
+                // Note that the newer SNBT version also supports more unicode escapes,
+                // but those don't seem to be mandatory, as the strings should already
+                // allow most UTF-8 or CESU-8 characters.
                 '\n' => {
                     snbt_string.push_str("\\n");
                     continue;
@@ -198,6 +205,13 @@ impl NbtTag {
 
         snbt_string.push(surrounding);
         Cow::Owned(snbt_string)
+    }
+
+    /// Parses a NBT compound or list from SNBT
+    #[inline]
+    pub fn from_snbt(input: &str, version: SnbtVersion) -> Result<Self, SnbtError> {
+        todo!()
+        // snbt::parse(input, version)
     }
 
     #[allow(clippy::write_with_newline)]
@@ -256,17 +270,17 @@ impl NbtTag {
         let ts = self.type_specifier();
 
         match self {
-            NbtTag::Byte(value) => write(value, ts, f),
-            NbtTag::Short(value) => write(value, ts, f),
-            NbtTag::Int(value) => write(value, ts, f),
-            NbtTag::Long(value) => write(value, ts, f),
-            NbtTag::Float(value) => write(value, ts, f),
-            NbtTag::Double(value) => write(value, ts, f),
+            NbtTag::Byte(value)      => write(value, ts, f),
+            NbtTag::Short(value)     => write(value, ts, f),
+            NbtTag::Int(value)       => write(value, ts, f),
+            NbtTag::Long(value)      => write(value, ts, f),
+            NbtTag::Float(value)     => write(value, ts, f),
+            NbtTag::Double(value)    => write(value, ts, f),
             NbtTag::ByteArray(value) => write_list(&**value, indent, ts.unwrap(), f),
-            NbtTag::String(value) => write!(f, "{}", Self::string_to_snbt(value)),
-            NbtTag::List(value) => value.to_formatted_snbt(indent, f),
-            NbtTag::Compound(value) => value.to_formatted_snbt(indent, f),
-            NbtTag::IntArray(value) => write_list(&**value, indent, ts.unwrap(), f),
+            NbtTag::String(value)    => write!(f, "{}", Self::string_to_snbt(value)),
+            NbtTag::List(value)      => value.to_formatted_snbt(indent, f),
+            NbtTag::Compound(value)  => value.to_formatted_snbt(indent, f),
+            NbtTag::IntArray(value)  => write_list(&**value, indent, ts.unwrap(), f),
             NbtTag::LongArray(value) => write_list(&**value, indent, ts.unwrap(), f),
         }
     }
@@ -669,6 +683,13 @@ impl NbtList {
         self.0.push(value.into());
     }
 
+    /// Parses an NBT list from SNBT
+    #[inline]
+    pub fn from_snbt(input: &str, version: SnbtVersion) -> Result<Self, SnbtError> {
+        //snbt::parse(input, version)
+        todo!()
+    }
+
     #[allow(clippy::write_with_newline)]
     fn to_formatted_snbt(&self, indent: &mut String, f: &mut Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
@@ -1005,10 +1026,10 @@ impl NbtCompound {
         self.0.insert(name.into(), value.into());
     }
 
-    /// Parses a nbt compound from snbt
+    /// Parses an NBT compound from SNBT
     #[inline]
-    pub fn from_snbt(input: &str) -> Result<Self, SnbtError> {
-        snbt::parse(input)
+    pub fn from_snbt(input: &str, version: SnbtVersion) -> Result<Self, SnbtError> {
+        snbt::parse(input, version)
     }
 
     #[allow(clippy::write_with_newline)]
@@ -1111,15 +1132,6 @@ where
     }
 }
 
-impl FromStr for NbtCompound {
-    type Err = SnbtError;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_snbt(s)
-    }
-}
-
 impl Display for NbtCompound {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1157,18 +1169,18 @@ mod serde_impl {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer {
             match self {
-                &NbtTag::Byte(value) => serializer.serialize_i8(value),
-                &NbtTag::Short(value) => serializer.serialize_i16(value),
-                &NbtTag::Int(value) => serializer.serialize_i32(value),
-                &NbtTag::Long(value) => serializer.serialize_i64(value),
-                &NbtTag::Float(value) => serializer.serialize_f32(value),
-                &NbtTag::Double(value) => serializer.serialize_f64(value),
-                NbtTag::ByteArray(array) => Array::from(array).serialize(serializer),
-                NbtTag::String(value) => serializer.serialize_str(value),
-                NbtTag::List(list) => list.serialize(serializer),
+                &NbtTag::Byte(value)       => serializer.serialize_i8(value),
+                &NbtTag::Short(value)      => serializer.serialize_i16(value),
+                &NbtTag::Int(value)        => serializer.serialize_i32(value),
+                &NbtTag::Long(value)       => serializer.serialize_i64(value),
+                &NbtTag::Float(value)      => serializer.serialize_f32(value),
+                &NbtTag::Double(value)     => serializer.serialize_f64(value),
+                NbtTag::ByteArray(array)   => Array::from(array).serialize(serializer),
+                NbtTag::String(value)      => serializer.serialize_str(value),
+                NbtTag::List(list)         => list.serialize(serializer),
                 NbtTag::Compound(compound) => compound.serialize(serializer),
-                NbtTag::IntArray(array) => Array::from(array).serialize(serializer),
-                NbtTag::LongArray(array) => Array::from(array).serialize(serializer),
+                NbtTag::IntArray(array)    => Array::from(array).serialize(serializer),
+                NbtTag::LongArray(array)   => Array::from(array).serialize(serializer),
             }
         }
     }

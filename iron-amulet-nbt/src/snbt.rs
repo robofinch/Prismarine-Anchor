@@ -20,15 +20,19 @@ pub enum SnbtVersion {
 }
 
 /// Parses the given string into an NBT tag compound.
-pub fn parse<T: AsRef<str> + ?Sized>(string_nbt: &T) -> Result<NbtCompound, SnbtError> {
-    parse_and_size(string_nbt).map(|(tag, _)| tag)
+pub fn parse<T: AsRef<str> + ?Sized>(
+    string_nbt: &T,
+    version: SnbtVersion,
+) -> Result<NbtCompound, SnbtError> {
+    parse_and_size(string_nbt, version).map(|(tag, _)| tag)
 }
 
 /// Parses the given string just like [`parse`], but also returns the amount of parsed characters.
 pub fn parse_and_size<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
+    version: SnbtVersion,
 ) -> Result<(NbtCompound, usize), SnbtError> {
-    let mut tokens = Lexer::new(string_nbt.as_ref());
+    let mut tokens = Lexer::new(string_nbt.as_ref(), version);
     let open_curly = tokens.assert_next(Token::OpenCurly)?;
     parse_compound_tag(&mut tokens, &open_curly)
 }
@@ -333,16 +337,18 @@ struct Lexer<'a> {
     index: usize,
     raw_token_buffer: Cow<'a, str>,
     peeked: Option<Option<Result<TokenData, SnbtError>>>,
+    version: SnbtVersion,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(raw: &'a str) -> Self {
+    fn new(raw: &'a str, version: SnbtVersion) -> Self {
         Lexer {
             raw,
             chars: raw.char_indices().peekable(),
             index: 0,
             raw_token_buffer: Cow::Owned(String::new()),
             peeked: None,
+            version,
         }
     }
 
@@ -810,6 +816,8 @@ enum Token {
     ClosedCurly,
     OpenSquare,
     ClosedSquare,
+    OpenParen,
+    ClosedParen,
     Comma,
     Colon,
     Semicolon,
@@ -820,18 +828,22 @@ enum Token {
     Long(i64),
     Float(f64),
     Double(f64),
+    BoolFunc,
+    UuicFunc,
 }
 
 impl Token {
     fn as_expectation(&self) -> &'static str {
         match self {
-            Token::OpenCurly => "'{'",
-            Token::ClosedCurly => "'}'",
-            Token::OpenSquare => "'['",
+            Token::OpenCurly    => "'{'",
+            Token::ClosedCurly  => "'}'",
+            Token::OpenSquare   => "'['",
             Token::ClosedSquare => "']'",
-            Token::Comma => "','",
-            Token::Colon => "':'",
-            Token::Semicolon => "';'",
+            Token::OpenParen    => "'('",
+            Token::ClosedParen  => "')'",
+            Token::Comma        => "','",
+            Token::Colon        => "':'",
+            Token::Semicolon    => "';'",
             _ => "value",
         }
     }
@@ -839,11 +851,11 @@ impl Token {
     fn into_tag(self) -> Result<NbtTag, Self> {
         match self {
             Token::String { value, .. } => Ok(NbtTag::String(value)),
-            Token::Byte(value) => Ok(NbtTag::Byte(value as i8)),
-            Token::Short(value) => Ok(NbtTag::Short(value as i16)),
-            Token::Int(value) => Ok(NbtTag::Int(value as i32)),
-            Token::Long(value) => Ok(NbtTag::Long(value)),
-            Token::Float(value) => Ok(NbtTag::Float(value as f32)),
+            Token::Byte(value)   => Ok(NbtTag::Byte(value as i8)),
+            Token::Short(value)  => Ok(NbtTag::Short(value as i16)),
+            Token::Int(value)    => Ok(NbtTag::Int(value as i32)),
+            Token::Long(value)   => Ok(NbtTag::Long(value)),
+            Token::Float(value)  => Ok(NbtTag::Float(value as f32)),
             Token::Double(value) => Ok(NbtTag::Double(value)),
             tk => Err(tk),
         }
@@ -1071,7 +1083,7 @@ pub enum ParserErrorType {
         /// The index of the trailing comma.
         index: usize,
     },
-    /// An unmatched curly or square bracket was encountered.
+    /// An unmatched curly bracket, square bracket, or parenthesis was encountered.
     UnmatchedBrace {
         /// The index of the unmatched brace.
         index: usize,
