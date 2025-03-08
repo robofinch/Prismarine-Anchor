@@ -72,11 +72,26 @@ pub enum NBTCompression {
     /// Zlib compressed NBT data. When writing, the default compression level will be used.
     ZlibCompressed,
     /// Zlib compressed NBT data with the given compression level.
-    ZlibCompressedWith(Compression),
+    ZlibCompressedWith(CompressionLevel),
     /// Gz compressed NBT data. When writing, the default compression level will be used.
     GzCompressed,
     /// Gz compressed NBT data with the given compression level.
-    GzCompressedWith(Compression),
+    GzCompressedWith(CompressionLevel),
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct CompressionLevel(u8);
+
+impl From<Compression> for CompressionLevel {
+    fn from(value: Compression) -> Self {
+        Self(value.level() as u8)
+    }
+}
+
+impl From<CompressionLevel> for Compression {
+    fn from(value: CompressionLevel) -> Self {
+        Compression::new(value.0 as u32)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -245,9 +260,9 @@ pub fn write_nbt<W: Write>(
             return write_nbt_uncompressed(writer, opts, root_name, root);
         }
         NBTCompression::ZlibCompressed => (2, Compression::default()),
-        NBTCompression::ZlibCompressedWith(compression) => (2, compression),
+        NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
         NBTCompression::GzCompressed => (1, Compression::default()),
-        NBTCompression::GzCompressedWith(compression) => (1, compression),
+        NBTCompression::GzCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {

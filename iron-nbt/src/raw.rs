@@ -1,9 +1,10 @@
 use std::{
+    borrow::Cow,
     io::{Read, Result, Write},
     mem::ManuallyDrop,
     ptr,
-    result::Result as StdResult,
     slice,
+    str,
 };
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -12,6 +13,9 @@ use crate::{
     io::{Endianness, NbtIoError, Options, StringEncoding},
     tag::NbtTag,
 };
+
+
+type NbtResult<T> = std::result::Result<T, NbtIoError>;
 
 
 #[inline]
@@ -35,8 +39,8 @@ pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
 
 #[cfg(feature = "serde")]
 #[inline]
-pub fn read_bool<R: Read>(reader: &mut R, _opts: Options) -> Result<bool> {
-    Ok(read_u8(reader)? != 0)
+pub fn read_bool<R: Read>(reader: &mut R, opts: Options) -> Result<bool> {
+    Ok(read_u8(reader, opts)? != 0)
 }
 
 #[inline]
@@ -97,53 +101,46 @@ pub fn read_f64<R: Read>(reader: &mut R, opts: Options) -> Result<f64> {
     }
 }
 
-pub fn read_string<R: Read>(reader: &mut R, opts: Options) -> StdResult<String, NbtIoError> {
-    let len = read_u16(reader, opts)? as usize;
-    let mut bytes = vec![0; len];
-    reader.read_exact(&mut bytes)?;
-
-    Ok(match opts.string_encoding {
-        StringEncoding::Utf8 => {
-            String::from_utf8(bytes).map_err(|_| NbtIoError::InvalidUtf8String)?
-        },
-        StringEncoding::Cesu8 => {
-            let java_decoded = match cesu8::from_java_cesu8(&bytes) {
-                Ok(string) => string,
-                Err(_) => return Err(NbtIoError::InvalidCesu8String),
-            };
-            java_decoded.into_owned()
-        }
-    })
-}
-
-#[cfg(feature = "serde")]
-use std::{str, borrow::Cow};
-#[cfg(feature = "serde")]
-pub fn read_string_into<'a, R: Read>(
-    reader: &mut R,
-    opts: Options,
-    dest: &'a mut Vec<u8>,
-) -> StdResult<Cow<'a, str>, NbtIoError> {
-    let len = read_u16(reader, opts)? as usize;
-    dest.resize(len, 0);
-    reader.read_exact(dest)?;
+pub fn string_from_bytes(bytes: &[u8], opts: Options) -> NbtResult<Cow<str>> {
     match opts.string_encoding {
-        StringEncoding::Utf8 => Ok(
-            Cow::Borrowed(str::from_utf8(dest.as_slice()).map_err(|_| NbtIoError::InvalidUtf8String)?)
-        ),
-        StringEncoding::Cesu8 => {
-            match cesu8::from_java_cesu8(dest) {
-                Ok(string) => Ok(string),
-                Err(_) => Err(NbtIoError::InvalidCesu8String),
-            }
+        StringEncoding::Utf8 => match str::from_utf8(bytes) {
+            Ok(string) => Ok(Cow::Borrowed(string)),
+            Err(_) => Err(NbtIoError::InvalidUtf8String)
+        },
+        StringEncoding::Cesu8 => match cesu8::from_java_cesu8(bytes) {
+            Ok(string) => Ok(string),
+            Err(_) => Err(NbtIoError::InvalidCesu8String),
         }
     }
 }
 
+pub fn bytes_from_string(string: &str, opts: Options) -> Cow<[u8]> {
+    match opts.string_encoding {
+        StringEncoding::Utf8 => Cow::Borrowed(string.as_bytes()),
+        StringEncoding::Cesu8 => cesu8::to_java_cesu8(string)
+    }
+}
+
+pub fn read_string<R: Read>(reader: &mut R, opts: Options) -> NbtResult<String> {
+    let len = read_u16(reader, opts)? as usize;
+    let mut bytes = vec![0; len];
+    reader.read_exact(&mut bytes)?;
+
+    Ok(string_from_bytes(bytes.as_slice(), opts)?.into_owned())
+}
+
+#[cfg(feature = "serde")]
+pub fn read_string_into<'a, R: Read>(reader: &mut R, opts: Options, dest: &'a mut Vec<u8>) -> NbtResult<Cow<'a, str>> {
+    let len = read_u16(reader, opts)? as usize;
+    dest.resize(len, 0);
+    reader.read_exact(dest)?;
+    string_from_bytes(dest, opts)
+}
+
 #[cfg(feature = "serde")]
 #[inline]
-pub fn write_bool<W: Write>(writer: &mut W, _opts: Options, value: bool) -> Result<()> {
-    write_u8(writer, if value { 1 } else { 0 })
+pub fn write_bool<W: Write>(writer: &mut W, opts: Options, value: bool) -> Result<()> {
+    write_u8(writer, opts, if value { 1 } else { 0 })
 }
 
 #[inline]
@@ -205,14 +202,9 @@ pub fn write_f64<W: Write>(writer: &mut W, opts: Options, value: f64) -> Result<
 }
 
 pub fn write_string<W: Write>(writer: &mut W, opts: Options, string: &str) -> Result<()> {
-    match opts.string_encoding {
-        StringEncoding::Utf8 => writer.write_all(string.as_bytes()),
-        StringEncoding::Cesu8 => {
-            let mod_utf8 = cesu8::to_java_cesu8(string);
-            write_u16(writer, opts, mod_utf8.len() as u16)?;
-            writer.write_all(&mod_utf8)
-        }
-    }
+    let string = bytes_from_string(string, opts);
+    write_u16(writer, opts, string.len() as u16)?;
+    writer.write_all(&string)
 }
 
 #[inline]
