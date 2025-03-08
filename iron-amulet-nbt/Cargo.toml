@@ -1,5 +1,5 @@
 [package]
-name = "iron-nbt"
+name = "iron-amulet-nbt"
 authors = ["Finley Huggins"]
 license.workspace = true
 version.workspace = true

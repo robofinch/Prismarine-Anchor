@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["iron-leveldb", "iron-nbt"]
+members = [ "iron-amulet", "iron-amulet-core", "iron-amulet-nbt", "iron-amulet-translate", "iron-leveldb"]
 
 [workspace.package]
 name = "iron-amulet"
@@ -21,6 +21,8 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 
 # debug = true # include debug symbols, useful when profiling wasm
 
+# Note: will probably not use this for Iron Amulet, we should instead catch the unwind
+# and try to save data to avoid losing everything from a crash.
 panic = "abort" # This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
 
 
@@ -34,7 +36,11 @@ panic = "abort" # This leads to better optimizations and smaller binaries (and i
 opt-level = 2
 
 [workspace.dependencies]
-iron-leveldb = { version = "0.1.0", path = "./iron-leveldb" }
+iron-amulet             = { version = "0.1.0", path = "./iron-amulet" }
+iron-amulet-core        = { version = "0.1.0", path = "./iron-amulet-core" }
+iron-amulet-nbt         = { version = "0.1.0", path = "./iron-amulet-nbt" }
+iron-amulet-translate   = { version = "0.1.0", path = "./iron-amulet-translate" }
+iron-leveldb            = { version = "0.1.0", path = "./iron-leveldb" }
 
 anyhow = "1.0.97"
 byteorder = "1.5.0"
