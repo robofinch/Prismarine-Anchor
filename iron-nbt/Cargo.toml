@@ -1,0 +1,18 @@
+[package]
+name = "iron-nbt"
+authors = ["Finley Huggins"]
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+byteorder.workspace = true
+cesu8.workspace = true
+flate2.workspace = true
+indexmap = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+
+[features]
+preserve_order = ["indexmap"]

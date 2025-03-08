@@ -1,6 +1,46 @@
-[package]
+[workspace]
+resolver = "2"
+members = ["iron-leveldb", "iron-nbt"]
+
+[workspace.package]
 name = "iron-amulet"
+# Applies to code in this repository, not necessarily all dependencies, of course.
+license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 
-[dependencies]
+# Some of this toml is copied from egui's repository, it's my go-to large multicrate example project
+
+[profile.release]
+# lto = true # VERY slightly smaller wasm
+# opt-level = 's' # 10-20% smaller wasm compared to `opt-level = 3`
+# opt-level = 1 # very slow and big wasm. Don't do this.
+opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
+# opt-level = 3 # unnecessarily large wasm for no performance gain
+
+# debug = true # include debug symbols, useful when profiling wasm
+
+panic = "abort" # This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
+
+
+[profile.dev]
+# Can't leave this on by default, because it breaks the Windows build. Related: https://github.com/rust-lang/cargo/issues/4897
+# split-debuginfo = "unpacked" # faster debug builds on mac
+# opt-level = 1                # Make debug builds run faster
+
+[profile.dev.package."*"]
+# Optimize all dependencies even in debug builds (does not affect workspace packages):
+opt-level = 2
+
+[workspace.dependencies]
+iron-leveldb = { version = "0.1.0", path = "./iron-leveldb" }
+
+anyhow = "1.0.97"
+byteorder = "1.5.0"
+cesu8 = "1.1.0"
+flate2 = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+indexmap = { version = "2.7.1", features = ["serde"] }
+rusty-leveldb = "3.0.2"
+serde = { version = "1.0.218", features = ["serde_derive"] }
+thiserror = "2"

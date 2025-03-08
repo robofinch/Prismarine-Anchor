@@ -1,1 +1,13 @@
-/target
+# Mac stuff:
+.DS_Store
+
+# trunk output folder
+dist
+
+# Rust compile target directories:
+target
+target_ra
+target_wasm
+
+# Editor settings
+.vscode
