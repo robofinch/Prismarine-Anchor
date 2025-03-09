@@ -1,3 +1,4 @@
+pub mod encoding;
 pub mod io;
 mod raw;
 mod repr;

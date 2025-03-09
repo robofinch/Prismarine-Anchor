@@ -3,7 +3,6 @@ resolver = "2"
 members = [ "iron-amulet", "iron-amulet-core", "iron-amulet-nbt", "iron-amulet-translate", "iron-leveldb"]
 
 [workspace.package]
-name = "iron-amulet"
 # Applies to code in this repository, not necessarily all dependencies, of course.
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
@@ -40,6 +39,8 @@ iron-amulet             = { version = "0.1.0", path = "./iron-amulet" }
 iron-amulet-core        = { version = "0.1.0", path = "./iron-amulet-core" }
 iron-amulet-nbt         = { version = "0.1.0", path = "./iron-amulet-nbt" }
 iron-amulet-translate   = { version = "0.1.0", path = "./iron-amulet-translate" }
+# May also need something like "iron-amulet-model-reader"
+# This LevelDB wrapper is probably unnecessary, and will likely be removed.
 iron-leveldb            = { version = "0.1.0", path = "./iron-leveldb" }
 
 anyhow = "1.0.97"
@@ -49,4 +50,4 @@ flate2 = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
 indexmap = { version = "2.7.1", features = ["serde"] }
 rusty-leveldb = "3.0.2"
 serde = { version = "1.0.218", features = ["serde_derive"] }
-thiserror = "2"
+varint-rs = "2.2.0"

@@ -8,9 +8,11 @@ use std::{
 };
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use varint_rs::{VarintReader, VarintWriter};
 
 use crate::{
-    io::{Endianness, NbtIoError, IoOptions, StringEncoding},
+    encoding::{Endianness, EncodingOptions, StringEncoding},
+    io::NbtIoError,
     tag::NbtTag,
 };
 
@@ -39,69 +41,70 @@ pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
 
 #[cfg(feature = "serde")]
 #[inline]
-pub fn read_bool<R: Read>(reader: &mut R, opts: IoOptions) -> Result<bool> {
+pub fn read_bool<R: Read>(reader: &mut R, opts: EncodingOptions) -> Result<bool> {
     Ok(read_u8(reader, opts)? != 0)
 }
 
 #[inline]
-pub fn read_u8<R: Read>(reader: &mut R, _opts: IoOptions) -> Result<u8> {
+pub fn read_u8<R: Read>(reader: &mut R, _opts: EncodingOptions) -> Result<u8> {
     reader.read_u8()
 }
 
 #[inline]
-pub fn read_u16<R: Read>(reader: &mut R, opts: IoOptions) -> Result<u16> {
-    match opts.endianness {
-        Endianness::BigEndian    => reader.read_u16::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_u16::<LittleEndian>()
-    }
-}
-
-#[inline]
-pub fn read_i8<R: Read>(reader: &mut R, _opts: IoOptions) -> Result<i8> {
+pub fn read_i8<R: Read>(reader: &mut R, _opts: EncodingOptions) -> Result<i8> {
     reader.read_i8()
 }
 
 #[inline]
-pub fn read_i16<R: Read>(reader: &mut R, opts: IoOptions) -> Result<i16> {
+pub fn read_i16<R: Read>(reader: &mut R, opts: EncodingOptions) -> Result<i16> {
     match opts.endianness {
-        Endianness::BigEndian    => reader.read_i16::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_i16::<LittleEndian>()
+        Endianness::BigEndian
+            => reader.read_i16::<BigEndian>(),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => reader.read_i16::<LittleEndian>()
     }
 }
 
 #[inline]
-pub fn read_i32<R: Read>(reader: &mut R, opts: IoOptions) -> Result<i32> {
+pub fn read_i32<R: Read>(reader: &mut R, opts: EncodingOptions) -> NbtResult<i32> {
     match opts.endianness {
         Endianness::BigEndian    => reader.read_i32::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_i32::<LittleEndian>()
-    }
+        Endianness::LittleEndian => reader.read_i32::<LittleEndian>(),
+        Endianness::NetworkLittleEndian => reader.read_i32_varint()
+    }.map_err(|e| NbtIoError::StdIo(e))
 }
 
 #[inline]
-pub fn read_i64<R: Read>(reader: &mut R, opts: IoOptions) -> Result<i64> {
+pub fn read_i64<R: Read>(reader: &mut R, opts: EncodingOptions) -> NbtResult<i64> {
     match opts.endianness {
         Endianness::BigEndian    => reader.read_i64::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_i64::<LittleEndian>()
+        Endianness::LittleEndian => reader.read_i64::<LittleEndian>(),
+        Endianness::NetworkLittleEndian => reader.read_i64_varint()
+    }.map_err(|e| NbtIoError::StdIo(e))
+}
+
+#[inline]
+pub fn read_f32<R: Read>(reader: &mut R, opts: EncodingOptions) -> Result<f32> {
+    match opts.endianness {
+        Endianness::BigEndian
+            => reader.read_f32::<BigEndian>(),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => reader.read_f32::<LittleEndian>()
     }
 }
 
 #[inline]
-pub fn read_f32<R: Read>(reader: &mut R, opts: IoOptions) -> Result<f32> {
+pub fn read_f64<R: Read>(reader: &mut R, opts: EncodingOptions) -> Result<f64> {
     match opts.endianness {
-        Endianness::BigEndian    => reader.read_f32::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_f32::<LittleEndian>()
+        Endianness::BigEndian
+            => reader.read_f64::<BigEndian>(),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => reader.read_f64::<LittleEndian>()
     }
 }
 
 #[inline]
-pub fn read_f64<R: Read>(reader: &mut R, opts: IoOptions) -> Result<f64> {
-    match opts.endianness {
-        Endianness::BigEndian    => reader.read_f64::<BigEndian>(),
-        Endianness::LittleEndian => reader.read_f64::<LittleEndian>()
-    }
-}
-
-pub fn string_from_bytes(bytes: &[u8], opts: IoOptions) -> NbtResult<Cow<str>> {
+pub fn string_from_bytes(bytes: &[u8], opts: EncodingOptions) -> NbtResult<Cow<str>> {
     match opts.string_encoding {
         StringEncoding::Utf8 => match str::from_utf8(bytes) {
             Ok(string) => Ok(Cow::Borrowed(string)),
@@ -114,15 +117,26 @@ pub fn string_from_bytes(bytes: &[u8], opts: IoOptions) -> NbtResult<Cow<str>> {
     }
 }
 
-pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<[u8]> {
+#[inline]
+pub fn bytes_from_string(string: &str, opts: EncodingOptions) -> Cow<[u8]> {
     match opts.string_encoding {
         StringEncoding::Utf8 => Cow::Borrowed(string.as_bytes()),
         StringEncoding::Cesu8 => cesu8::to_java_cesu8(string)
     }
 }
 
-pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String> {
-    let len = read_u16(reader, opts)? as usize;
+#[inline]
+pub fn read_string_len<R: Read>(reader: &mut R, opts: EncodingOptions) -> NbtResult<usize> {
+    Ok(match opts.endianness {
+        Endianness::BigEndian | Endianness::LittleEndian
+            => read_i16(reader, opts)? as usize,
+        Endianness::NetworkLittleEndian
+            => reader.read_i32_varint()? as usize
+    })
+}
+
+pub fn read_string<R: Read>(reader: &mut R, opts: EncodingOptions) -> NbtResult<String> {
+    let len = read_string_len(reader, opts)?;
     let mut bytes = vec![0; len];
     reader.read_exact(&mut bytes)?;
 
@@ -130,8 +144,13 @@ pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String
 }
 
 #[cfg(feature = "serde")]
-pub fn read_string_into<'a, R: Read>(reader: &mut R, opts: IoOptions, dest: &'a mut Vec<u8>) -> NbtResult<Cow<'a, str>> {
-    let len = read_u16(reader, opts)? as usize;
+pub fn read_string_into<'a, R: Read>(
+    reader: &mut R,
+    opts: EncodingOptions,
+    dest: &'a mut Vec<u8>
+) -> NbtResult<Cow<'a, str>> {
+
+    let len = read_string_len(reader, opts)?;
     dest.resize(len, 0);
     reader.read_exact(dest)?;
     string_from_bytes(dest, opts)
@@ -139,71 +158,82 @@ pub fn read_string_into<'a, R: Read>(reader: &mut R, opts: IoOptions, dest: &'a 
 
 #[cfg(feature = "serde")]
 #[inline]
-pub fn write_bool<W: Write>(writer: &mut W, opts: IoOptions, value: bool) -> Result<()> {
+pub fn write_bool<W: Write>(writer: &mut W, opts: EncodingOptions, value: bool) -> Result<()> {
     write_u8(writer, opts, if value { 1 } else { 0 })
 }
 
 #[inline]
-pub fn write_u8<W: Write>(writer: &mut W, _opts: IoOptions, value: u8) -> Result<()> {
+pub fn write_u8<W: Write>(writer: &mut W, _opts: EncodingOptions, value: u8) -> Result<()> {
     writer.write_u8(value)
 }
 
 #[inline]
-pub fn write_u16<W: Write>(writer: &mut W, opts: IoOptions, value: u16) -> Result<()> {
-    match opts.endianness {
-        Endianness::BigEndian    => writer.write_u16::<BigEndian>(value),
-        Endianness::LittleEndian => writer.write_u16::<LittleEndian>(value),
-    }
-}
-
-#[inline]
-pub fn write_i8<W: Write>(writer: &mut W, _opts: IoOptions, value: i8) -> Result<()> {
+pub fn write_i8<W: Write>(writer: &mut W, _opts: EncodingOptions, value: i8) -> Result<()> {
     writer.write_i8(value)
 }
 
 #[inline]
-pub fn write_i16<W: Write>(writer: &mut W, opts: IoOptions, value: i16) -> Result<()> {
+pub fn write_i16<W: Write>(writer: &mut W, opts: EncodingOptions, value: i16) -> Result<()> {
     match opts.endianness {
-        Endianness::BigEndian    => writer.write_i16::<BigEndian>(value),
-        Endianness::LittleEndian => writer.write_i16::<LittleEndian>(value),
+        Endianness::BigEndian
+            => writer.write_i16::<BigEndian>(value),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => writer.write_i16::<LittleEndian>(value),
     }
 }
 
 #[inline]
-pub fn write_i32<W: Write>(writer: &mut W, opts: IoOptions, value: i32) -> Result<()> {
+pub fn write_i32<W: Write>(writer: &mut W, opts: EncodingOptions, value: i32) -> Result<()> {
     match opts.endianness {
         Endianness::BigEndian    => writer.write_i32::<BigEndian>(value),
         Endianness::LittleEndian => writer.write_i32::<LittleEndian>(value),
+        Endianness::NetworkLittleEndian => writer.write_i32_varint(value)
     }
 }
 
 #[inline]
-pub fn write_i64<W: Write>(writer: &mut W, opts: IoOptions, value: i64) -> Result<()> {
+pub fn write_i64<W: Write>(writer: &mut W, opts: EncodingOptions, value: i64) -> Result<()> {
     match opts.endianness {
         Endianness::BigEndian    => writer.write_i64::<BigEndian>(value),
         Endianness::LittleEndian => writer.write_i64::<LittleEndian>(value),
+        Endianness::NetworkLittleEndian => writer.write_i64_varint(value)
     }
 }
 
 #[inline]
-pub fn write_f32<W: Write>(writer: &mut W, opts: IoOptions, value: f32) -> Result<()> {
+pub fn write_f32<W: Write>(writer: &mut W, opts: EncodingOptions, value: f32) -> Result<()> {
     match opts.endianness {
-        Endianness::BigEndian    => writer.write_f32::<BigEndian>(value),
-        Endianness::LittleEndian => writer.write_f32::<LittleEndian>(value),
+        Endianness::BigEndian
+            => writer.write_f32::<BigEndian>(value),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => writer.write_f32::<LittleEndian>(value),
     }
 }
 
 #[inline]
-pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> Result<()> {
+pub fn write_f64<W: Write>(writer: &mut W, opts: EncodingOptions, value: f64) -> Result<()> {
     match opts.endianness {
-        Endianness::BigEndian    => writer.write_f64::<BigEndian>(value),
-        Endianness::LittleEndian => writer.write_f64::<LittleEndian>(value),
+        Endianness::BigEndian
+            => writer.write_f64::<BigEndian>(value),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => writer.write_f64::<LittleEndian>(value),
     }
 }
 
-pub fn write_string<W: Write>(writer: &mut W, opts: IoOptions, string: &str) -> Result<()> {
+#[inline]
+pub fn write_string_len<W: Write>(writer: &mut W, opts: EncodingOptions, len: usize) -> Result<()> {
+    match opts.endianness {
+        Endianness::BigEndian | Endianness::LittleEndian
+            => write_i16(writer, opts, len as i16),
+        Endianness::NetworkLittleEndian
+            => writer.write_i32_varint(len as i32)
+    }
+}
+
+#[inline]
+pub fn write_string<W: Write>(writer: &mut W, opts: EncodingOptions, string: &str) -> Result<()> {
     let string = bytes_from_string(string, opts);
-    write_u16(writer, opts, string.len() as u16)?;
+    write_string_len(writer, opts, string.len())?;
     writer.write_all(&string)
 }
 
@@ -272,49 +302,75 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
 }
 
 #[inline]
-pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> Result<Vec<i32>> {
-    let mut bytes = ManuallyDrop::new(vec![0i32; len]);
+pub fn read_i32_array<R: Read>(reader: &mut R, opts: EncodingOptions, len: usize) -> Result<Vec<i32>> {
 
-    let ptr = bytes.as_mut_ptr() as *mut u8;
-    let length = bytes.len() * 4;
-    let capacity = bytes.capacity() * 4;
+    if opts.endianness == Endianness::NetworkLittleEndian {
+        // The number of bytes to read per i32 is variable; we can't do any better than reading
+        // the values one-at-a-time
+        let mut bytes = Vec::with_capacity(len);
+        for _ in 0..len {
+            bytes.push(reader.read_i32_varint()?)
+        }
+        Ok(bytes)
 
-    let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+    } else {
+        let mut bytes = ManuallyDrop::new(vec![0i32; len]);
 
-    reader.read_exact(&mut bytes)?;
+        let ptr = bytes.as_mut_ptr() as *mut u8;
+        let length = bytes.len() * 4;
+        let capacity = bytes.capacity() * 4;
 
-    // Safety: the length of the vec is a multiple of 4, and the alignment is 4
-    match opts.endianness {
-        Endianness::BigEndian => Ok(unsafe {
-            convert_int_array_in_place::<i32, 4>(bytes, i32::from_be_bytes)
-        }),
-        Endianness::LittleEndian => Ok(unsafe {
-            convert_int_array_in_place::<i32, 4>(bytes, i32::from_le_bytes)
-        })
+        let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+
+        reader.read_exact(&mut bytes)?;
+
+        // Safety: the length of the vec is a multiple of 4, and the alignment is 4
+        match opts.endianness {
+            Endianness::BigEndian => Ok(unsafe {
+                convert_int_array_in_place::<i32, 4>(bytes, i32::from_be_bytes)
+            }),
+            Endianness::LittleEndian => Ok(unsafe {
+                convert_int_array_in_place::<i32, 4>(bytes, i32::from_le_bytes)
+            }),
+            Endianness::NetworkLittleEndian => unreachable!()
+        }
     }
 
 }
 
 #[inline]
-pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> Result<Vec<i64>> {
-    let mut bytes = ManuallyDrop::new(vec![0i64; len]);
+pub fn read_i64_array<R: Read>(reader: &mut R, opts: EncodingOptions, len: usize) -> Result<Vec<i64>> {
 
-    let ptr = bytes.as_mut_ptr() as *mut u8;
-    let length = bytes.len() * 8;
-    let capacity = bytes.capacity() * 8;
+    if opts.endianness == Endianness::NetworkLittleEndian {
+        // The number of bytes to read per i32 is variable; we can't do any better than reading
+        // the values one-at-a-time
+        let mut bytes = Vec::with_capacity(len);
+        for _ in 0..len {
+            bytes.push(reader.read_i64_varint()?)
+        }
+        Ok(bytes)
 
-    let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+    } else {
+        let mut bytes = ManuallyDrop::new(vec![0i64; len]);
 
-    reader.read_exact(&mut bytes)?;
+        let ptr = bytes.as_mut_ptr() as *mut u8;
+        let length = bytes.len() * 8;
+        let capacity = bytes.capacity() * 8;
 
-    // Safety: the length of the vec is a multiple of 8, and the alignment is 8
-    match opts.endianness {
-        Endianness::BigEndian => Ok(unsafe {
-            convert_int_array_in_place::<i64, 8>(bytes, i64::from_be_bytes)
-        }),
-        Endianness::LittleEndian => Ok(unsafe {
-            convert_int_array_in_place::<i64, 8>(bytes, i64::from_le_bytes)
-        })
+        let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+
+        reader.read_exact(&mut bytes)?;
+
+        // Safety: the length of the vec is a multiple of 8, and the alignment is 8
+        match opts.endianness {
+            Endianness::BigEndian => Ok(unsafe {
+                convert_int_array_in_place::<i64, 8>(bytes, i64::from_be_bytes)
+            }),
+            Endianness::LittleEndian => Ok(unsafe {
+                convert_int_array_in_place::<i64, 8>(bytes, i64::from_le_bytes)
+            }),
+            Endianness::NetworkLittleEndian => unreachable!()
+        }
     }
 }
 

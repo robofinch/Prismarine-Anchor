@@ -11,96 +11,17 @@ use flate2::{
 };
 
 use crate::{
+    encoding::{EncodingOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
     raw,
 };
 
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct IoOptions {
-    // Note for possible improvement / change:
-    // It might end up better for performance to leave Endianness in the type system
-    // instead of having it be an enum; however, that would monomorphize most or all of the looooong
-    // serde impl and raw.rs functions into two copies
-    pub endianness: Endianness, // Bedrock edition is LittleEndian, Java is BigEndian
-    pub compression: NBTCompression,
-    pub string_encoding: StringEncoding, // Java is CESU-8, Bedrock is probably UTF-8
-}
-
-impl IoOptions {
-    /// Default Java encoding for NBT
-    pub fn java() -> Self {
-        Self {
-            endianness: Endianness::BigEndian,
-            compression: NBTCompression::GzCompressed,
-            string_encoding: StringEncoding::Cesu8,
-        }
-    }
-
-    /// Default Bedrock encoding for NBT
-    pub fn bedrock() -> Self {
-        Self {
-            endianness: Endianness::LittleEndian,
-            compression: NBTCompression::GzCompressed,
-            string_encoding: StringEncoding::Utf8,
-        }
-    }
-}
-
-/// Endianness of stored NBT
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum Endianness {
-    /// Used by Java
-    BigEndian,
-    /// Used by Bedrock for numeric information
-    LittleEndian
-}
-
-// Note that there's also an option to include/exclude the Zlib header, which should not matter
-// for NBT, but does matter for Bedrock's LevelDB.
-/// Describes the compression options for NBT data: uncompressed, Zlib compressed and Gz compressed.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum NBTCompression {
-    /// Uncompressed NBT data.
-    Uncompressed,
-    /// Zlib compressed NBT data. When writing, the default compression level will be used.
-    ZlibCompressed,
-    /// Zlib compressed NBT data with the given compression level.
-    ZlibCompressedWith(CompressionLevel),
-    /// Gz compressed NBT data. When writing, the default compression level will be used.
-    GzCompressed,
-    /// Gz compressed NBT data with the given compression level.
-    GzCompressedWith(CompressionLevel),
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct CompressionLevel(u8);
-
-impl From<Compression> for CompressionLevel {
-    fn from(value: Compression) -> Self {
-        Self(value.level() as u8)
-    }
-}
-
-impl From<CompressionLevel> for Compression {
-    fn from(value: CompressionLevel) -> Self {
-        Compression::new(value.0 as u32)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum StringEncoding {
-    /// Used by Bedrock
-    Utf8,
-    /// Used by Java
-    Cesu8
-}
-
-/// Reads the given flavor of NBT data from the given reader, returning the resulting NBT
+/// Reads the given encoding of NBT data from the given reader, returning the resulting NBT
 /// compound and associated root name.
 pub fn read_nbt<R: Read>(
     reader: &mut R,
-    opts: IoOptions
+    opts: EncodingOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     match opts.compression {
@@ -113,7 +34,7 @@ pub fn read_nbt<R: Read>(
 }
 
 fn read_nbt_uncompressed<R: Read>(
-    reader: &mut R, opts: IoOptions
+    reader: &mut R, opts: EncodingOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -133,7 +54,7 @@ fn read_nbt_uncompressed<R: Read>(
 }
 
 fn read_tag_body_dyn<R: Read>(
-    reader: &mut R, opts: IoOptions, tag_id: u8
+    reader: &mut R, opts: EncodingOptions, tag_id: u8
 ) -> Result<NbtTag, NbtIoError> {
 
     macro_rules! drive_reader {
@@ -150,7 +71,7 @@ fn read_tag_body_dyn<R: Read>(
 
 #[inline]
 fn read_tag_body_const<R: Read, const TAG_ID: u8>(
-    reader: &mut R, opts: IoOptions
+    reader: &mut R, opts: EncodingOptions
 ) -> Result<NbtTag, NbtIoError> {
 
     let tag = match TAG_ID {
@@ -173,7 +94,7 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
             let tag_id = raw::read_u8(reader, opts)?;
             let len = raw::read_i32(reader, opts)? as usize;
 
-            // Make sure we don't have a list of TAG_End unless it's empty or an invalid type
+            // Make sure we don't have an invalid type or a nonempty list of TAG_End
             if tag_id > 0xC || (tag_id == 0 && len > 0) {
                 return Err(NbtIoError::InvalidTagId(tag_id));
             }
@@ -231,17 +152,16 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
     Ok(tag)
 }
 
-/// Writes the given flavor of NBT data to the given writer. If no root name is provided, and empty
-/// string is used.
+/// Writes the given encoding of NBT data to the given writer.
+/// If no root name is provided, the empty string is used.
 pub fn write_nbt<W: Write>(
     writer: &mut W,
-    opts: IoOptions,
+    opts: EncodingOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
-    flavor: NBTCompression,
 ) -> Result<(), NbtIoError> {
 
-    let (mode, compression) = match flavor {
+    let (mode, compression) = match opts.compression {
         NBTCompression::Uncompressed => {
             return write_nbt_uncompressed(writer, opts, root_name, root);
         }
@@ -262,7 +182,7 @@ pub fn write_nbt<W: Write>(
 /// NBT data without any compression.
 fn write_nbt_uncompressed<W>(
     writer: &mut W,
-    opts: IoOptions,
+    opts: EncodingOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
 ) -> Result<(), NbtIoError>
@@ -281,7 +201,7 @@ where
     Ok(())
 }
 
-fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
+fn write_tag_body<W: Write>(writer: &mut W, opts: EncodingOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
     match tag {
         &NbtTag::Byte  (value) => raw::write_i8 (writer, opts, value)?,
         &NbtTag::Short (value) => raw::write_i16(writer, opts, value)?,
@@ -348,7 +268,10 @@ fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Re
 pub enum NbtIoError {
     /// A native I/O error.
     StdIo(io::Error),
-    /// No root tag was found. All NBT data must start with a valid compound tag.
+    /// No root tag was found. All NBT file data must start with a valid compound tag or list tag,
+    /// and in a given context, usually only one of the two is accepted.
+    /// Java exclusively uses root compound tags, and in most but not all circumstances,
+    /// Bedrock uses root compound tags as well.
     MissingRootTag,
     /// A sequential data structure was found to be non-homogenous. All sequential structures
     /// in NBT data are homogenous.
@@ -381,10 +304,14 @@ pub enum NbtIoError {
     InvalidKey,
     /// An invalid enum variant was encountered.
     InvalidEnumVariant,
-    /// An invalid cesu8 string was encountered.
+    /// An invalid CESU-8 string was encountered.
     InvalidCesu8String,
-    /// An invalid utf8 string was encountered.
+    /// An invalid UTF-8 string was encountered.
     InvalidUtf8String,
+    /// Bytes forming an invalid Network-Endian i32 were encountered.
+    InvalidNetI32,
+    /// Bytes forming an invalid Network-Endian i64 were encountered.
+    InvalidNetI64,
     /// An unsupported type was passed to a serializer or queried from a deserializer.
     UnsupportedType(&'static str),
     /// A custom error message.
@@ -417,8 +344,8 @@ impl Display for NbtIoError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             NbtIoError::StdIo(error) => write!(f, "{}", error),
-            NbtIoError::MissingRootTag =>
-                write!(f, "NBT tree does not start with a valid root tag."),
+            NbtIoError::MissingRootTag
+                => write!(f, "NBT tree does not start with a valid root tag."),
             &NbtIoError::NonHomogenousList {
                 list_type,
                 encountered_type,
@@ -445,18 +372,24 @@ impl Display for NbtIoError {
                 "Tag type mismatch: expected 0x{:X} but found 0x{:X}",
                 expected, found
             ),
-            NbtIoError::ExpectedSeq => write!(f, "Expected sequential tag type (array)"),
-            NbtIoError::ExpectedEnum => write!(
-                f,
-                "Encountered invalid enum representation in the NBT tag tree"
-            ),
-            NbtIoError::InvalidKey => write!(f, "Map keys must be a valid string"),
-            NbtIoError::InvalidEnumVariant =>
-                write!(f, "Encountered invalid enum variant while deserializing"),
-            NbtIoError::InvalidCesu8String => write!(f, "Encountered invalid CESU8 string"),
-            NbtIoError::InvalidUtf8String => write!(f, "Encountered invalid UTF8 string"),
-            NbtIoError::UnsupportedType(ty) =>
-                write!(f, "Type {} is not supported by Minecraft's NBT format", ty),
+            NbtIoError::ExpectedSeq
+                => write!(f, "Expected sequential tag type (array)"),
+            NbtIoError::ExpectedEnum
+                => write!(f, "Encountered invalid enum representation in the NBT tag tree"),
+            NbtIoError::InvalidKey
+                => write!(f, "Map keys must be a valid string"),
+            NbtIoError::InvalidEnumVariant
+                => write!(f, "Encountered invalid enum variant while deserializing"),
+            NbtIoError::InvalidCesu8String
+                => write!(f, "Encountered invalid CESU8 string"),
+            NbtIoError::InvalidUtf8String
+                => write!(f, "Encountered invalid UTF8 string"),
+            NbtIoError::InvalidNetI32
+                => write!(f, "Encountered bytes that formed an invalid Network-Endian i32"),
+            NbtIoError::InvalidNetI64
+                => write!(f, "Encountered bytes that formed an invalid Network-Endian i64"),
+            NbtIoError::UnsupportedType(ty)
+                => write!(f, "Type {} is not supported by Minecraft's NBT format", ty),
             NbtIoError::Custom(msg) => write!(f, "{}", msg),
         }
     }

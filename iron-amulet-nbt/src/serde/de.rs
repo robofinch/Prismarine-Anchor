@@ -21,14 +21,14 @@ use serde::{
     forward_to_deserialize_any,
 };
 
-use crate::{io::{NbtIoError, IoOptions}, raw::{self, string_from_bytes}};
+use crate::{encoding::EncodingOptions, io::NbtIoError, raw::{self, string_from_bytes}};
 use super::TYPE_HINT_NICHE;
 
 
 /// The deserializer type for reading binary NBT data.
 pub struct Deserializer<'a, R, B> {
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -36,7 +36,7 @@ impl<'a, R: Read> Deserializer<'a, R, Unbuffered> {
     /// Attempts to construct a new deserializer with the given reader. If the data in the reader
     /// does not start with a valid compound tag, an error is returned. Otherwise, the root name
     /// is returned along with the deserializer.
-    pub fn new(reader: &'a mut R, opts: IoOptions) -> Result<(Self, String), NbtIoError> {
+    pub fn new(reader: &'a mut R, opts: EncodingOptions) -> Result<(Self, String), NbtIoError> {
         if raw::read_u8(reader, opts)? != 0xA {
             return Err(NbtIoError::MissingRootTag);
         }
@@ -67,13 +67,13 @@ where
     /// [`new`]: crate::serde::Deserializer::new
     pub fn from_cursor(
         reader: &'a mut Cursor<&'buffer [u8]>,
-        opts: IoOptions,
+        opts: EncodingOptions,
     ) -> Result<(Self, Cow<'buffer, str>), NbtIoError> {
         if raw::read_u8(reader, opts)? != 0xA {
             return Err(NbtIoError::MissingRootTag);
         }
 
-        let root_name_len = raw::read_u16(reader, opts)? as usize;
+        let root_name_len = raw::read_string_len(reader, opts)?;
         let bytes = read_bytes_from_cursor(reader, root_name_len)?;
 
         let root_name = string_from_bytes(bytes, opts)?;
@@ -151,7 +151,7 @@ where
 #[inline]
 fn drive_visitor_seq_const<'de, 'a, 'buffer, R, V, B, const TAG_ID: u8>(
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -190,7 +190,7 @@ where
 
 fn drive_visitor_seq_tag<'de, 'a, 'buffer, R, V, B>(
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -208,12 +208,16 @@ where
             match id {
                 0x0 => {
                     if len == 0 {
-                        visitor.visit_seq(DeserializeSeq::<_, _, 0x0, 0x9>::new(DeserializeTag::<_, B, 0x0>::new(reader, opts), len))
+                        visitor.visit_seq(DeserializeSeq::<_, _, 0x0, 0x9>::new(
+                            DeserializeTag::<_, B, 0x0>::new(reader, opts), len
+                        ))
                     } else {
                         Err(NbtIoError::InvalidTagId(0))
                     }
                 }
-                $( $id => visitor.visit_seq(DeserializeSeq::<_, _, $id, 0x9>::new(DeserializeTag::<_, B, $id>::new(reader, opts), len)), )*
+                $( $id => visitor.visit_seq(DeserializeSeq::<_, _, $id, 0x9>::new(
+                    DeserializeTag::<_, B, $id>::new(reader, opts), len)
+                ), )*
                 _ => Err(NbtIoError::InvalidTagId(id))
             }
         };
@@ -224,14 +228,14 @@ where
 
 struct DeserializeEnum<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     variant: Cow<'a, str>,
     _buffered: PhantomData<B>,
 }
 
 impl<'a, R, B, const TAG_ID: u8> DeserializeEnum<'a, R, B, TAG_ID> {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions, variant: Cow<'a, str>) -> Self {
+    fn new(reader: &'a mut R, opts: EncodingOptions, variant: Cow<'a, str>) -> Self {
         DeserializeEnum {
             reader,
             opts,
@@ -261,7 +265,7 @@ where
 
 struct DeserializeVariant<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -271,7 +275,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
+    fn new(reader: &'a mut R, opts: EncodingOptions) -> Self {
         DeserializeVariant {
             reader,
             opts,
@@ -421,7 +425,7 @@ enum TypeHintDispatchState {
 
 struct DeserializeMap<'a, R, B> {
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     tag_id: u8,
     _buffered: PhantomData<B>,
 }
@@ -432,7 +436,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
+    fn new(reader: &'a mut R, opts: EncodingOptions) -> Self {
         DeserializeMap {
             reader,
             opts,
@@ -495,7 +499,7 @@ where
 
 pub struct DeserializeTag<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
-    opts: IoOptions,
+    opts: EncodingOptions,
     _buffered: PhantomData<B>,
 }
 
@@ -505,7 +509,7 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> DeserializeTag<'a, R, B, TAG_ID> {
+    fn new(reader: &'a mut R, opts: EncodingOptions) -> DeserializeTag<'a, R, B, TAG_ID> {
         DeserializeTag {
             reader,
             opts,
@@ -626,7 +630,7 @@ where
     where V: Visitor<'de> {
         if TAG_ID == 0x8 {
             if B::BUFFERED {
-                let len = raw::read_u16(self.reader, self.opts)? as usize;
+                let len = raw::read_string_len(self.reader, self.opts)?;
                 // Safety: R is `&'a mut Cursor<&'buffer [u8]>` and `B` is
                 // `BufferedCursor<'buffer>` by the constructor `Deserializer::from_cursor`
                 let bytes: &'de [u8] = unsafe {
@@ -774,7 +778,9 @@ where
                 macro_rules! drive_visitor {
                     ($($id:literal)*) => {
                         match id {
-                            $( $id => visitor.visit_enum(DeserializeEnum::<_, B, $id>::new(self.reader, self.opts, variant)), )*
+                            $( $id => visitor.visit_enum(DeserializeEnum::<_, B, $id>::new(
+                                self.reader, self.opts, variant
+                            )), )*
                             _ => Err(NbtIoError::InvalidTagId(id))
                         }
                     };
