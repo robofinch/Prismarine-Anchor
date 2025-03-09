@@ -3,8 +3,8 @@ resolver = "2"
 members = [ "iron-amulet", "iron-amulet-core", "iron-amulet-nbt", "iron-amulet-translate", "iron-leveldb"]
 
 [workspace.package]
-# Applies to code in this repository, not necessarily all dependencies, of course.
-license = "MIT OR Apache-2.0"
+# No license provided to anyone for now; all rights reserved. See README for more.
+license = ""
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
