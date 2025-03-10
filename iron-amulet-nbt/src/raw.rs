@@ -299,11 +299,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: EncodingOptions, len: usize
     if opts.endianness == Endianness::NetworkLittleEndian {
         // The number of bytes to read per i32 is variable; we can't do any better than reading
         // the values one-at-a-time
-        let mut bytes = Vec::with_capacity(len);
-        for _ in 0..len {
-            bytes.push(reader.read_i32_varint()?)
-        }
-        Ok(bytes)
+        (0..len).map(|_| reader.read_i32_varint()).collect()
 
     } else {
         let mut bytes = ManuallyDrop::new(vec![0i32; len]);
@@ -334,13 +330,9 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: EncodingOptions, len: usize
 pub fn read_i64_array<R: Read>(reader: &mut R, opts: EncodingOptions, len: usize) -> Result<Vec<i64>> {
 
     if opts.endianness == Endianness::NetworkLittleEndian {
-        // The number of bytes to read per i32 is variable; we can't do any better than reading
+        // The number of bytes to read per i64 is variable; we can't do any better than reading
         // the values one-at-a-time
-        let mut bytes = Vec::with_capacity(len);
-        for _ in 0..len {
-            bytes.push(reader.read_i64_varint()?)
-        }
-        Ok(bytes)
+        (0..len).map(|_| reader.read_i64_varint()).collect()
 
     } else {
         let mut bytes = ManuallyDrop::new(vec![0i64; len]);
