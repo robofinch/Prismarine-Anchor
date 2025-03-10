@@ -11,24 +11,65 @@ use std::{
 use crate::tag::{NbtCompound, NbtList, NbtTag};
 
 
+/// Determines which version of the SNBT specification should be used to convert between
+/// NBT and SNBT. Currently, the version has no impact on converting NBT to SNBT;
+/// the output will be compatible with both SNBT versions. Enabling the newer SNBT version
+/// expands the parsing features for converting SNBT to NBT.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum SnbtVersion {
-    /// For Java 1.21.5 and later. Not yet implemented.
+    /// For Java 1.21.5 and later. Adds additional parsing features,
+    /// and is almost completely backwards-compatible with the exception of unquoted strings
+    /// being prohibited from starting with `+`, `-`, `.`, or a digit.
     UpdatedJava,
-    /// For Java before 1.21.5, or Bedrock
-    Other
+    /// For Java before 1.21.5, or Bedrock Edition.
+    /// Fewer parsing features than the newer SNBT version. The specification for
+    /// unquoted strings is also slightly more lenient than with the newer version;
+    /// a string beginning with `+`, `-`, `.`, or a digit may be left unquoted
+    /// if it could not represent a syntactically valid numeric type.
+    ///
+    /// Converting NBT to SNBT with this version will still quote such strings,
+    /// for the sake of greater compatibility.
+    Other,
+}
+
+/// Parses the given string into an NBT tag.
+pub fn parse_any<T: AsRef<str> + ?Sized>(
+    string_nbt: &T,
+    version: SnbtVersion,
+) -> Result<NbtTag, SnbtError> {
+    parse_any_and_size(string_nbt, version).map(|(tag, _)| tag)
+}
+
+/// Parses the given string into a tag just like [`parse_any`],
+/// but also returns the amount of parsed characters.
+pub fn parse_any_and_size<T: AsRef<str> + ?Sized>(
+    string_nbt: &T,
+    version: SnbtVersion,
+) -> Result<(NbtTag, usize), SnbtError> {
+    let mut tokens = Lexer::new(string_nbt.as_ref(), version);
+    let value = parse_next_value(&mut tokens, None)?;
+
+    if let Some(td) = tokens.next(None).transpose()? {
+        return Err(SnbtError::unexpected_token(
+            tokens.raw,
+            Some(&td),
+            "end of input after reading an NBT tag"
+        ))
+    }
+
+    Ok((value, tokens.index))
 }
 
 /// Parses the given string into an NBT tag compound.
-pub fn parse<T: AsRef<str> + ?Sized>(
+pub fn parse_compound<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     version: SnbtVersion,
 ) -> Result<NbtCompound, SnbtError> {
-    parse_and_size(string_nbt, version).map(|(tag, _)| tag)
+    parse_compound_and_size(string_nbt, version).map(|(tag, _)| tag)
 }
 
-/// Parses the given string just like [`parse`], but also returns the amount of parsed characters.
-pub fn parse_and_size<T: AsRef<str> + ?Sized>(
+/// Parses the given string just like [`parse_compound`], but also returns the amount of parsed characters.
+pub fn parse_compound_and_size<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     version: SnbtVersion,
 ) -> Result<(NbtCompound, usize), SnbtError> {
@@ -184,7 +225,7 @@ where
                         match td.into_value::<T>() {
                             Ok(value) => list.push(value),
                             Err(td) =>
-                                return Err(SnbtError::non_homogenous_list(
+                                return Err(SnbtError::non_homogenous_integer_list(
                                     tokens.raw,
                                     td.index,
                                     td.char_width,
@@ -213,7 +254,8 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
 
     // Construct the list and use the first element to determine the list's type
     let mut list = NbtList::new();
-    let descrim = mem::discriminant(&first_element);
+    let mut descrim = mem::discriminant(&first_element);
+    let mut list_holds_compounds = matches!(&first_element, &NbtTag::Compound{..});
     list.push(first_element);
 
     loop {
@@ -238,14 +280,45 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
                 };
                 let element = parse_next_value(tokens, DELIMITER)?;
 
-                // Ensure type homogeneity
-                if mem::discriminant(&element) != descrim {
-                    return Err(SnbtError::non_homogenous_list(
-                        tokens.raw, index, char_width,
-                    ));
-                }
+                if mem::discriminant(&element) == descrim {
+                    list.push(element);
 
-                list.push(element);
+                } else {
+                    match tokens.snbt_version() {
+                        SnbtVersion::UpdatedJava => {
+                            // In order to preserve list homogeneity, convert everything
+                            // to a compound tag.
+
+                            #[inline]
+                            fn to_compound(tag: NbtTag) -> NbtTag {
+                                if let NbtTag::Compound{..} = tag {
+                                    tag
+                                } else {
+                                    let mut compound = NbtCompound::with_capacity(1);
+                                    compound.insert("", tag);
+                                    NbtTag::Compound(compound)
+                                }
+                            }
+
+                            let compounded_element = to_compound(element);
+
+                            if !list_holds_compounds {
+                                // Convert the rest of the list to compound tags
+                                list = list.into_iter().map(|tag| to_compound(tag)).collect();
+
+                                descrim = mem::discriminant(&compounded_element);
+                                list_holds_compounds = true;
+                            }
+
+                            list.push(compounded_element);
+                        },
+
+                        SnbtVersion::Other =>
+                            return Err(SnbtError::non_homogenous_tag_list(
+                                tokens.raw, index, char_width,
+                            ))
+                    };
+                }
             }
 
             // Some invalid token
@@ -350,6 +423,11 @@ impl<'a> Lexer<'a> {
             peeked: None,
             version,
         }
+    }
+
+    #[inline]
+    fn snbt_version(&self) -> SnbtVersion {
+        self.version
     }
 
     fn peek(
@@ -981,10 +1059,17 @@ impl SnbtError {
         }
     }
 
-    fn non_homogenous_list(input: &str, index: usize, char_width: usize) -> Self {
+    fn non_homogenous_integer_list(input: &str, index: usize, char_width: usize) -> Self {
         SnbtError {
             segment: Self::segment(input, index, char_width, 15, 0),
-            error: ParserErrorType::NonHomogenousList { index },
+            error: ParserErrorType::NonHomogenousIntegerList { index },
+        }
+    }
+
+    fn non_homogenous_tag_list(input: &str, index: usize, char_width: usize) -> Self {
+        SnbtError {
+            segment: Self::segment(input, index, char_width, 15, 0),
+            error: ParserErrorType::NonHomogenousTagList { index },
         }
     }
 
@@ -1037,9 +1122,14 @@ impl Display for SnbtError {
                 "Unmatched brace at column {} near '{}'",
                 index, self.segment
             ),
-            &ParserErrorType::NonHomogenousList { index } => write!(
+            &ParserErrorType::NonHomogenousIntegerList { index } => write!(
                 f,
-                "Non-homogenous typed list (only allowed in Java 1.21.5 and above) at column {} near '{}'",
+                "Non-homogenous typed array of integers at column {} near '{}'",
+                index, self.segment
+            ),
+            &ParserErrorType::NonHomogenousTagList { index } => write!(
+                f,
+                "Non-homogenous typed list of tags (only allowed in Java 1.21.5 and above) at column {} near '{}'",
                 index, self.segment
             ),
         }
@@ -1057,6 +1147,8 @@ impl Error for SnbtError {}
 /// A specific type of parser error. This enum includes metadata about each specific error.
 #[derive(Clone, Debug)]
 pub enum ParserErrorType {
+    // Nesting depth
+
     /// An unmatched single or double quote.
     UnmatchedQuote {
         /// The index of the unmatched quote.
@@ -1088,8 +1180,12 @@ pub enum ParserErrorType {
         /// The index of the unmatched brace.
         index: usize,
     },
-    /// A non-homogenous list was encountered.
-    NonHomogenousList {
+    /// A non-homogenous array of integers was encountered.
+    NonHomogenousIntegerList {
+        /// The index where the invalid list value was encountered.
+        index: usize,
+    },
+    NonHomogenousTagList {
         /// The index where the invalid list value was encountered.
         index: usize,
     },
