@@ -273,6 +273,8 @@ pub enum NbtIoError {
     /// Java exclusively uses root compound tags, and in most but not all circumstances,
     /// Bedrock uses root compound tags as well.
     MissingRootTag,
+    // nesting depth
+
     /// A sequential data structure was found to be non-homogenous. All sequential structures
     /// in NBT data are homogenous.
     NonHomogenousList {

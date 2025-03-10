@@ -16,4 +16,26 @@ serde = { workspace = true, optional = true }
 varint-rs.workspace = true
 
 [features]
-preserve_order = ["indexmap"]
+default = [ "allow_list_root" ]
+# Need to actually use document_features for the below comments to be visible in the generated docs
+
+## If enabled, Compound tags will preserve the order of their elements.
+preserve_order      = [ "indexmap" ]
+## If enabled, the maximum nesting depth limit used when parsing or writing NBT or SNBT data can
+## be configured via additional functions for parsing and writing.
+configurable_depth  = []
+## Adds NBT file parsing and writing functions that allow a List to be the root node.
+## Such a root node is not usually used by Minecraft.
+allow_list_root     = []
+
+#! ### Nonstandard Features
+#! The following features add additional NBT file parsing and writing functions that are not used by
+#! any version of Minecraft, and probably not by any other NBT parsing library.
+#! Only use these nonstandard options if you have a reason to; they are included here
+#! because they are simple to implement, and plausibly useful, not because they are important.
+
+## Adds functions that read and write NbtTags of any variant to or from a file.
+allow_any_root      = [ "allow_list_root" ]
+## Adds functions that read and write NbtTags of any variant to or from an NBT file which
+## does not give the root node a name.
+allow_unnamed_root  = [ "allow_any_root" ]
