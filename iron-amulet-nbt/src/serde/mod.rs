@@ -19,7 +19,7 @@ use crate::encoding::{EncodingOptions, NBTCompression};
 
 
 pub use self::array::Array;
-pub(crate) use self::array::{TypeHint, TYPE_HINT_NICHE};
+pub(crate) use self::array::TypeHint;
 pub use self::de::Deserializer;
 pub use self::ser::{Serializer, UncheckedSerializer};
 pub use self::util::Ser;

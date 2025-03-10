@@ -20,7 +20,7 @@ use serde::de::{
 
 use crate::raw;
 use crate::{encoding::EncodingOptions, io::NbtIoError, raw::string_from_bytes};
-use super::TYPE_HINT_NICHE;
+use super::array::TYPE_HINT_NICHE;
 
 
 /// The deserializer type for reading binary NBT data.
