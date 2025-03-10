@@ -1,19 +1,20 @@
+use std::{fmt, io};
+use std::error::Error;
 use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    io::{self, Read, Write},
+    fmt::{Display, Formatter},
+    io::{Read, Write},
 };
 
+use flate2::Compression;
 use flate2::{
     read::{GzDecoder, ZlibDecoder},
     write::{GzEncoder, ZlibEncoder},
-    Compression,
 };
 
+use crate::raw;
 use crate::{
     encoding::{EncodingOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
-    raw,
 };
 
 

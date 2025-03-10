@@ -1,22 +1,23 @@
 #[cfg(feature = "configurable_depth")]
-pub mod limited;
+mod limited;
 
 
+use std::fmt;
+use std::hash::Hash;
 use std::{
     borrow::{Borrow, BorrowMut, Cow},
-    fmt::{self, Debug, Display, Formatter},
-    hash::Hash,
+    fmt::{Debug, Display, Formatter},
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
+use crate::{raw, snbt};
 use crate::{
-    raw,
     repr::{NbtReprError, NbtStructureError},
-    snbt::{self, SnbtError, SnbtVersion},
+    snbt::{SnbtError, SnbtVersion},
 };
 
 #[cfg(feature = "configurable_depth")]
-use self::limited::{CompoundWithLimit, ListWithLimit, TagWithLimit};
+pub use self::limited::{CompoundWithLimit, ListWithLimit, TagWithLimit};
 
 
 /// The hash map type utilized in this crate. If the feature `preserve_order` is enabled, then this
@@ -37,7 +38,7 @@ pub type Map<T> = std::collections::HashMap<String, T>;
 /// The limit may be increased here, but note that this crate uses recursive functions
 /// to read and write NBT data; if the limit is too high and unreasonably nested data is received,
 /// a crash could occur from the nested function calls exceeding the maximum stack size.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DepthLimit(pub u32);
 
 impl Default for DepthLimit {

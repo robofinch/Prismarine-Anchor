@@ -4,22 +4,19 @@ mod ser;
 mod util;
 
 
-use std::{
-    borrow::Cow,
-    io::{Cursor, Read, Write},
-};
+use std::borrow::Cow;
+use std::io::{Cursor, Read, Write};
 
+use flate2::Compression;
 use flate2::{
     read::{GzDecoder, ZlibDecoder},
     write::{GzEncoder, ZlibEncoder},
-    Compression,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{
-    encoding::{EncodingOptions, NBTCompression},
-    io::NbtIoError,
-};
+use crate::io::NbtIoError;
+use crate::encoding::{EncodingOptions, NBTCompression};
+
 
 pub use self::array::Array;
 pub(crate) use self::array::{TypeHint, TYPE_HINT_NICHE};

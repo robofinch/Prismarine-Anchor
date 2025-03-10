@@ -1,17 +1,14 @@
-use serde::{
-    ser::{
-        self,
-        SerializeMap,
-        SerializeSeq,
-        SerializeStruct,
-        SerializeStructVariant,
-        SerializeTuple,
-        SerializeTupleStruct,
-        SerializeTupleVariant,
-    },
-    serde_if_integer128,
-    Serialize,
-    Serializer,
+use serde::ser;
+use serde::serde_if_integer128;
+use serde::{Serialize, Serializer};
+use serde::ser::{
+    SerializeMap,
+    SerializeSeq,
+    SerializeStruct,
+    SerializeStructVariant,
+    SerializeTuple,
+    SerializeTupleStruct,
+    SerializeTupleVariant,
 };
 
 

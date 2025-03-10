@@ -1,20 +1,12 @@
-use std::{
-    borrow::Cow,
-    io::{Read, Result, Write},
-    mem::ManuallyDrop,
-    ptr,
-    slice,
-    str,
-};
+use std::{ptr, slice, str};
+use std::{borrow::Cow, mem::ManuallyDrop};
+use std::io::{Read, Result, Write};
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
-use varint_rs::{VarintReader, VarintWriter};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
+use varint_rs::{VarintReader as _, VarintWriter as _};
 
-use crate::{
-    encoding::{Endianness, EncodingOptions, StringEncoding},
-    io::NbtIoError,
-    tag::NbtTag,
-};
+use crate::{io::NbtIoError, tag::NbtTag};
+use crate::encoding::{Endianness, EncodingOptions, StringEncoding};
 
 
 type NbtResult<T> = std::result::Result<T, NbtIoError>;

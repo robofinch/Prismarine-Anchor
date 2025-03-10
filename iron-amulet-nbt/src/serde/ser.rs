@@ -1,24 +1,20 @@
-use std::{
-    cell::Cell,
-    io::{Cursor, Write},
-    marker::PhantomData,
+use std::{cell::Cell, marker::PhantomData};
+use std::io::{Cursor, Write};
+
+use serde::Serialize;
+use serde::ser::{
+    Impossible,
+    SerializeMap,
+    SerializeSeq,
+    SerializeStruct,
+    SerializeStructVariant,
+    SerializeTuple,
+    SerializeTupleStruct,
+    SerializeTupleVariant,
 };
 
-use serde::{
-    ser::{
-        Impossible,
-        SerializeMap,
-        SerializeSeq,
-        SerializeStruct,
-        SerializeStructVariant,
-        SerializeTuple,
-        SerializeTupleStruct,
-        SerializeTupleVariant,
-    },
-    Serialize,
-};
-
-use crate::{encoding::EncodingOptions, io::NbtIoError, raw};
+use crate::raw;
+use crate::{encoding::EncodingOptions, io::NbtIoError};
 use super::{
     array::{BYTE_ARRAY_NICHE, INT_ARRAY_NICHE, LONG_ARRAY_NICHE},
     util::{DefaultSerializer, Ser},

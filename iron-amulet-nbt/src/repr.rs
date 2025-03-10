@@ -1,7 +1,6 @@
-use std::{
-    error::Error,
-    fmt::{self, Debug, Display, Formatter},
-};
+use std::fmt;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 
 #[derive(Debug)]

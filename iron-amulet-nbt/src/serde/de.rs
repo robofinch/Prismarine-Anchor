@@ -1,27 +1,25 @@
+use std::{fmt, io};
+use std::{borrow::Cow, error::Error, marker::PhantomData};
 use std::{
-    borrow::Cow,
-    error::Error,
-    fmt::{self, Display, Formatter},
-    io::{self, Cursor, ErrorKind, Read},
-    marker::PhantomData,
+    fmt::{Display, Formatter},
+    io::{Cursor, ErrorKind, Read},
 };
 
-use serde::{
-    de::{
-        self,
-        value::CowStrDeserializer,
-        DeserializeSeed,
-        EnumAccess,
-        IntoDeserializer,
-        MapAccess,
-        SeqAccess,
-        VariantAccess,
-        Visitor,
-    },
-    forward_to_deserialize_any,
+use serde::de;
+use serde::forward_to_deserialize_any;
+use serde::de::{
+    DeserializeSeed,
+    EnumAccess,
+    IntoDeserializer,
+    MapAccess,
+    SeqAccess,
+    VariantAccess,
+    value::CowStrDeserializer,
+    Visitor,
 };
 
-use crate::{encoding::EncodingOptions, io::NbtIoError, raw::{self, string_from_bytes}};
+use crate::raw;
+use crate::{encoding::EncodingOptions, io::NbtIoError, raw::string_from_bytes};
 use super::TYPE_HINT_NICHE;
 
 

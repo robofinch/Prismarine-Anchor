@@ -1,12 +1,6 @@
-use std::{
-    borrow::Cow,
-    char,
-    error::Error,
-    fmt::{self, Debug, Display, Formatter},
-    iter::Peekable,
-    mem,
-    str::{self, CharIndices},
-};
+use std::{char, fmt, mem, str};
+use std::{borrow::Cow, error::Error, iter::Peekable, str::CharIndices};
+use std::fmt::{Debug, Display, Formatter};
 
 use crate::tag::{NbtCompound, NbtList, NbtTag};
 
@@ -15,7 +9,7 @@ use crate::tag::{NbtCompound, NbtList, NbtTag};
 /// NBT and SNBT. Currently, the version has no impact on converting NBT to SNBT;
 /// the output will be compatible with both SNBT versions. Enabling the newer SNBT version
 /// expands the parsing features for converting SNBT to NBT.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnbtVersion {
     /// For Java 1.21.5 and later. Adds additional parsing features,
     /// and is almost completely backwards-compatible with the exception of unquoted strings
@@ -520,9 +514,9 @@ impl<'a> Lexer<'a> {
 
         let (state, ch0) = match self.next_ch() {
             Some('\'') => (State::InSingleQuotes, '\''),
-            Some('"') => (State::InDoubleQuotes, '"'),
-            Some(ch0) => (State::Unquoted, ch0),
-            None => unreachable!("slurp_token called on an empty token"),
+            Some('"')  => (State::InDoubleQuotes, '"'),
+            Some(ch0)  => (State::Unquoted, ch0),
+            None       => unreachable!("slurp_token called on an empty token"),
         };
 
         match state {
@@ -1145,7 +1139,7 @@ impl Debug for SnbtError {
 impl Error for SnbtError {}
 
 /// A specific type of parser error. This enum includes metadata about each specific error.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum ParserErrorType {
     // Nesting depth
 

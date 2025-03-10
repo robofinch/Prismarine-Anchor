@@ -1,11 +1,15 @@
 use std::{io::Read, path::Path, rc::Rc};
+
 use flate2::{Compress, Compression, Decompress};
 use flate2::bufread::{ZlibDecoder, ZlibEncoder};
-use rusty_leveldb::compressor::NoneCompressor;
-use rusty_leveldb::{Compressor, CompressorId, CompressorList, Options, Status, StatusCode, DB};
+use rusty_leveldb::{
+    DB, compressor::NoneCompressor, Compressor, CompressorId, CompressorList,
+    Options, Status, StatusCode
+};
 
 
-// may need to implement some more helper functions for handling the DB, or a wrapper class
+// Will likely not give this code its own crate; there's no real need for a wrapper struct,
+// just a single module for the below function and its supporting types will probably be enough.
 
 
 /// Create a new LevelDB with settings that should be compatible with Minecraft
@@ -24,7 +28,6 @@ pub fn new_leveldb(
         DBCompressor::ZlibWithoutHeader => 4
     };
 
-    // These settings are what Amulet Editor uses, for the most part.
     let options = Options {
         create_if_missing,
         compressor,
@@ -37,7 +40,7 @@ pub fn new_leveldb(
 
 /// Indicates whether world data should be read and written as compressed,
 /// and whether the Zlib header should be present in the data read and written.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DBCompressor {
     None,
     ZlibWithHeader,
@@ -102,14 +105,5 @@ impl Compressor for ZlibCompressor {
             )
         })?;
         Ok(buf)
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn leveldb() {
-
     }
 }

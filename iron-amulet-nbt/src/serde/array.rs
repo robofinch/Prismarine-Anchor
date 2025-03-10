@@ -1,15 +1,9 @@
-use std::{
-    borrow::{Borrow, BorrowMut},
-    fmt,
-    marker::PhantomData,
-};
+use std::fmt;
+use std::marker::PhantomData;
+use std::borrow::{Borrow, BorrowMut};
 
-use serde::{
-    de::{EnumAccess, Error, MapAccess, SeqAccess, Visitor},
-    Deserialize,
-    Deserializer,
-    Serialize,
-};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde::de::{EnumAccess, Error, MapAccess, SeqAccess, Visitor};
 
 use crate::raw;
 

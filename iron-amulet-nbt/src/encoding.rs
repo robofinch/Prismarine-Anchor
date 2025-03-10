@@ -1,15 +1,15 @@
 use flate2::Compression;
 
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncodingOptions {
     // Note for possible improvement / change:
     // It might end up better for performance to leave Endianness in the type system
-    // instead of having it be an enum; however, that would monomorphize most or all of the looooong
-    // serde impl and raw.rs functions into two copies
+    // instead of having it be an enum; however, that could monomorphize most or all of the looooong
+    // serde impl and raw.rs functions into multiple copies
     pub endianness: Endianness, // Bedrock Edition is LittleEndian, Java is BigEndian
     pub compression: NBTCompression,
-    pub string_encoding: StringEncoding, // Java is CESU-8, Bedrock is probably UTF-8
+    pub string_encoding: StringEncoding, // Java is CESU-8, Bedrock is probably always UTF-8
 }
 
 impl EncodingOptions {
@@ -33,7 +33,7 @@ impl EncodingOptions {
 }
 
 /// Endianness of stored NBT
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Endianness {
     /// Used by Java
     BigEndian,
@@ -49,7 +49,7 @@ pub enum Endianness {
 // Note that there's also an option to include/exclude the Zlib header, which should not matter
 // for NBT, but does matter for Bedrock's LevelDB.
 /// Describes the compression options for NBT data: uncompressed, Zlib compressed and Gz compressed.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NBTCompression {
     /// Uncompressed NBT data.
     Uncompressed,
@@ -63,7 +63,7 @@ pub enum NBTCompression {
     GzCompressedWith(CompressionLevel),
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompressionLevel(u8);
 
 impl From<Compression> for CompressionLevel {
@@ -80,7 +80,7 @@ impl From<CompressionLevel> for Compression {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StringEncoding {
     /// Used by Bedrock
     Utf8,
