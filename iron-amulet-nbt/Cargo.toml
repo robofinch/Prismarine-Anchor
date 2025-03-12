@@ -1,29 +1,47 @@
 [package]
 name = "iron-amulet-nbt"
 authors = ["Finley Huggins"]
-license.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+# Eventually won't be the same license as the rest of the workspace, so
+# might as well turn off license.workspace = true for now,
+# even if they're still the same string
+license = "" # Will probably be MIT OR Apache-2.0.
+
+# Note that licenses of dependencies include:
+# Unicode-3.0       - no copies of their Data Files or Software are included here,
+# Unicode-DFS-2016    we just use a unicode library (without modifying said library).
+#                     No action needed.
+# Apache-2.0        - the only dependency requiring Apache-2.0 (without 'OR [something]')
+#                     has no NOTICE file
+# MIT               - requires copyright notice for all substantial portions of code;
+#                     here, the license file for quartz_nbt needed to be included
+# Zlib              - no req's if you don't modify their code
+
 [dependencies]
-anyhow.workspace = true
+anyhow.workspace    = true
 byteorder.workspace = true
-cesu8.workspace = true
-flate2.workspace = true
-indexmap = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
+cesu8.workspace     = true
+flate2.workspace    = true
+indexmap            = { workspace = true, optional = true }
+serde               = { workspace = true, optional = true }
+unicode_names2      = { workspace = true, optional = true }
 varint-rs.workspace = true
 
 [features]
-default = [ "allow_list_root" ]
+default = [ "allow_list_root", "named_escapes" ]
 # Need to actually use document_features for the below comments to be visible in the generated docs
 
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "indexmap" ]
+## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
+named_escapes       = [ "unicode_names2" ]
 ## If enabled, the maximum nesting depth limit used when parsing or writing NBT or SNBT data can
 ## be configured via additional functions for parsing and writing.
 configurable_depth  = []
+# May need to rename the above to "configurable_limits"
 ## Adds NBT file parsing and writing functions that allow a List to be the root node.
 ## Such a root node is not usually used by Minecraft.
 allow_list_root     = []
