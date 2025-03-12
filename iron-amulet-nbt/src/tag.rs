@@ -13,7 +13,7 @@ use std::{
 use crate::{raw, snbt};
 use crate::{
     repr::{NbtReprError, NbtStructureError},
-    snbt::{SnbtError, SnbtVersion},
+    snbt::{allowed_unquoted, SnbtError, SnbtVersion},
 };
 
 #[cfg(feature = "configurable_depth")]
@@ -171,11 +171,10 @@ impl NbtTag {
 
         if let Some(first) = string.chars().next() {
             // The older SNBT versions might still allow this string to be unquoted
-            // if it's "not confused with other data types" according to minecraft.wiki
-            // (and if it doesn't begin with whitespace);
-            // the newer SNBT version requires it to be quoted.
+            // if it's "not confused with other data types" according to minecraft.wiki,
+            // and the newer SNBT version requires it to be quoted.
             // The simplest and most compatible option is to quote it.
-            if first.is_whitespace() || first.is_ascii_digit()
+            if first.is_ascii_digit()
                 || first == '-'
                 || first == '+'
                 || first == '.'
@@ -184,28 +183,8 @@ impl NbtTag {
             }
         }
 
-        if let Some(last) = string.chars().next_back() {
-            if last.is_whitespace() {
-                return true;
-            }
-        }
-
         for ch in string.chars() {
-            if ch == ':'
-                || ch == ','
-                || ch == '"'
-                || ch == '\''
-                || ch == '{'
-                || ch == '}'
-                || ch == '['
-                || ch == ']'
-                // Note that all the escape sequences only allowed in quoted strings in Java 1.21.5
-                // use \, so this also catches those.
-                || ch == '\\'
-                || ch == '\n'
-                || ch == '\r'
-                || ch == '\t'
-            {
+            if !allowed_unquoted(ch)  {
                 return true;
             }
         }
@@ -236,6 +215,9 @@ impl NbtTag {
                 // Note that the newer SNBT version also supports more unicode escapes,
                 // but those don't seem to be mandatory, as the strings should already
                 // allow most UTF-8 or CESU-8 characters.
+
+                // TODO: add option to use escape sequences when possible,
+                // and choose which categories of escapes to use.
                 '\n' => {
                     snbt_string.push_str("\\n");
                     continue;
@@ -279,6 +261,7 @@ impl NbtTag {
         current_depth: u32,
         depth_limit: DepthLimit,
     ) -> fmt::Result {
+
         fn write_list(
             list: &[impl Display],
             indent: &mut String,

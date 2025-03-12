@@ -371,6 +371,8 @@ unsafe fn convert_int_array_in_place<I, const SIZE: usize>(
     let mut read = bytes.as_ptr() as *const [u8; SIZE];
     let mut write = bytes.as_mut_ptr() as *mut I;
 
+    // Note that if something managed to panic here, the state of bytes
+    // might not be correct, but it won't violate memory safety (any 8 bits are a valid u8)
     unsafe {
         let end = bytes.as_ptr().add(bytes.len()) as *const [u8; SIZE];
 
