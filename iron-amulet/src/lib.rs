@@ -8,10 +8,6 @@ use rusty_leveldb::{
 };
 
 
-// Will likely not give this code its own crate; there's no real need for a wrapper struct,
-// just a single module for the below function and its supporting types will probably be enough.
-
-
 /// Create a new LevelDB with settings that should be compatible with Minecraft
 pub fn new_leveldb(
     name: impl AsRef<Path>, create_if_missing: bool, compressor: DBCompressor

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "iron-amulet", "iron-amulet-core", "iron-amulet-nbt", "iron-amulet-translate", "iron-leveldb"]
+members = [ "iron-amulet", "iron-amulet-nbt" ]
 
 [workspace.package]
 # No license provided to anyone for now; all rights reserved. See README for more.
@@ -37,12 +37,7 @@ opt-level = 2
 # TODO: support wasm. maybe some of the below deps will only work on non-wasm targets.
 [workspace.dependencies]
 iron-amulet             = { version = "0.1.0", path = "./iron-amulet" }
-iron-amulet-core        = { version = "0.1.0", path = "./iron-amulet-core" }
 iron-amulet-nbt         = { version = "0.1.0", path = "./iron-amulet-nbt" }
-iron-amulet-translate   = { version = "0.1.0", path = "./iron-amulet-translate" }
-# May also need something like "iron-amulet-model-reader"
-# This LevelDB wrapper is probably unnecessary, and will likely be removed.
-iron-leveldb            = { version = "0.1.0", path = "./iron-leveldb" }
 
 anyhow = "1.0.97"
 byteorder = "1.5.0"

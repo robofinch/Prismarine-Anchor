@@ -179,10 +179,10 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 [[package]]
 name = "iron-amulet"
 version = "0.1.0"
-
-[[package]]
-name = "iron-amulet-core"
-version = "0.1.0"
+dependencies = [
+ "flate2",
+ "rusty-leveldb",
+]
 
 [[package]]
 name = "iron-amulet-nbt"
@@ -197,18 +197,6 @@ dependencies = [
  "serde",
  "unicode_names2",
  "varint-rs",
-]
-
-[[package]]
-name = "iron-amulet-translate"
-version = "0.1.0"
-
-[[package]]
-name = "iron-leveldb"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "rusty-leveldb",
 ]
 
 [[package]]

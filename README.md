@@ -1,11 +1,17 @@
 # Iron Amulet
 In-progress reimplementation of [Amulet Editor](https://www.amuletmc.com/) in Rust.
+(Might end up very different, though, as perfectly matching Amulet is not a priority,
+and this is a clean-room-style reimplementation not based on Amulet's source.)
 
 ### Licensing
 
 Licensing details are in progress. Do not interpret any of the following as providing you
 with any license to use or copy this version of the project. Licenses as roughly described
 below will likely be provided at some point in the future, but are not provided now.
+
+First, note that the below is me being pedantic and thorough and handling edge cases.
+Don't let it concern you very much, this is a "just in case" sort of thing.
+
 
 Most of this project will likely not be open source,
 and will prohibit competing with Amulet similarly to the
