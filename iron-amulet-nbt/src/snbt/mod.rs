@@ -1,4 +1,3 @@
-mod utils;
 mod lexer;
 
 
@@ -10,7 +9,7 @@ use crate::tag::{DepthLimit, NbtCompound, NbtList, NbtTag};
 use self::lexer::{Lexer, Token, TokenData};
 
 
-pub use self::utils::allowed_unquoted;
+pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
 
 
 // Should add module-wide documentation about the specification and implementation.

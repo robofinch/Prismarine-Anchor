@@ -13,7 +13,7 @@ use std::{
 use crate::{raw, snbt};
 use crate::{
     repr::{NbtReprError, NbtStructureError},
-    snbt::{allowed_unquoted, SnbtError, SnbtVersion},
+    snbt::{allowed_unquoted, SnbtError, SnbtVersion, starts_unquoted_number},
 };
 
 #[cfg(feature = "configurable_depth")]
@@ -161,10 +161,13 @@ impl NbtTag {
         format!("{:#?}", TagWithLimit::new(&self, depth_limit))
     }
 
-    /// Returns whether or not the given string needs to be quoted due to non-alphanumeric or otherwise
-    /// non-standard characters.
+    /// Returns whether or not the given string needs to be quoted to form valid SNBT.
     #[inline]
     pub fn should_quote(string: &str) -> bool {
+        // Empty strings, strings whose first char collides with numbers,
+        // and strings with more than the restricted set of characters that may be unquoted
+        // all need to be quoted.
+
         if string.is_empty() {
             return true;
         }
@@ -174,11 +177,7 @@ impl NbtTag {
             // if it's "not confused with other data types" according to minecraft.wiki,
             // and the newer SNBT version requires it to be quoted.
             // The simplest and most compatible option is to quote it.
-            if first.is_ascii_digit()
-                || first == '-'
-                || first == '+'
-                || first == '.'
-            {
+            if starts_unquoted_number(first) {
                 return true;
             }
         }
