@@ -1,19 +1,21 @@
-pub mod encoding;
+mod tag;
+mod repr; // Used by tag module
+// Note - tag module contains Debug and Display implementations for NBT -> SNBT
+pub mod snbt;
+
 pub mod io;
 mod raw;
+
+pub mod encoding;
+mod limits;
 
 #[cfg(feature = "serde")]
 pub mod serde;
 
-mod repr; // Used by tag module
-mod tag;
-// Module with SNBT -> NBT parser;
-// tag module contains Debug and Display implementations for NBT -> SNBT
-pub mod snbt;
-
 
 pub use repr::*;
 pub use tag::*;
+pub use limits::*;
 
 
 // The macros might be worth looking into later.

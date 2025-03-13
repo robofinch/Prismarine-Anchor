@@ -34,6 +34,7 @@ panic = "abort" # This leads to better optimizations and smaller binaries (and i
 # Optimize all dependencies even in debug builds (does not affect workspace packages):
 opt-level = 2
 
+# TODO: support wasm. maybe some of the below deps will only work on non-wasm targets.
 [workspace.dependencies]
 iron-amulet             = { version = "0.1.0", path = "./iron-amulet" }
 iron-amulet-core        = { version = "0.1.0", path = "./iron-amulet-core" }
@@ -47,6 +48,7 @@ anyhow = "1.0.97"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
 flate2 = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+enum-map = "2.7.3"
 indexmap = { version = "2.7.1", features = ["serde"] }
 rusty-leveldb = "3.0.2"
 serde = { version = "1.0.218", features = ["serde_derive"] }

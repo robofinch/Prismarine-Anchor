@@ -1,3 +1,6 @@
+//! Specialized lexing functions for parsing tokens that require
+//! manipulating strings and characters.
+
 use std::array;
 
 use super::super::{SnbtError, SnbtVersion};
@@ -13,10 +16,14 @@ use super::{Lexer, Token, TokenData};
 // ================================
 //      Utils
 // ================================
+/// Returns whether a character is in `[0-9a-zA-Z]` or is `_`, `-`, `.`, or `+`,
+/// which are the characters allowed to be in unquoted strings.
 pub fn allowed_unquoted(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '+')
 }
 
+/// Returns whether a character is in `[0-9]` or is `-`, `.`, or `+`,
+/// which can be the first character of a valid integer or float tag in SNBT.
 pub fn starts_unquoted_number(c: char) -> bool {
     c.is_ascii_digit() || matches!(c, '-' | '.' | '+')
 }
@@ -83,7 +90,7 @@ const UUID_FUNC: &str = "uuid(";
 const FUNC_SUFFIX: &str = ")";
 
 impl Lexer<'_> {
-    // Parse the operations (if the token_string is an operation)
+    /// Parse operations (if the token_string is an operation)
     #[inline]
     pub fn try_parse_operations(
         &mut self, start: usize, char_width: usize, token_string: &str
@@ -101,8 +108,7 @@ impl Lexer<'_> {
         None
     }
 
-
-    // Parse the bool(..) operation
+    /// Parse the bool(..) operation
     fn parse_bool_func(
         &mut self,
         start: usize,
@@ -165,7 +171,7 @@ impl Lexer<'_> {
         ))
     }
 
-    // Parse the uuid(..) operation
+    /// Parse the uuid(..) operation
     fn parse_uuid_func(
         &mut self,
         start: usize,
@@ -319,10 +325,10 @@ impl Lexer<'_> {
 // ================================
 
 impl Lexer<'_> {
-    // Parses the body of an escape sequence (i.e., excluding the initial backslash),
-    // and returns the character indicated by the escape as well as the number
-    // of characters in the escape sequence's body.
-    // `index` should be the index of the escape sequence's start, i.e., the backslash.
+    /// Parses the body of an escape sequence (i.e., excluding the initial backslash),
+    /// and returns the character indicated by the escape as well as the number
+    /// of characters in the escape sequence's body.
+    /// `index` should be the index of the escape sequence's start, i.e., the backslash.
     pub fn parse_escape_sequence(
         &mut self,
         index: usize,

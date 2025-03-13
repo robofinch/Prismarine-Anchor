@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::{raw, snbt};
+use crate::limits::DepthLimit;
 use crate::{
     repr::{NbtReprError, NbtStructureError},
     snbt::{allowed_unquoted, SnbtError, SnbtVersion, starts_unquoted_number},
@@ -31,22 +32,6 @@ pub type Map<T> = indexmap::IndexMap<String, T>;
 /// Otherwise, this type defaults to `std`'s `HashMap`.
 #[cfg(not(feature = "preserve_order"))]
 pub type Map<T> = std::collections::HashMap<String, T>;
-
-
-/// The recursive NBT tags (Compounds and Lists)
-/// can be nested up to (and including) 512 levels deep in the standard specification.
-/// The limit may be increased here, but note that this crate uses recursive functions
-/// to read and write NBT data; if the limit is too high and unreasonably nested data is received,
-/// a crash could occur from the nested function calls exceeding the maximum stack size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DepthLimit(pub u32);
-
-impl Default for DepthLimit {
-    /// The maximum depth that NBT compounds and tags can be nested in the standard Minecraft specification.
-    fn default() -> Self {
-        Self(512)
-    }
-}
 
 /// The generic NBT tag type, containing all supported tag variants which wrap around a corresponding
 /// rust type.

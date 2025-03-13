@@ -113,7 +113,7 @@ impl<'a> Lexer<'a> {
         next.map(|(_, ch)| ch)
     }
 
-    // Asserts that the next token is the same type as the provided token.
+    /// Asserts that the next token is the same type as the provided token.
     pub fn assert_next(&mut self, token: Token) -> Result<TokenData, SnbtError> {
         match self.next(None).transpose()? {
             // We found a token so check the token type
@@ -133,7 +133,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    // Collects a token from the character iterator.
+    /// Collects a multi-character token from the character iterator and parses it
+    /// with `parse_token`.
     fn slurp_token(&mut self, delimiter: Option<fn(char) -> bool>) -> Result<TokenData, SnbtError> {
         let start = self.index;
         // Width of *raw input* in chars. The string passed to parse_token
@@ -250,7 +251,7 @@ impl<'a> Lexer<'a> {
         Ok(self.parse_token(raw_token_buffer, start, char_width, quoted)?)
     }
 
-    // Parses an isolated token
+    /// Parses an isolated token
     fn parse_token(
         &mut self,
         token_string: Cow<'_, str>,
@@ -354,6 +355,7 @@ pub enum Token {
     Long(i64),
     Float(f64),
     Double(f64),
+    AmbiguousWord(AmbiguousWord)
 }
 
 impl Token {
@@ -431,3 +433,21 @@ macro_rules! opt_float_from_token {
 
 opt_float_from_token!(f32);
 opt_float_from_token!(f64);
+
+#[derive(Debug)]
+pub enum AmbiguousWord {
+    True,
+    False,
+    InfinityD,
+    InfinityF,
+    NegInfinityD,
+    NegInfinityF,
+    NaND,
+    NaNF,
+}
+
+impl AmbiguousWord {
+    pub fn ambiguous() {
+
+    }
+}

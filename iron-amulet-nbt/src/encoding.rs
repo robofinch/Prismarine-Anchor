@@ -1,15 +1,20 @@
 use flate2::Compression;
 
 
+/// Encoding options for reading/writing NBT data from/to bytes (e.g. from/to a file).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncodingOptions {
     // Note for possible improvement / change:
     // It might end up better for performance to leave Endianness in the type system
     // instead of having it be an enum; however, that could monomorphize most or all of the looooong
     // serde impl and raw.rs functions into multiple copies
-    pub endianness: Endianness, // Bedrock Edition is LittleEndian, Java is BigEndian
+
+    /// Bedrock Edition is LittleEndian, Java is BigEndian
+    pub endianness: Endianness,
+    /// Compression usage varies in Minecraft
     pub compression: NBTCompression,
-    pub string_encoding: StringEncoding, // Java is CESU-8, Bedrock is probably always UTF-8
+    /// Java is CESU-8, Bedrock is probably always UTF-8
+    pub string_encoding: StringEncoding,
 }
 
 impl EncodingOptions {
@@ -47,7 +52,7 @@ pub enum Endianness {
 }
 
 // Note that there's also an option to include/exclude the Zlib header, which should not matter
-// for NBT, but does matter for Bedrock's LevelDB.
+// for NBT as far as I'm aware, but does matter for Bedrock's LevelDB.
 /// Describes the compression options for NBT data: uncompressed, Zlib compressed and Gz compressed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NBTCompression {
@@ -80,6 +85,7 @@ impl From<CompressionLevel> for Compression {
     }
 }
 
+/// String encodings used by Minecraft. Java is CESU-8, Bedrock is probably always UTF-8.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StringEncoding {
     /// Used by Bedrock

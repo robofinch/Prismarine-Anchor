@@ -1,3 +1,5 @@
+//! Specialized lexing functions for parsing numeric tokens.
+
 use std::{str::Chars, iter::Peekable};
 
 use super::super::SnbtError;
@@ -5,8 +7,8 @@ use super::{Lexer, Token, TokenData};
 
 
 // This module contains:
-// - Numeric parsing for Original SNBT
-// - Numeric parsing for Original SNBT
+// - Lexer functions
+// - Three main numeric parsing functions
 // - Functions for calculating tokens from parsed information
 // - Helper functions
 

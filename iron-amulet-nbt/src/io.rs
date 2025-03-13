@@ -17,6 +17,7 @@ use crate::{
     tag::{NbtCompound, NbtList, NbtTag},
 };
 
+
 // todo: implement allow_*_root features
 
 /// Reads the given encoding of NBT data from the given reader, returning the resulting NBT

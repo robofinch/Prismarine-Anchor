@@ -1,3 +1,5 @@
+//! Module for parsing SNBT into NBT data
+
 mod lexer;
 
 
@@ -5,7 +7,11 @@ use std::{char, fmt, mem, str};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::tag::{DepthLimit, NbtCompound, NbtList, NbtTag};
+use enum_map::enum_map;
+use enum_map::{Enum, EnumMap};
+
+use crate::limits::DepthLimit;
+use crate::tag::{NbtCompound, NbtList, NbtTag};
 use self::lexer::{Lexer, Token, TokenData};
 
 
@@ -14,16 +20,22 @@ pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
 
 // Should add module-wide documentation about the specification and implementation.
 
+// ================================
+//      Settings
+// ================================
+
 /// Determines which version of the SNBT specification should be used to convert between
 /// NBT and SNBT. The updated version is used in Java Edition at or above 1.21.5.
 /// The original version is used by Java before 1.21.5, as well as by
 /// other versions of Minecraft.
 ///
-/// Currently, the version has no impact on converting NBT to SNBT;
+/// By default, the version has no impact on converting NBT to SNBT;
 /// the output will be compatible with both SNBT versions. Enabling the newer SNBT version
 /// expands the parsing features for converting SNBT to NBT, and makes a few strings invalid
 /// which were previously valid SNBT.
-// Will need to use different escape sequences for NBT to SNBT
+/// Finer control is possible through fields of [`SnbtParseOptions`] and [`SnbtWriteOptions`],
+/// and in particular, outputting character escape sequences only valid in `UpdatedJava` SNBT,
+/// such as `\n` or `\t`, can be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnbtVersion {
     /// For Java 1.21.5 and later. Adds additional parsing features, and is mostly
@@ -35,19 +47,200 @@ pub enum SnbtVersion {
     /// Leading `0`'s are prohibited for integers.
     /// Most other parsing rules are looser than in the original version; only these
     /// stricter exceptions are mentioned as care must be taken with them.
-    /// See minecraft.wiki for full details.
-    // TODO: add actual link
+    /// See [minecraft.wiki] for full details.
+    ///
+    /// [minecraft.wiki]: https://minecraft.wiki/w/Java_Edition_1.21.5#:~:text=SNBT%20format
     UpdatedJava,
     /// For Java before 1.21.5, or Bedrock Edition.
     /// Fewer parsing features than the newer SNBT version. The specification for
     /// unquoted strings is also slightly more lenient than with the newer version; for this
     /// implementation, unquoted strings are prohibited from starting with `-` or a digit,
-    /// and can otherwise have any characters in `[0-9a-zA-Z]` or `_`, `-`, `.`, `+`.
-    /// Floating point values may also be implicitly
+    /// and can otherwise have any characters in `[0-9a-zA-Z]` or `_`, `-`, `.`, `+`. If you
+    /// manage to make a SNBT floating point literal larger than `f32::MAX` or `f64::MAX`, it
+    /// wouldn't be rejected as invalid and would result in positive infinity.
+    /// (You should avoid making infinite or NaN values or SNBT or NBT, as Minecraft does not
+    /// like them.)
     ///
     /// Converting NBT to SNBT with this version will still quote strings with the updated version
     /// in mind, for the sake of greater compatibility.
     Original,
+}
+
+/// Options for parsing SNBT data into NBT data
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnbtParseOptions {
+    /// Version of the SNBT format used. Has many effects on how SNBT is parsed. Note that
+    /// the[ `UpdatedJava`] version normally halts with an error if an infinite float or double
+    /// is encountered; the below `replace_non_finite` option takes precedence.
+    ///
+    /// [`UpdatedJava`]: SnbtVersion::UpdatedJava
+    version: SnbtVersion,
+    /// The maximum depth that NBT compounds and tags can be recursively nested.
+    depth_limit: DepthLimit,
+    /// How the unquoted symbols `true` and `false` should be parsed.
+    true_false: ParseTrueFalse,
+    /// How unquoted symbols like `Infinityf` which likely came from infinite floats
+    /// should be parsed.
+    non_finite: ParseNonFinite,
+    /// Whether infinite floating-point numbers should be replaced with finite values
+    /// (`MAX` or `MIN` for infinities, `0.` for NaN). Takes precedence over halting with an
+    /// error on an infinite float or double literal (e.g. `1e1000`) in the [`UpdatedJava`]
+    /// version. Note that parsing an unquoted symbol like `Infinityd` is controlled by
+    /// [`ParseNonFinite`] before it could become a nonfinite floating-point number handled
+    /// by this setting; selecting `true` for this setting and `Error` for [`ParseNonFinite`]
+    /// may result in parsing `Infinityd` to error but `1e1000` to succeed.
+    ///
+    /// [`UpdatedJava`]: SnbtVersion::UpdatedJava
+    replace_non_finite: bool,
+}
+
+/// SNBT allows the unquoted symbols `true` and `false` to be used instead of `1b` and `0b`.
+/// This enum indicates whether they should always be parsed as bytes, always parsed
+/// as unquoted strings, or parsed as bytes unless they are an `NbtCompound` key or
+/// an element of an `NbtList` of String tags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseTrueFalse {
+    AsByte,
+    AsDetected,
+    AsString,
+}
+
+/// NBT and SNBT aren't meant to support infinite and NaN float or double values, but they
+/// could be encountered anyway. When an infinite NBT float is converted to SNBT and back, a normal
+/// parser would end up treating the result as a string. With Minecraft Java's default parser,
+/// as per [MC-200070], a positive infinite double is printed as `Infinityd`,
+/// and an NaN float is printed as `NaNf`, for example. This enum indicates whether such a value
+/// (in an unquoted literal) should be parsed as always a (non-finite) number, always a string,
+/// or as a number unless it is an `NbtCompound` key or an element of an `NbtList` of String tags.
+/// Alternatively, encountering such a value can return an error that halts further parsing
+/// Note that [`SnbtParseOptions`] provides the option to replace infinities with the
+/// `MAX` or `MIN` constant of `f32` or `f64` and replace NaN values with `0.0` when reading
+/// into NBT; combined, the settings can, for instance, parse `Infinityd` as `f64::MAX`.
+///
+/// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseNonFinite {
+    AsDetected,
+    AsFloat,
+    AsString,
+    Error,
+}
+
+/// Options for writing NBT data to SNBT
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnbtWriteOptions {
+    /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT,
+    /// but will log warnings if escape sequences are used in the `Original` version.
+    // TODO: actually add error logging throughout the crate
+    version: SnbtVersion,
+    /// The maximum depth that NBT compounds and tags can be recursively nested.
+    depth_limit: DepthLimit,
+    /// How to print an infinite or NaN float/double tag, or if writing should
+    /// halt with an error (if possible).
+    non_finite: WriteNonFinite,
+}
+
+/// NBT and SNBT aren't meant to support infinite and NaN float or double values, but they
+/// could be encountered anyway. When an infinite NBT float is converted to SNBT and back, a normal
+/// parser would end up treating the result as a string. With Minecraft Java's default parser,
+/// as per [MC-200070], a positive infinite double is printed as `Infinityd`,
+/// and an NaN float is printed as `NaNf`, for example. This enum indicates whether such a value
+/// in an NBT tag should be displayed in that form, or display positive infinity as though it were
+/// the `MAX` constant of `f32` or `f64`, negative infinity as the `MIN` constant, and NaN as `0.`.
+///
+/// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteNonFinite {
+    PrintStrings,
+    PrintFloats,
+}
+
+/// The various escape sequences allowed in SNBT
+#[derive(Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscapeSequences {
+    /// `\b`, backspace
+    B,
+    /// `\f`, form feed
+    F,
+    /// `\n`, newline
+    N,
+    /// `\r`, carriage return
+    R,
+    /// `\s`, space
+    S,
+    /// `\t`, horizontal tab
+    T,
+    /// `\x--`, two-character unicode escapes
+    UnicodeTwo,
+    /// `\u----`, four-character unicode escapes
+    UnicodeFour,
+    /// `\U--------`, eight-character unicode escapes
+    UnicodeEight,
+    /// `\N{----}`, named unicode escapes. (Note that `----` is a placeholder for a name
+    /// of any length.)
+    ///
+    /// If the `named_escapes` feature is not enabled, this option will be ignored.
+    UnicodeNamed,
+}
+
+impl EscapeSequences {
+    /// Enables all escape sequences.
+    #[inline]
+    pub fn all_escapes() -> EnumMap<Self, bool> {
+        enum_map! {
+            _ => true
+        }
+    }
+
+    /// Disables all escape sequences.
+    #[inline]
+    pub fn no_escapes() -> EnumMap<Self, bool> {
+        enum_map! {
+            _ => false
+        }
+    }
+
+    /// Enables `\n` (newline), `\r` (carriage return), and `\t` (horizontal tab).
+    #[inline]
+    pub fn standard_whitespace_escapes() -> EnumMap<Self, bool> {
+        enum_map! {
+            Self::N => true,
+            Self::R => true,
+            Self::T => true,
+            _ => false,
+        }
+    }
+
+    /// Enables `\b` (backspace), `\f` (form feed), `\n` (newline),
+    /// `\r` (carriage return), `\s` (space), and `\t` (horizontal tab).
+    #[inline]
+    pub fn one_character_escapes() -> EnumMap<Self, bool> {
+        enum_map! {
+            Self::B => true,
+            Self::F => true,
+            Self::N => true,
+            Self::R => true,
+            Self::S => true,
+            Self::T => true,
+            _ => false,
+        }
+    }
+
+    /// Enables unicode escapes: `\x`, `\u`, and `\U` for two-, four-, or eight-character
+    /// escapes, respectively, and `\N{----}` for named unicode escapes.
+    /// Note that the named escape setting is ignored if the `named_escapes` feature
+    /// is not enabled.
+    #[inline]
+    pub fn unicode_escapes() -> EnumMap<Self, bool> {
+        enum_map! {
+            Self::UnicodeTwo => true,
+            Self::UnicodeFour => true,
+            Self::UnicodeEight => true,
+            Self::UnicodeNamed => true,
+            _ => false,
+        }
+    }
 }
 
 // ================================

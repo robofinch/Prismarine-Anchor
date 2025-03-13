@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
-use crate::tag::{DepthLimit, NbtCompound, NbtList, NbtTag};
+use crate::limits::DepthLimit;
+use crate::tag::{NbtCompound, NbtList, NbtTag};
 
 
 macro_rules! depth_limited {
