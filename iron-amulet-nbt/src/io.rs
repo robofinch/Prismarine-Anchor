@@ -13,7 +13,7 @@ use flate2::{
 
 use crate::raw;
 use crate::{
-    encoding::{EncodingOptions, NBTCompression},
+    settings::{IoOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
 };
 
@@ -24,20 +24,20 @@ use crate::{
 /// compound and associated root name.
 pub fn read_nbt<R: Read>(
     reader: &mut R,
-    opts: EncodingOptions
+    opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     match opts.compression {
         NBTCompression::Uncompressed => read_nbt_uncompressed(reader, opts),
         NBTCompression::ZlibCompressed | NBTCompression::ZlibCompressedWith(_) =>
             read_nbt_uncompressed(&mut ZlibDecoder::new(reader), opts),
-        NBTCompression::GzCompressed | NBTCompression::GzCompressedWith(_) =>
+        NBTCompression::GzipCompressed | NBTCompression::GzipCompressedWith(_) =>
             read_nbt_uncompressed(&mut GzDecoder::new(reader), opts),
     }
 }
 
 fn read_nbt_uncompressed<R: Read>(
-    reader: &mut R, opts: EncodingOptions
+    reader: &mut R, opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -57,7 +57,7 @@ fn read_nbt_uncompressed<R: Read>(
 }
 
 fn read_tag_body_dyn<R: Read>(
-    reader: &mut R, opts: EncodingOptions, tag_id: u8
+    reader: &mut R, opts: IoOptions, tag_id: u8
 ) -> Result<NbtTag, NbtIoError> {
 
     macro_rules! drive_reader {
@@ -74,7 +74,7 @@ fn read_tag_body_dyn<R: Read>(
 
 #[inline]
 fn read_tag_body_const<R: Read, const TAG_ID: u8>(
-    reader: &mut R, opts: EncodingOptions
+    reader: &mut R, opts: IoOptions
 ) -> Result<NbtTag, NbtIoError> {
 
     let tag = match TAG_ID {
@@ -159,7 +159,7 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
 /// If no root name is provided, the empty string is used.
 pub fn write_nbt<W: Write>(
     writer: &mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
 ) -> Result<(), NbtIoError> {
@@ -170,8 +170,8 @@ pub fn write_nbt<W: Write>(
         }
         NBTCompression::ZlibCompressed => (2, Compression::default()),
         NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzCompressed => (1, Compression::default()),
-        NBTCompression::GzCompressedWith(compression) => (1, compression.into()),
+        NBTCompression::GzipCompressed => (1, Compression::default()),
+        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {
@@ -185,7 +185,7 @@ pub fn write_nbt<W: Write>(
 /// NBT data without any compression.
 fn write_nbt_uncompressed<W>(
     writer: &mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
 ) -> Result<(), NbtIoError>
@@ -204,7 +204,7 @@ where
     Ok(())
 }
 
-fn write_tag_body<W: Write>(writer: &mut W, opts: EncodingOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
+fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
     match tag {
         &NbtTag::Byte  (value) => raw::write_i8 (writer, opts, value)?,
         &NbtTag::Short (value) => raw::write_i16(writer, opts, value)?,

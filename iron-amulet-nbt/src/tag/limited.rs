@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
-use crate::limits::DepthLimit;
+use crate::settings::DepthLimit;
 use crate::tag::{NbtCompound, NbtList, NbtTag};
 
 

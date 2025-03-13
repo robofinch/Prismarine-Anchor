@@ -3,7 +3,7 @@
 
 use std::array;
 
-use super::super::{SnbtError, SnbtVersion};
+use crate::{settings::SnbtVersion, snbt::SnbtError};
 use super::{Lexer, Token, TokenData};
 
 

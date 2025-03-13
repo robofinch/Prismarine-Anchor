@@ -6,8 +6,7 @@ pub mod snbt;
 pub mod io;
 mod raw;
 
-pub mod encoding;
-mod limits;
+pub mod settings;
 
 #[cfg(feature = "serde")]
 pub mod serde;
@@ -15,7 +14,6 @@ pub mod serde;
 
 pub use repr::*;
 pub use tag::*;
-pub use limits::*;
 
 
 // The macros might be worth looking into later.

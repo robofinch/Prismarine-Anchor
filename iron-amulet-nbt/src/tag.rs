@@ -11,10 +11,10 @@ use std::{
 };
 
 use crate::{raw, snbt};
-use crate::limits::DepthLimit;
 use crate::{
     repr::{NbtReprError, NbtStructureError},
-    snbt::{allowed_unquoted, SnbtError, SnbtVersion, starts_unquoted_number},
+    settings::{DepthLimit, SnbtVersion},
+    snbt::{allowed_unquoted, SnbtError, starts_unquoted_number},
 };
 
 #[cfg(feature = "configurable_depth")]

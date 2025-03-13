@@ -14,7 +14,7 @@ use serde::ser::{
 };
 
 use crate::raw;
-use crate::{encoding::EncodingOptions, io::NbtIoError};
+use crate::{io::NbtIoError, settings::IoOptions};
 use super::{
     array::{BYTE_ARRAY_NICHE, INT_ARRAY_NICHE, LONG_ARRAY_NICHE},
     util::{DefaultSerializer, Ser},
@@ -32,7 +32,7 @@ pub type UncheckedSerializer<'a, W> = Ser<SerializerImpl<'a, W, Unchecked>>;
 impl<'a, W: Write> Serializer<'a, W> {
     /// Constructs a new serializer with the given writer, IO options, and root name.
     /// If no root name is specified, then an empty string is written to the header.
-    pub fn new(writer: &'a mut W, opts: EncodingOptions, root_name: Option<&'a str>) -> Self {
+    pub fn new(writer: &'a mut W, opts: IoOptions, root_name: Option<&'a str>) -> Self {
         SerializerImpl::new(
             writer,
             opts,
@@ -44,7 +44,7 @@ impl<'a, W: Write> Serializer<'a, W> {
 impl<'a, W: Write> UncheckedSerializer<'a, W> {
     /// Constructs a new unchecked serializer with the given writer, IO options, and root name.
     /// If no root name is specified, then an empty string is written to the header.
-    pub fn new(writer: &'a mut W, opts: EncodingOptions, root_name: Option<&'a str>) -> Self {
+    pub fn new(writer: &'a mut W, opts: IoOptions, root_name: Option<&'a str>) -> Self {
         SerializerImpl::new(
             writer,
             opts,
@@ -55,13 +55,13 @@ impl<'a, W: Write> UncheckedSerializer<'a, W> {
 
 pub struct SerializerImpl<'a, W, C> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: BorrowedPrefix<&'a str>,
     _phantom: PhantomData<C>,
 }
 
 impl<'a, W: Write, C: TypeChecker> SerializerImpl<'a, W, C> {
-    fn new(writer: &'a mut W, opts: EncodingOptions, root_name: BorrowedPrefix<&'a str>) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions, root_name: BorrowedPrefix<&'a str>) -> Self {
         SerializerImpl {
             writer,
             opts,
@@ -154,14 +154,14 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
 
 struct SerializeArray<'a, W> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
 }
 
 impl<'a, W> SerializeArray<'a, W>
 where W: Write
 {
     #[inline]
-    fn new(writer: &'a mut W, opts: EncodingOptions) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions) -> Self {
         SerializeArray {
             writer,
             opts
@@ -274,7 +274,7 @@ where W: Write
 
 pub struct SerializeList<'a, W, C> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     length: Option<i32>,
     type_checker: C,
 }
@@ -284,7 +284,7 @@ where
     W: Write,
     C: TypeChecker,
 {
-    fn new(writer: &'a mut W, opts: EncodingOptions, length: i32) -> Result<Self, NbtIoError> {
+    fn new(writer: &'a mut W, opts: IoOptions, length: i32) -> Result<Self, NbtIoError> {
         Ok(SerializeList {
             writer,
             opts,
@@ -406,7 +406,7 @@ where
 
 struct SerializeListElement<'a, W, P, C> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     prefix: P,
     type_checker: &'a C,
 }
@@ -418,7 +418,7 @@ where
     C: TypeChecker,
 {
     #[inline]
-    fn new(writer: &'a mut W, opts: EncodingOptions, inner_prefix: P, inner_type_checker: &'a C) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions, inner_prefix: P, inner_type_checker: &'a C) -> Self {
         SerializeListElement {
             writer,
             opts,
@@ -691,14 +691,14 @@ where
 
 pub struct SerializeCompound<'a, W, C> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     key: Option<Box<[u8]>>,
     _phantom: PhantomData<C>,
 }
 
 impl<'a, W: Write, C: TypeChecker> SerializeCompound<'a, W, C> {
     #[inline]
-    fn new(writer: &'a mut W, opts: EncodingOptions) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions) -> Self {
         SerializeCompound {
             writer,
             opts,
@@ -809,14 +809,14 @@ impl<'a, W: Write, C: TypeChecker> SerializeStructVariant for SerializeCompound<
 
 struct SerializeCompoundEntry<'a, W, C, P> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
     prefix: P,
     _phantom: PhantomData<C>,
 }
 
 impl<'a, W: Write, C: TypeChecker, P: Prefix> SerializeCompoundEntry<'a, W, C, P> {
     #[inline]
-    fn new(writer: &'a mut W, opts: EncodingOptions, prefix: P) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions, prefix: P) -> Self {
         SerializeCompoundEntry {
             writer,
             opts,
@@ -1066,12 +1066,12 @@ where
 
 struct SerializeKey<'a, W> {
     writer: &'a mut W,
-    opts: EncodingOptions,
+    opts: IoOptions,
 }
 
 impl<'a, W: Write> SerializeKey<'a, W> {
     #[inline]
-    fn new(writer: &'a mut W, opts: EncodingOptions) -> Self {
+    fn new(writer: &'a mut W, opts: IoOptions) -> Self {
         SerializeKey {
             writer,
             opts
@@ -1157,10 +1157,10 @@ impl TypeChecker for Homogenous {
 }
 
 pub trait Prefix: Sized {
-    fn write_raw<W: Write>(self, writer: &mut W, opts: EncodingOptions) -> Result<(), NbtIoError>;
+    fn write_raw<W: Write>(self, writer: &mut W, opts: IoOptions) -> Result<(), NbtIoError>;
 
     #[inline]
-    fn write<W: Write>(self, writer: &mut W, opts: EncodingOptions, tag_id: u8) -> Result<(), NbtIoError> {
+    fn write<W: Write>(self, writer: &mut W, opts: IoOptions, tag_id: u8) -> Result<(), NbtIoError> {
         raw::write_u8(writer, opts, tag_id)?;
         self.write_raw(writer, opts)
     }
@@ -1170,12 +1170,12 @@ pub struct NoPrefix;
 
 impl Prefix for NoPrefix {
     #[inline]
-    fn write_raw<W: Write>(self, _writer: &mut W, _opts: EncodingOptions) -> Result<(), NbtIoError> {
+    fn write_raw<W: Write>(self, _writer: &mut W, _opts: IoOptions) -> Result<(), NbtIoError> {
         Ok(())
     }
 
     #[inline]
-    fn write<W: Write>(self, _writer: &mut W, _opts: EncodingOptions, _tag_id: u8) -> Result<(), NbtIoError> {
+    fn write<W: Write>(self, _writer: &mut W, _opts: IoOptions, _tag_id: u8) -> Result<(), NbtIoError> {
         Ok(())
     }
 }
@@ -1193,7 +1193,7 @@ impl LengthPrefix {
 
 impl Prefix for LengthPrefix {
     #[inline]
-    fn write_raw<W: Write>(self, writer: &mut W, opts: EncodingOptions) -> Result<(), NbtIoError> {
+    fn write_raw<W: Write>(self, writer: &mut W, opts: IoOptions) -> Result<(), NbtIoError> {
         raw::write_i32(writer, opts, self.length)?;
         Ok(())
     }
@@ -1212,7 +1212,7 @@ impl<K: Serialize> BorrowedPrefix<K> {
 
 impl<K: Serialize> Prefix for BorrowedPrefix<K> {
     #[inline]
-    fn write_raw<W: Write>(self, writer: &mut W, opts: EncodingOptions) -> Result<(), NbtIoError> {
+    fn write_raw<W: Write>(self, writer: &mut W, opts: IoOptions) -> Result<(), NbtIoError> {
         self.key
             .serialize(SerializeKey::new(writer, opts).into_serializer())
     }
@@ -1231,7 +1231,7 @@ impl RawPrefix {
 
 impl Prefix for RawPrefix {
     #[inline]
-    fn write_raw<W: Write>(self, writer: &mut W, _opts: EncodingOptions) -> Result<(), NbtIoError> {
+    fn write_raw<W: Write>(self, writer: &mut W, _opts: IoOptions) -> Result<(), NbtIoError> {
         writer.write_all(&self.raw)?;
         Ok(())
     }

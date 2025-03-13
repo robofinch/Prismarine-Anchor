@@ -15,7 +15,7 @@ use flate2::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::io::NbtIoError;
-use crate::encoding::{EncodingOptions, NBTCompression};
+use crate::settings::{IoOptions, NBTCompression};
 
 
 pub use self::array::Array;
@@ -29,7 +29,7 @@ pub use self::util::Ser;
 /// be a struct or non-unit enum variant, else the serializer will return with an error.
 pub fn serialize<T: Serialize>(
     value: &T,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
 ) -> Result<Vec<u8>, NbtIoError> {
     let mut cursor = Cursor::new(Vec::<u8>::new());
@@ -44,7 +44,7 @@ pub fn serialize<T: Serialize>(
 /// [`serialize`]: crate::serde::serialize
 pub fn serialize_unchecked<T: Serialize>(
     value: &T,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
 ) -> Result<Vec<u8>, NbtIoError> {
     let mut cursor = Cursor::new(Vec::<u8>::new());
@@ -59,7 +59,7 @@ pub fn serialize_unchecked<T: Serialize>(
 pub fn serialize_into<W: Write, T: Serialize>(
     writer: &mut W,
     value: &T,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
 ) -> Result<(), NbtIoError> {
     let (mode, compression) = match opts.compression {
@@ -68,8 +68,8 @@ pub fn serialize_into<W: Write, T: Serialize>(
         }
         NBTCompression::ZlibCompressed => (2, Compression::default()),
         NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzCompressed => (1, Compression::default()),
-        NBTCompression::GzCompressedWith(compression) => (1, compression.into()),
+        NBTCompression::GzipCompressed => (1, Compression::default()),
+        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {
@@ -95,7 +95,7 @@ pub fn serialize_into<W: Write, T: Serialize>(
 pub fn serialize_into_unchecked<W: Write, T: Serialize>(
     writer: &mut W,
     value: &T,
-    opts: EncodingOptions,
+    opts: IoOptions,
     root_name: Option<&str>,
 ) -> Result<(), NbtIoError> {
     let (mode, compression) = match opts.compression {
@@ -104,8 +104,8 @@ pub fn serialize_into_unchecked<W: Write, T: Serialize>(
         }
         NBTCompression::ZlibCompressed => (2, Compression::default()),
         NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzCompressed => (1, Compression::default()),
-        NBTCompression::GzCompressedWith(compression) => (1, compression.into()),
+        NBTCompression::GzipCompressed => (1, Compression::default()),
+        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {
@@ -129,7 +129,7 @@ pub fn serialize_into_unchecked<W: Write, T: Serialize>(
 /// The NBT data must be uncompressed, start with a compound tag, and represent the type `T`
 /// correctly, else the deserializer will return with an error.
 pub fn deserialize_from_buffer<'de, T: Deserialize<'de>>(
-    buffer: &'de [u8], opts: EncodingOptions
+    buffer: &'de [u8], opts: IoOptions
 ) -> Result<(T, Cow<'de, str>), NbtIoError> {
     let mut cursor = Cursor::new(buffer);
     let (de, root_name) = Deserializer::from_cursor(&mut cursor, opts)?;
@@ -142,7 +142,7 @@ pub fn deserialize_from_buffer<'de, T: Deserialize<'de>>(
 /// deserializer will return with an error.
 pub fn deserialize<T: DeserializeOwned>(
     bytes: &[u8],
-    opts: EncodingOptions,
+    opts: IoOptions,
 ) -> Result<(T, String), NbtIoError> {
     deserialize_from(&mut Cursor::new(bytes), opts)
 }
@@ -153,19 +153,19 @@ pub fn deserialize<T: DeserializeOwned>(
 /// deserializer will return with an error.
 pub fn deserialize_from<R: Read, T: DeserializeOwned>(
     reader: &mut R,
-    opts: EncodingOptions,
+    opts: IoOptions,
 ) -> Result<(T, String), NbtIoError> {
     match opts.compression {
         NBTCompression::Uncompressed => deserialize_from_raw(reader, opts),
         NBTCompression::ZlibCompressed | NBTCompression::ZlibCompressedWith(_) =>
             deserialize_from_raw(&mut ZlibDecoder::new(reader), opts),
-            NBTCompression::GzCompressed | NBTCompression::GzCompressedWith(_) =>
+            NBTCompression::GzipCompressed | NBTCompression::GzipCompressedWith(_) =>
             deserialize_from_raw(&mut GzDecoder::new(reader), opts),
     }
 }
 
 fn deserialize_from_raw<'de: 'a, 'a, R: Read, T: Deserialize<'de>>(
-    reader: &'a mut R, opts: EncodingOptions
+    reader: &'a mut R, opts: IoOptions
 ) -> Result<(T, String), NbtIoError> {
     let (de, root_name) = Deserializer::new(reader, opts)?;
     Ok((T::deserialize(de)?, root_name))

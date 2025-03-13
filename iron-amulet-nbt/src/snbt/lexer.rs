@@ -6,8 +6,8 @@ mod other_utils;
 use std::{char, mem, str};
 use std::{borrow::Cow, iter::Peekable, str::CharIndices};
 
-use crate::tag::NbtTag;
-use super::{SnbtVersion, SnbtError};
+use crate::{settings::SnbtVersion, tag::NbtTag};
+use super::SnbtError;
 
 
 pub use self::other_utils::{allowed_unquoted, starts_unquoted_number};
