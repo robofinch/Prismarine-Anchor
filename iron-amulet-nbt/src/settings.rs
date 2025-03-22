@@ -153,7 +153,7 @@ impl From<Compression> for CompressionLevel {
 
 impl From<CompressionLevel> for Compression {
     fn from(value: CompressionLevel) -> Self {
-        Compression::new(value.0 as u32)
+        Compression::new(u32::from(value.0))
     }
 }
 
@@ -199,9 +199,11 @@ pub enum SnbtVersion {
     /// Note that by default, this crate's SNBT parsers and writers won't halt with an error
     /// when encountering a non-finite number; they are instead replaced by finite values;
     /// see [`replace_non_finite`] and [`WriteNonFinite`]. Other settings conform
-    /// to Minecraft's behavior by default (except whitespace; here, whitespace between
-    /// tokens is trimmed, while Minecraft might throw an error on, say, an unexpected newline
-    /// in SNBT.)
+    /// to Minecraft's behavior by default, except for whitespace and sequential lengths.
+    /// Here, whitespace between tokens is trimmed, while Minecraft might throw an error on,
+    /// say, an unexpected newline in SNBT. Additionally, string and list tags should have lengths
+    /// which fit in an i16 or i32, depending on the exact case. No limits are placed on SNBT
+    /// string or list lengths here, beyond hardware limitations.
     ///
     /// [minecraft.wiki]: https://minecraft.wiki/w/Java_Edition_1.21.5#:~:text=SNBT%20format
     /// [`replace_non_finite`]: SnbtParseOptions::replace_non_finite
@@ -222,9 +224,11 @@ pub enum SnbtVersion {
     /// Note that by default, this crate's SNBT parsers and writers won't halt with an error
     /// when encountering a non-finite number; they are instead replaced by finite values;
     /// see [`replace_non_finite`] and [`WriteNonFinite`]. Other settings conform
-    /// to Minecraft's behavior by default (except whitespace; here, whitespace between
-    /// tokens is trimmed, while Minecraft might throw an error on, say, an unexpected newline
-    /// in SNBT.)
+    /// to Minecraft's behavior by default, except for whitespace and sequential lengths.
+    /// Here, whitespace between tokens is trimmed, while Minecraft might throw an error on,
+    /// say, an unexpected newline in SNBT. Additionally, string and list tags should have lengths
+    /// which fit in an i16 or i32, depending on the exact case. No limits are placed on SNBT
+    /// string or list lengths here, beyond hardware limitations.
     Original,
 }
 

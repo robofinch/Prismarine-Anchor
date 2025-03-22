@@ -13,7 +13,7 @@ use flate2::{
 
 use crate::raw;
 use crate::{
-    settings::{IoOptions, NBTCompression},
+    settings::{DepthLimit, IoOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
 };
 
@@ -49,7 +49,7 @@ fn read_nbt_uncompressed<R: Read>(
     }
 
     let root_name = raw::read_string(reader, opts)?;
-    match read_tag_body_const::<_, 0xA>(reader, opts) {
+    match read_tag_body_const::<_, 0xA>(reader, opts, 0) {
         Ok(NbtTag::Compound(compound)) => Ok((compound, root_name)),
         Err(e) => Err(e),
         _ => unreachable!(),
@@ -57,13 +57,13 @@ fn read_nbt_uncompressed<R: Read>(
 }
 
 fn read_tag_body_dyn<R: Read>(
-    reader: &mut R, opts: IoOptions, tag_id: u8
+    reader: &mut R, opts: IoOptions, tag_id: u8, current_depth: u32
 ) -> Result<NbtTag, NbtIoError> {
 
     macro_rules! drive_reader {
         ($($id:literal)*) => {
             match tag_id {
-                $( $id => read_tag_body_const::<_, $id>(reader, opts), )*
+                $( $id => read_tag_body_const::<_, $id>(reader, opts, current_depth), )*
                 _ => Err(NbtIoError::InvalidTagId(tag_id))
             }
         };
@@ -74,7 +74,7 @@ fn read_tag_body_dyn<R: Read>(
 
 #[inline]
 fn read_tag_body_const<R: Read, const TAG_ID: u8>(
-    reader: &mut R, opts: IoOptions
+    reader: &mut R, opts: IoOptions, current_depth: u32
 ) -> Result<NbtTag, NbtIoError> {
 
     let tag = match TAG_ID {
@@ -85,7 +85,7 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
         0x5 => NbtTag::Float ( raw::read_f32( reader, opts )?),
         0x6 => NbtTag::Double( raw::read_f64( reader, opts )?),
         0x7 => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             let mut array = vec![0u8; len];
 
             reader.read_exact(&mut array)?;
@@ -95,7 +95,7 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
         0x8 => NbtTag::String(raw::read_string(reader, opts)?),
         0x9 => {
             let tag_id = raw::read_u8(reader, opts)?;
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
 
             // Make sure we don't have an invalid type or a nonempty list of TAG_End
             if tag_id > 0xC || (tag_id == 0 && len > 0) {
@@ -106,6 +106,12 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
                 return Ok(NbtTag::List(NbtList::new()));
             }
 
+            if current_depth >= opts.depth_limit.0 {
+                return Err(NbtIoError::ExceededDepthLimit {
+                    limit: opts.depth_limit
+                });
+            }
+
             let mut list = NbtList::with_capacity(len);
 
             macro_rules! drive_reader {
@@ -114,7 +120,9 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
                         $(
                             $id => {
                                 for _ in 0 .. len {
-                                    list.push(read_tag_body_const::<_, $id>(reader, opts)?);
+                                    list.push(read_tag_body_const::<_, $id>(
+                                        reader, opts, current_depth + 1
+                                    )?);
                                 }
                             },
                         )*
@@ -131,10 +139,16 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
             let mut compound = NbtCompound::new();
             let mut tag_id = raw::read_u8(reader, opts)?;
 
+            if tag_id != 0x0 && current_depth >= opts.depth_limit.0 {
+                return Err(NbtIoError::ExceededDepthLimit {
+                    limit: opts.depth_limit
+                });
+            }
+
             // Read until TAG_End
             while tag_id != 0x0 {
                 let name = raw::read_string(reader, opts)?;
-                let tag = read_tag_body_dyn(reader, opts, tag_id)?;
+                let tag = read_tag_body_dyn(reader, opts, tag_id, current_depth + 1)?;
                 compound.insert(name, tag);
                 tag_id = raw::read_u8(reader, opts)?;
             }
@@ -142,11 +156,11 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
             NbtTag::Compound(compound)
         }
         0xB => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             NbtTag::IntArray(raw::read_i32_array(reader, opts, len)?)
         }
         0xC => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             NbtTag::LongArray(raw::read_i64_array(reader, opts, len)?)
         }
         _ => unreachable!("read_tag_body_const called with unchecked TAG_ID"),
@@ -195,16 +209,28 @@ where
     // Compound ID
     raw::write_u8(writer, opts, 0xA)?;
     raw::write_string(writer, opts, root_name.unwrap_or(""))?;
+
+    if opts.depth_limit.0 == 0 && !root.inner().is_empty() {
+        return Err(NbtIoError::ExceededDepthLimit {
+            limit: opts.depth_limit
+        });
+    }
+
     for (name, tag) in root.inner() {
         raw::write_u8(writer, opts, raw::id_for_tag(Some(tag)))?;
         raw::write_string(writer, opts, name)?;
-        write_tag_body(writer, opts, tag)?;
+        write_tag_body(writer, opts, tag, 1)?;
     }
     raw::write_u8(writer, opts, raw::id_for_tag(None))?;
     Ok(())
 }
 
-fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Result<(), NbtIoError> {
+fn write_tag_body<W: Write>(
+    writer: &mut W,
+    opts: IoOptions,
+    tag: &NbtTag,
+    current_depth: u32,
+) -> Result<(), NbtIoError> {
     match tag {
         &NbtTag::Byte  (value) => raw::write_i8 (writer, opts, value)?,
         &NbtTag::Short (value) => raw::write_i16(writer, opts, value)?,
@@ -213,7 +239,7 @@ fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Re
         &NbtTag::Float (value) => raw::write_f32(writer, opts, value)?,
         &NbtTag::Double(value) => raw::write_f64(writer, opts, value)?,
         NbtTag::ByteArray(value) => {
-            raw::write_i32(writer, opts, value.len() as i32)?;
+            raw::write_usize_as_i32(writer, opts, value.len())?;
             writer.write_all(raw::cast_bytes_to_unsigned(value.as_slice()))?;
         }
         NbtTag::String(value) => raw::write_string(writer, opts, value)?,
@@ -223,7 +249,13 @@ fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Re
             } else {
                 let list_type = raw::id_for_tag(Some(&value[0]));
                 raw::write_u8(writer, opts, list_type)?;
-                raw::write_i32(writer, opts, value.len() as i32)?;
+                raw::write_usize_as_i32(writer, opts, value.len())?;
+
+                if current_depth >= opts.depth_limit.0 && !value.is_empty() {
+                    return Err(NbtIoError::ExceededDepthLimit {
+                        limit: opts.depth_limit
+                    });
+                }
 
                 for sub_tag in value.as_ref() {
                     let tag_id = raw::id_for_tag(Some(sub_tag));
@@ -234,28 +266,34 @@ fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Re
                         });
                     }
 
-                    write_tag_body(writer, opts, sub_tag)?;
+                    write_tag_body(writer, opts, sub_tag, current_depth + 1)?;
                 }
             },
         NbtTag::Compound(value) => {
+            if current_depth >= opts.depth_limit.0 && !value.is_empty() {
+                return Err(NbtIoError::ExceededDepthLimit {
+                    limit: opts.depth_limit
+                });
+            }
+
             for (name, tag) in value.inner() {
                 raw::write_u8(writer, opts, raw::id_for_tag(Some(tag)))?;
                 raw::write_string(writer, opts, name)?;
-                write_tag_body(writer, opts, tag)?;
+                write_tag_body(writer, opts, tag, current_depth + 1)?;
             }
 
             // TAG_End
             raw::write_u8(writer, opts, raw::id_for_tag(None))?;
         }
         NbtTag::IntArray(value) => {
-            raw::write_i32(writer, opts, value.len() as i32)?;
+            raw::write_usize_as_i32(writer, opts, value.len())?;
 
             for &int in value.iter() {
                 raw::write_i32(writer, opts, int)?;
             }
         }
         NbtTag::LongArray(value) => {
-            raw::write_i32(writer, opts, value.len() as i32)?;
+            raw::write_usize_as_i32(writer, opts, value.len())?;
 
             for &long in value.iter() {
                 raw::write_i64(writer, opts, long)?;
@@ -277,8 +315,11 @@ pub enum NbtIoError {
     /// Java exclusively uses root compound tags, and in most but not all circumstances,
     /// Bedrock uses root compound tags as well.
     MissingRootTag,
-    // nesting depth
-
+    /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
+    ExceededDepthLimit {
+        /// The limit which was exceeded.
+        limit: DepthLimit
+    },
     /// A sequential data structure was found to be non-homogenous. All sequential structures
     /// in NBT data are homogenous.
     NonHomogenousList {
@@ -293,6 +334,11 @@ pub enum NbtIoError {
     OptionInList,
     /// A sequential type without a definite length was passed to a serializer.
     MissingLength,
+    /// The length of a string or sequential length was too large to fit in the numeric type
+    /// it needed to.
+    ExcessiveLength,
+    /// The length of a string or sequential length was negative.
+    NegativeLength,
     /// An invalid tag ID was encountered.
     InvalidTagId(u8),
     /// The first tag ID was expected, but the second was found.
@@ -352,6 +398,11 @@ impl Display for NbtIoError {
             NbtIoError::StdIo(error) => write!(f, "{}", error),
             NbtIoError::MissingRootTag
                 => write!(f, "NBT tree does not start with a valid root tag."),
+            NbtIoError::ExceededDepthLimit { limit }
+                => write!(
+                    f, "Exceeded depth limit {} for nested tag lists and compound tags",
+                    limit.0
+                ),
             &NbtIoError::NonHomogenousList {
                 list_type,
                 encountered_type,
@@ -367,6 +418,14 @@ impl Display for NbtIoError {
             NbtIoError::MissingLength => write!(
                 f,
                 "Sequential types must have an initial computable length to be serializable"
+            ),
+            NbtIoError::ExcessiveLength => write!(
+                f,
+                "Length of a string or sequential type must fit in an i16, i32, or usize, depending on situation"
+            ),
+            NbtIoError::NegativeLength => write!(
+                f,
+                "Length of a string or sequential type must be nonnegative"
             ),
             &NbtIoError::InvalidTagId(id) => write!(
                 f,

@@ -1,6 +1,6 @@
 use std::{ptr, slice, str};
 use std::{borrow::Cow, mem::ManuallyDrop};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Result as IoResult, Write};
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
 use varint_rs::{VarintReader as _, VarintWriter as _};
@@ -9,7 +9,7 @@ use crate::{io::NbtIoError, tag::NbtTag};
 use crate::settings::{Endianness, IoOptions, StringEncoding};
 
 
-type NbtResult<T> = std::result::Result<T, NbtIoError>;
+type NbtResult<T> = Result<T, NbtIoError>;
 
 
 #[inline]
@@ -33,22 +33,22 @@ pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
 
 #[cfg(feature = "serde")]
 #[inline]
-pub fn read_bool<R: Read>(reader: &mut R, opts: IoOptions) -> Result<bool> {
+pub fn read_bool<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<bool> {
     Ok(read_u8(reader, opts)? != 0)
 }
 
 #[inline]
-pub fn read_u8<R: Read>(reader: &mut R, _opts: IoOptions) -> Result<u8> {
+pub fn read_u8<R: Read>(reader: &mut R, _opts: IoOptions) -> IoResult<u8> {
     reader.read_u8()
 }
 
 #[inline]
-pub fn read_i8<R: Read>(reader: &mut R, _opts: IoOptions) -> Result<i8> {
+pub fn read_i8<R: Read>(reader: &mut R, _opts: IoOptions) -> IoResult<i8> {
     reader.read_i8()
 }
 
 #[inline]
-pub fn read_i16<R: Read>(reader: &mut R, opts: IoOptions) -> Result<i16> {
+pub fn read_i16<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<i16> {
     match opts.endianness {
         Endianness::BigEndian
             => reader.read_i16::<BigEndian>(),
@@ -58,25 +58,25 @@ pub fn read_i16<R: Read>(reader: &mut R, opts: IoOptions) -> Result<i16> {
 }
 
 #[inline]
-pub fn read_i32<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<i32> {
+pub fn read_i32<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<i32> {
     match opts.endianness {
         Endianness::BigEndian    => reader.read_i32::<BigEndian>(),
         Endianness::LittleEndian => reader.read_i32::<LittleEndian>(),
         Endianness::NetworkLittleEndian => reader.read_i32_varint()
-    }.map_err(|e| NbtIoError::StdIo(e))
+    }
 }
 
 #[inline]
-pub fn read_i64<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<i64> {
+pub fn read_i64<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<i64> {
     match opts.endianness {
         Endianness::BigEndian    => reader.read_i64::<BigEndian>(),
         Endianness::LittleEndian => reader.read_i64::<LittleEndian>(),
         Endianness::NetworkLittleEndian => reader.read_i64_varint()
-    }.map_err(|e| NbtIoError::StdIo(e))
+    }
 }
 
 #[inline]
-pub fn read_f32<R: Read>(reader: &mut R, opts: IoOptions) -> Result<f32> {
+pub fn read_f32<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<f32> {
     match opts.endianness {
         Endianness::BigEndian
             => reader.read_f32::<BigEndian>(),
@@ -86,7 +86,7 @@ pub fn read_f32<R: Read>(reader: &mut R, opts: IoOptions) -> Result<f32> {
 }
 
 #[inline]
-pub fn read_f64<R: Read>(reader: &mut R, opts: IoOptions) -> Result<f64> {
+pub fn read_f64<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<f64> {
     match opts.endianness {
         Endianness::BigEndian
             => reader.read_f64::<BigEndian>(),
@@ -118,13 +118,18 @@ pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<[u8]> {
 }
 
 #[inline]
+pub fn read_i32_as_usize<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
+    usize::try_from(read_i32(reader, opts)?).map_err(|_| NbtIoError::ExcessiveLength)
+}
+
+#[inline]
 pub fn read_string_len<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
-    Ok(match opts.endianness {
+    match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian
-            => read_i16(reader, opts)? as usize,
+            => usize::try_from(read_i16(reader, opts)?),
         Endianness::NetworkLittleEndian
-            => reader.read_i32_varint()? as usize
-    })
+            => usize::try_from(reader.read_i32_varint()?),
+    }.map_err(|_| NbtIoError::ExcessiveLength)
 }
 
 pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String> {
@@ -150,22 +155,22 @@ pub fn read_string_into<'a, R: Read>(
 
 #[cfg(feature = "serde")]
 #[inline]
-pub fn write_bool<W: Write>(writer: &mut W, opts: IoOptions, value: bool) -> Result<()> {
+pub fn write_bool<W: Write>(writer: &mut W, opts: IoOptions, value: bool) -> IoResult<()> {
     write_u8(writer, opts, if value { 1 } else { 0 })
 }
 
 #[inline]
-pub fn write_u8<W: Write>(writer: &mut W, _opts: IoOptions, value: u8) -> Result<()> {
+pub fn write_u8<W: Write>(writer: &mut W, _opts: IoOptions, value: u8) -> IoResult<()> {
     writer.write_u8(value)
 }
 
 #[inline]
-pub fn write_i8<W: Write>(writer: &mut W, _opts: IoOptions, value: i8) -> Result<()> {
+pub fn write_i8<W: Write>(writer: &mut W, _opts: IoOptions, value: i8) -> IoResult<()> {
     writer.write_i8(value)
 }
 
 #[inline]
-pub fn write_i16<W: Write>(writer: &mut W, opts: IoOptions, value: i16) -> Result<()> {
+pub fn write_i16<W: Write>(writer: &mut W, opts: IoOptions, value: i16) -> IoResult<()> {
     match opts.endianness {
         Endianness::BigEndian
             => writer.write_i16::<BigEndian>(value),
@@ -175,7 +180,7 @@ pub fn write_i16<W: Write>(writer: &mut W, opts: IoOptions, value: i16) -> Resul
 }
 
 #[inline]
-pub fn write_i32<W: Write>(writer: &mut W, opts: IoOptions, value: i32) -> Result<()> {
+pub fn write_i32<W: Write>(writer: &mut W, opts: IoOptions, value: i32) -> IoResult<()> {
     match opts.endianness {
         Endianness::BigEndian    => writer.write_i32::<BigEndian>(value),
         Endianness::LittleEndian => writer.write_i32::<LittleEndian>(value),
@@ -184,7 +189,7 @@ pub fn write_i32<W: Write>(writer: &mut W, opts: IoOptions, value: i32) -> Resul
 }
 
 #[inline]
-pub fn write_i64<W: Write>(writer: &mut W, opts: IoOptions, value: i64) -> Result<()> {
+pub fn write_i64<W: Write>(writer: &mut W, opts: IoOptions, value: i64) -> IoResult<()> {
     match opts.endianness {
         Endianness::BigEndian    => writer.write_i64::<BigEndian>(value),
         Endianness::LittleEndian => writer.write_i64::<LittleEndian>(value),
@@ -193,7 +198,7 @@ pub fn write_i64<W: Write>(writer: &mut W, opts: IoOptions, value: i64) -> Resul
 }
 
 #[inline]
-pub fn write_f32<W: Write>(writer: &mut W, opts: IoOptions, value: f32) -> Result<()> {
+pub fn write_f32<W: Write>(writer: &mut W, opts: IoOptions, value: f32) -> IoResult<()> {
     match opts.endianness {
         Endianness::BigEndian
             => writer.write_f32::<BigEndian>(value),
@@ -203,7 +208,7 @@ pub fn write_f32<W: Write>(writer: &mut W, opts: IoOptions, value: f32) -> Resul
 }
 
 #[inline]
-pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> Result<()> {
+pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> IoResult<()> {
     match opts.endianness {
         Endianness::BigEndian
             => writer.write_f64::<BigEndian>(value),
@@ -213,20 +218,32 @@ pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> Resul
 }
 
 #[inline]
-pub fn write_string_len<W: Write>(writer: &mut W, opts: IoOptions, len: usize) -> Result<()> {
-    match opts.endianness {
-        Endianness::BigEndian | Endianness::LittleEndian
-            => write_i16(writer, opts, len as i16),
-        Endianness::NetworkLittleEndian
-            => writer.write_i32_varint(len as i32)
-    }
+pub fn write_usize_as_i32<W: Write>(writer: &mut W, opts: IoOptions, value: usize) -> NbtResult<()> {
+    let value = i32::try_from(value).map_err(|_| NbtIoError::ExcessiveLength)?;
+    write_i32(writer, opts, value)?;
+    Ok(())
 }
 
 #[inline]
-pub fn write_string<W: Write>(writer: &mut W, opts: IoOptions, string: &str) -> Result<()> {
+pub fn write_string_len<W: Write>(writer: &mut W, opts: IoOptions, len: usize) -> NbtResult<()> {
+    // Error if the length can't be written
+    match opts.endianness {
+        Endianness::BigEndian | Endianness::LittleEndian => {
+            let len = i16::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
+            write_i16(writer, opts, len)
+        }
+        Endianness::NetworkLittleEndian => {
+            let len = i32::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
+            writer.write_i32_varint(len)
+        }
+    }.map_err(NbtIoError::StdIo)
+}
+
+#[inline]
+pub fn write_string<W: Write>(writer: &mut W, opts: IoOptions, string: &str) -> NbtResult<()> {
     let string = bytes_from_string(string, opts);
     write_string_len(writer, opts, string.len())?;
-    writer.write_all(&string)
+    writer.write_all(&string).map_err(NbtIoError::StdIo)
 }
 
 #[inline]
@@ -294,7 +311,7 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
 }
 
 #[inline]
-pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> Result<Vec<i32>> {
+pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i32>> {
 
     if opts.endianness == Endianness::NetworkLittleEndian {
         // The number of bytes to read per i32 is variable; we can't do any better than reading
@@ -327,7 +344,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> R
 }
 
 #[inline]
-pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> Result<Vec<i64>> {
+pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i64>> {
 
     if opts.endianness == Endianness::NetworkLittleEndian {
         // The number of bytes to read per i64 is variable; we can't do any better than reading

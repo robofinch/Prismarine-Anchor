@@ -8,7 +8,7 @@ use std::{borrow::Cow, iter::Peekable, str::CharIndices};
 
 use crate::tag::NbtTag;
 use crate::settings::{
-    ParseNonFinite, ParseTrueFalse, SnbtParseOptions, SnbtVersion
+    DepthLimit, ParseNonFinite, ParseTrueFalse, SnbtParseOptions, SnbtVersion
 };
 use super::SnbtError;
 
@@ -38,6 +38,11 @@ impl<'a> Lexer<'a> {
     #[inline]
     pub fn snbt_version(&self) -> SnbtVersion {
         self.opts.version
+    }
+
+    #[inline]
+    pub fn depth_limit(&self) -> DepthLimit {
+        self.opts.depth_limit
     }
 
     #[inline]
@@ -508,11 +513,7 @@ impl FromLossless<Token> for i8 {
         match tk {
             Token::Byte(value) => Ok(value),
             Token::Int { value, suffixed: false } => {
-                if value < 1 << 8 {
-                    Ok(value as i8)
-                } else {
-                    Err((tk, true))
-                }
+                i8::try_from(value).map_err(|_| (tk, true))
             }
             _ => Err((tk, false)),
         }
@@ -522,14 +523,10 @@ impl FromLossless<Token> for i8 {
 impl FromLossless<Token> for i16 {
     fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
         match tk {
-            Token::Byte(value)  => Ok(value as i16),
+            Token::Byte(value)  => Ok(i16::from(value)),
             Token::Short(value) => Ok(value),
             Token::Int { value, suffixed: false } => {
-                if value < 1 << 16 {
-                    Ok(value as i16)
-                } else {
-                    Err((tk, true))
-                }
+                i16::try_from(value).map_err(|_| (tk, true))
             }
             _ => Err((tk, false)),
         }
@@ -539,8 +536,8 @@ impl FromLossless<Token> for i16 {
 impl FromLossless<Token> for i32 {
     fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
         match tk {
-            Token::Byte(value)       => Ok(value as i32),
-            Token::Short(value)      => Ok(value as i32),
+            Token::Byte(value)       => Ok(i32::from(value)),
+            Token::Short(value)      => Ok(i32::from(value)),
             Token::Int { value, .. } => Ok(value),
             _ => Err((tk, false)),
         }
@@ -550,9 +547,9 @@ impl FromLossless<Token> for i32 {
 impl FromLossless<Token> for i64 {
     fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
         match tk {
-            Token::Byte(value)       => Ok(value as i64),
-            Token::Short(value)      => Ok(value as i64),
-            Token::Int { value, .. } => Ok(value as i64),
+            Token::Byte(value)       => Ok(i64::from(value)),
+            Token::Short(value)      => Ok(i64::from(value)),
+            Token::Int { value, .. } => Ok(i64::from(value)),
             Token::Long(value)       => Ok(value),
             _ => Err((tk, false)),
         }

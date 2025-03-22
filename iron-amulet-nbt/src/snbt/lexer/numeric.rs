@@ -414,8 +414,8 @@ fn integral_value(
     let mut num: u64 = 0;
     for digit in digits {
         num = num
-            .checked_mul(radix as u64).ok_or(())?
-            .checked_add(digit as u64).ok_or(())?;
+            .checked_mul(u64::from(radix)).ok_or(())?
+            .checked_add(u64::from(digit)).ok_or(())?;
     }
 
     Ok(match (positive_sign, unsigned) {

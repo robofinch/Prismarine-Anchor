@@ -111,7 +111,9 @@ where
     #[inline]
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
-        DeserializeTag::<_, B, 0xA>::new(self.reader, self.opts).deserialize_map(visitor)
+        DeserializeTag::<_, B, 0xA>::new(
+            self.reader, self.opts, 0
+        ).deserialize_map(visitor)
     }
 
     #[inline]
@@ -137,7 +139,9 @@ where
     where
         V: Visitor<'de>,
     {
-        DeserializeTag::<_, B, 0xA>::new(self.reader, self.opts).deserialize_enum(name, variants, visitor)
+        DeserializeTag::<_, B, 0xA>::new(
+            self.reader, self.opts, 0
+        ).deserialize_enum(name, variants, visitor)
     }
 
     #[inline]
@@ -150,6 +154,7 @@ where
 fn drive_visitor_seq_const<'de, 'a, 'buffer, R, V, B, const TAG_ID: u8>(
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -161,24 +166,24 @@ where
 {
     match TAG_ID {
         0x7 => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             visitor.visit_seq(DeserializeSeq::<_, _, 0x1, TAG_ID>::new(
-                DeserializeTag::<_, B, 0x1>::new(reader, opts),
+                DeserializeTag::<_, B, 0x1>::new(reader, opts, current_depth),
                 len,
             ))
         }
-        0x9 => drive_visitor_seq_tag::<_, _, B>(reader, opts, visitor),
+        0x9 => drive_visitor_seq_tag::<_, _, B>(reader, opts, current_depth, visitor),
         0xB => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             visitor.visit_seq(DeserializeSeq::<_, _, 0x3, TAG_ID>::new(
-                DeserializeTag::<_, B, 0x3>::new(reader, opts),
+                DeserializeTag::<_, B, 0x3>::new(reader, opts, current_depth),
                 len,
             ))
         }
         0xC => {
-            let len = raw::read_i32(reader, opts)? as usize;
+            let len = raw::read_i32_as_usize(reader, opts)?;
             visitor.visit_seq(DeserializeSeq::<_, _, 0x4, TAG_ID>::new(
-                DeserializeTag::<_, B, 0x4>::new(reader, opts),
+                DeserializeTag::<_, B, 0x4>::new(reader, opts, current_depth),
                 len,
             ))
         }
@@ -189,6 +194,7 @@ where
 fn drive_visitor_seq_tag<'de, 'a, 'buffer, R, V, B>(
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     visitor: V,
 ) -> Result<V::Value, NbtIoError>
 where
@@ -199,7 +205,13 @@ where
     B: BufferSpecialization<'buffer>,
 {
     let id = raw::read_u8(reader, opts)?;
-    let len = raw::read_i32(reader, opts)? as usize;
+    let len = raw::read_i32_as_usize(reader, opts)?;
+
+    if len != 0 && current_depth >= opts.depth_limit.0 {
+        return Err(NbtIoError::ExceededDepthLimit {
+            limit: opts.depth_limit,
+        });
+    }
 
     macro_rules! drive_visitor {
         ($($id:literal)*) => {
@@ -207,14 +219,14 @@ where
                 0x0 => {
                     if len == 0 {
                         visitor.visit_seq(DeserializeSeq::<_, _, 0x0, 0x9>::new(
-                            DeserializeTag::<_, B, 0x0>::new(reader, opts), len
+                            DeserializeTag::<_, B, 0x0>::new(reader, opts, current_depth + 1), len
                         ))
                     } else {
                         Err(NbtIoError::InvalidTagId(0))
                     }
                 }
                 $( $id => visitor.visit_seq(DeserializeSeq::<_, _, $id, 0x9>::new(
-                    DeserializeTag::<_, B, $id>::new(reader, opts), len)
+                    DeserializeTag::<_, B, $id>::new(reader, opts, current_depth + 1), len)
                 ), )*
                 _ => Err(NbtIoError::InvalidTagId(id))
             }
@@ -227,16 +239,18 @@ where
 struct DeserializeEnum<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     variant: Cow<'a, str>,
     _buffered: PhantomData<B>,
 }
 
 impl<'a, R, B, const TAG_ID: u8> DeserializeEnum<'a, R, B, TAG_ID> {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions, variant: Cow<'a, str>) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions, current_depth: u32, variant: Cow<'a, str>) -> Self {
         DeserializeEnum {
             reader,
             opts,
+            current_depth,
             variant,
             _buffered: PhantomData,
         }
@@ -257,13 +271,16 @@ where
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where V: DeserializeSeed<'de> {
         let de: CowStrDeserializer<'a, Self::Error> = self.variant.into_deserializer();
-        Ok((seed.deserialize(de)?, DeserializeVariant::new(self.reader, self.opts)))
+        Ok((seed.deserialize(de)?, DeserializeVariant::new(
+            self.reader, self.opts, self.current_depth
+        )))
     }
 }
 
 struct DeserializeVariant<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     _buffered: PhantomData<B>,
 }
 
@@ -273,10 +290,11 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions, current_depth: u32) -> Self {
         DeserializeVariant {
             reader,
             opts,
+            current_depth,
             _buffered: PhantomData,
         }
     }
@@ -300,13 +318,17 @@ where
     #[inline]
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
     where T: DeserializeSeed<'de> {
-        seed.deserialize(&mut DeserializeTag::<_, B, TAG_ID>::new(self.reader, self.opts))
+        seed.deserialize(&mut DeserializeTag::<_, B, TAG_ID>::new(
+            self.reader, self.opts, self.current_depth
+        ))
     }
 
     #[inline]
     fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
-        drive_visitor_seq_const::<_, _, B, TAG_ID>(self.reader, self.opts, visitor)
+        drive_visitor_seq_const::<_, _, B, TAG_ID>(
+            self.reader, self.opts, self.current_depth, visitor
+        )
     }
 
     #[inline]
@@ -319,7 +341,9 @@ where
         V: Visitor<'de>,
     {
         if TAG_ID == 0xA {
-            visitor.visit_map(DeserializeMap::<_, B>::new(self.reader, self.opts))
+            visitor.visit_map(DeserializeMap::<_, B>::new(
+                self.reader, self.opts, self.current_depth
+            ))
         } else {
             Err(NbtIoError::TagTypeMismatch {
                 expected: 0xA,
@@ -424,6 +448,7 @@ enum TypeHintDispatchState {
 struct DeserializeMap<'a, R, B> {
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     tag_id: u8,
     _buffered: PhantomData<B>,
 }
@@ -434,10 +459,11 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> Self {
+    fn new(reader: &'a mut R, opts: IoOptions, current_depth: u32) -> Self {
         DeserializeMap {
             reader,
             opts,
+            current_depth,
             tag_id: 0,
             _buffered: PhantomData,
         }
@@ -456,7 +482,9 @@ where
         macro_rules! drive_visitor {
             ($($id:literal)*) => {
                 match tag_id {
-                    $( $id => seed.deserialize(&mut DeserializeTag::<_, B, $id>::new(self.reader, self.opts)), )*
+                    $( $id => seed.deserialize(&mut DeserializeTag::<_, B, $id>::new(
+                        self.reader, self.opts, self.current_depth + 1
+                    )), )*
                     _ => Err(NbtIoError::InvalidTagId(tag_id))
                 }
             };
@@ -482,9 +510,15 @@ where
 
         if self.tag_id == 0 {
             return Ok(None);
+        } else if self.current_depth >= self.opts.depth_limit.0 {
+            return Err(NbtIoError::ExceededDepthLimit {
+                limit: self.opts.depth_limit,
+            });
         }
 
-        let mut de = DeserializeTag::<_, B, 0x8>::new(self.reader, self.opts);
+        let mut de = DeserializeTag::<_, B, 0x8>::new(
+            self.reader, self.opts, self.current_depth + 1
+        );
         seed.deserialize(&mut de).map(Some)
     }
 
@@ -498,6 +532,7 @@ where
 pub struct DeserializeTag<'a, R, B, const TAG_ID: u8> {
     reader: &'a mut R,
     opts: IoOptions,
+    current_depth: u32,
     _buffered: PhantomData<B>,
 }
 
@@ -507,10 +542,14 @@ where
     B: BufferSpecialization<'buffer>,
 {
     #[inline]
-    fn new(reader: &'a mut R, opts: IoOptions) -> DeserializeTag<'a, R, B, TAG_ID> {
+    fn new(
+        reader: &'a mut R, opts: IoOptions, current_depth: u32
+    ) -> DeserializeTag<'a, R, B, TAG_ID> {
+
         DeserializeTag {
             reader,
             opts,
+            current_depth,
             _buffered: PhantomData,
         }
     }
@@ -541,26 +580,36 @@ where
             0x5 => visitor.visit_f32(raw::read_f32(self.reader, self.opts)?),
             0x6 => visitor.visit_f64(raw::read_f64(self.reader, self.opts)?),
             0x7 => {
-                let len = raw::read_i32(self.reader, self.opts)? as usize;
+                let len = raw::read_i32_as_usize(self.reader, self.opts)?;
                 visitor.visit_seq(DeserializeSeq::<_, _, 0x1, 0x7>::new(
-                    DeserializeTag::<_, B, 0x1>::new(self.reader, self.opts),
+                    DeserializeTag::<_, B, 0x1>::new(
+                        self.reader, self.opts, self.current_depth
+                    ),
                     len,
                 ))
             }
             0x8 => visitor.visit_string(raw::read_string(self.reader, self.opts)?),
-            0x9 => drive_visitor_seq_tag::<_, _, B>(self.reader, self.opts, visitor),
-            0xA => visitor.visit_map(DeserializeMap::<_, B>::new(self.reader, self.opts)),
+            0x9 => drive_visitor_seq_tag::<_, _, B>(
+                self.reader, self.opts, self.current_depth, visitor
+            ),
+            0xA => visitor.visit_map(DeserializeMap::<_, B>::new(
+                self.reader, self.opts, self.current_depth
+            )),
             0xB => {
-                let len = raw::read_i32(self.reader, self.opts)? as usize;
+                let len = raw::read_i32_as_usize(self.reader, self.opts)?;
                 visitor.visit_seq(DeserializeSeq::<_, _, 0x3, 0xB>::new(
-                    DeserializeTag::<_, B, 0x3>::new(self.reader, self.opts),
+                    DeserializeTag::<_, B, 0x3>::new(
+                        self.reader, self.opts, self.current_depth
+                    ),
                     len,
                 ))
             }
             0xC => {
-                let len = raw::read_i32(self.reader, self.opts)? as usize;
+                let len = raw::read_i32_as_usize(self.reader, self.opts)?;
                 visitor.visit_seq(DeserializeSeq::<_, _, 0x4, 0xC>::new(
-                    DeserializeTag::<_, B, 0x4>::new(self.reader, self.opts),
+                    DeserializeTag::<_, B, 0x4>::new(
+                        self.reader, self.opts, self.current_depth
+                    ),
                     len,
                 ))
             }
@@ -592,7 +641,7 @@ where
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
         if TAG_ID == 0x7 {
-            let len = raw::read_i32(self.reader, self.opts)? as usize;
+            let len = raw::read_i32_as_usize(self.reader, self.opts)?;
             let mut array = vec![0u8; len];
             self.reader.read_exact(&mut array)?;
             visitor.visit_byte_buf(array)
@@ -605,7 +654,7 @@ where
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
         if TAG_ID == 0x7 {
-            let len = raw::read_i32(self.reader, self.opts)? as usize;
+            let len = raw::read_i32_as_usize(self.reader, self.opts)?;
 
             if B::BUFFERED {
                 // Safety: R is `&'a mut Cursor<&'buffer [u8]>` and `B` is
@@ -692,13 +741,17 @@ where
     #[inline]
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
-        drive_visitor_seq_const::<_, _, B, TAG_ID>(self.reader, self.opts, visitor)
+        drive_visitor_seq_const::<_, _, B, TAG_ID>(
+            self.reader, self.opts, self.current_depth, visitor
+        )
     }
 
     #[inline]
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where V: Visitor<'de> {
-        visitor.visit_map(DeserializeMap::<_, B>::new(self.reader, self.opts))
+        visitor.visit_map(DeserializeMap::<_, B>::new(
+            self.reader, self.opts, self.current_depth
+        ))
     }
 
     #[inline]
@@ -746,26 +799,35 @@ where
             // Unit variant
             0x1 => visitor.visit_enum(
                 variants
-                    .get(raw::read_i8(self.reader, self.opts)? as usize)
+                    .get(
+                        usize::try_from(
+                            raw::read_i8(self.reader, self.opts)?
+                        ).map_err(|_| NbtIoError::NegativeLength)?
+                    )
                     .ok_or(NbtIoError::InvalidEnumVariant)?
                     .into_deserializer(),
             ),
             0x2 => visitor.visit_enum(
                 variants
-                    .get(raw::read_i16(self.reader, self.opts)? as usize)
+                    .get(
+                        usize::try_from(
+                            raw::read_i16(self.reader, self.opts)?
+                        ).map_err(|_| NbtIoError::NegativeLength)?
+                    )
                     .ok_or(NbtIoError::InvalidEnumVariant)?
                     .into_deserializer(),
             ),
             0x3 => visitor.visit_enum(
                 variants
-                    .get(raw::read_i32(self.reader, self.opts)? as usize)
+                    .get(raw::read_i32_as_usize(self.reader, self.opts)?)
                     .ok_or(NbtIoError::InvalidEnumVariant)?
                     .into_deserializer(),
             ),
             0x8 => {
                 let mut dest = Vec::new();
                 visitor
-                    .visit_enum(raw::read_string_into(self.reader, self.opts, &mut dest)?.into_deserializer())
+                    .visit_enum(raw::read_string_into(self.reader, self.opts, &mut dest)?
+                    .into_deserializer())
             }
             // Newtype, tuple, and struct variants
             0xA => {
@@ -777,7 +839,7 @@ where
                     ($($id:literal)*) => {
                         match id {
                             $( $id => visitor.visit_enum(DeserializeEnum::<_, B, $id>::new(
-                                self.reader, self.opts, variant
+                                self.reader, self.opts, self.current_depth, variant
                             )), )*
                             _ => Err(NbtIoError::InvalidTagId(id))
                         }

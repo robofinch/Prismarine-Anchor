@@ -30,6 +30,7 @@ pub fn starts_unquoted_number(c: char) -> bool {
 
 fn chars_to_u8(chars: [char; 2]) -> Option<u8> {
     let nibbles = [
+        // The u32's are actually in range of u8, because they're hex digits
         chars[0].to_digit(16)? as u8,
         chars[1].to_digit(16)? as u8,
     ];
@@ -42,9 +43,10 @@ fn chars_to_u16(chars: [char; 4]) -> Option<u16> {
 
     let mut sum = nibbles[0]?;
     for i in 1..4 {
-        sum = (sum << 4) +  nibbles[i]?;
+        sum = (sum << 4) + nibbles[i]?;
     }
 
+    // The sum is actually in range of u16, because the nibbles fit in u8's
     Some(sum as u16)
 }
 
@@ -443,12 +445,14 @@ impl Lexer<'_> {
             ))?,
         ];
 
-        let utf_val = chars_to_u8(chars).ok_or_else(|| SnbtError::unexpected_token_at(
-            self.raw,
-            index + 2, // Skip the '\\' and 'x', which are each byte length 1
-            2,
-            "two hexadecimal digits",
-        ))? as u32;
+        let utf_val = u32::from(chars_to_u8(chars).ok_or_else(|| {
+            SnbtError::unexpected_token_at(
+                self.raw,
+                index + 2, // Skip the '\\' and 'x', which are each byte length 1
+                2,
+                "two hexadecimal digits",
+            )
+        })?);
 
         let escaped = char::from_u32(utf_val)
             .ok_or(SnbtError::unknown_escape_sequence(
@@ -500,14 +504,14 @@ impl Lexer<'_> {
 
         let chars = [get_char()?, get_char()?, get_char()?, get_char()?];
 
-        let utf_val = chars_to_u16(chars).ok_or_else(|| {
+        let utf_val = u32::from(chars_to_u16(chars).ok_or_else(|| {
             SnbtError::unexpected_token_at(
                 self.raw,
                 index + 2, // Skip the '\\' and 'u', which are each byte length 1
                 4,
                 "four hexadecimal digits",
             )
-        })? as u32;
+        })?);
 
         let escaped = char::from_u32(utf_val)
             .ok_or(SnbtError::unknown_escape_sequence(
@@ -562,14 +566,14 @@ impl Lexer<'_> {
             get_char()?, get_char()?, get_char()?, get_char()?,
         ];
 
-        let utf_val = chars_to_u32(chars).ok_or_else(|| {
+        let utf_val = u32::from(chars_to_u32(chars).ok_or_else(|| {
             SnbtError::unexpected_token_at(
                 self.raw,
                 index + 2, // Skip the '\\' and 'U', which are each byte length 1
                 8,
                 "eight hexadecimal digits",
             )
-        })? as u32;
+        })?);
 
         let escaped = char::from_u32(utf_val)
             .ok_or(SnbtError::unknown_escape_sequence(
