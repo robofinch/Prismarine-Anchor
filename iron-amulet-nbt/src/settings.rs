@@ -1,5 +1,3 @@
-use enum_map::enum_map;
-use enum_map::{Enum, EnumMap};
 use flate2::Compression;
 
 
@@ -7,19 +5,14 @@ use flate2::Compression;
 //      Limits
 // ================================
 
-// This section could be expanded to add one or two more limits on parsing and writing data,
-// in particular in regards to length. It wouldn't be too hard to give functions here data
-// that results in too much memory allocation and ultimately a crash. Is that truly important
-// to fix? Compared to functional tasks, no, and it would be time-consuming to implement,
-// so it's left as an idea.
-
-/// The recursive NBT tags (Compounds and Lists)
-/// can be nested up to (and including) 512 levels deep in the standard specification.
-/// The limit may be increased here, but note that this crate uses recursive functions
-/// to read and write NBT data; if the limit is too high and unreasonably nested data is received,
+/// The recursive NBT tags (Compounds and Lists) can be nested up to (and including)
+/// 512 levels deep in the standard specification.
+/// The limit may be increased here if the `configurable_depth` feature is enabled,
+/// but note that this crate uses recursive functions to read and write NBT data;
+/// if the limit is too high and unreasonably nested data is received,
 /// a crash could occur from the nested function calls exceeding the maximum stack size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DepthLimit(pub u32);
+pub struct DepthLimit(pub(crate) u32);
 
 impl Default for DepthLimit {
     /// The maximum depth that NBT compounds and tags can be nested in the standard Minecraft specification.
@@ -27,6 +20,27 @@ impl Default for DepthLimit {
         Self(512)
     }
 }
+
+#[cfg(feature = "configurable_depth")]
+impl DepthLimit {
+    /// A limit on how deeply the recursive NBT tags (Compounds and Lists) may be nested.
+    /// Note that this crate uses recursive functions to read and write NBT data;
+    /// if the limit is too high and unreasonably nested data is received,
+    /// a crash could occur from the nested function calls exceeding the maximum stack size.
+    pub fn new(limit: u32) -> Self {
+        Self(limit)
+    }
+}
+
+// This section could be expanded to add one or two more limits on parsing and writing data,
+// in particular in regards to length (of files/bytes/strings, multicharacter tokens).
+// It wouldn't be too hard to give functions here data that results in too much memory allocation
+// and ultimately a crash.
+// Is that truly important to fix? Compared to functional tasks, no,
+// and it would be time-consuming to implement, so it's left as an idea.
+// And too much heap memory usage isn't even likely to be *too* much of a problem
+// thanks to swap space, and catch_unwind is there if needed (if panic isn't set to abort).
+// Stack memory usage is worse, we can limit that with DepthLimit.
 
 
 // ================================
@@ -260,6 +274,7 @@ pub struct SnbtParseOptions {
 
 impl SnbtParseOptions {
     /// The default settings for the `UpdatedJava` version
+    #[inline]
     pub fn default_updated() -> Self {
         Self {
             version:                    SnbtVersion::UpdatedJava,
@@ -267,12 +282,13 @@ impl SnbtParseOptions {
             true_false:                 ParseTrueFalse::AsDetected,
             non_finite:                 ParseNonFinite::AsDetected,
             replace_non_finite:         true,
-            enabled_escape_sequences:   EscapeSequence::all_escapes(),
+            enabled_escape_sequences:   EnabledEscapeSequences::all_escapes(),
             handle_invalid_escape:      HandleInvalidEscape::Error,
         }
     }
 
     /// The default settings for the `Original` version
+    #[inline]
     pub fn default_original() -> Self {
         Self {
             version:                    SnbtVersion::Original,
@@ -280,7 +296,7 @@ impl SnbtParseOptions {
             true_false:                 ParseTrueFalse::AsDetected,
             non_finite:                 ParseNonFinite::AsDetected,
             replace_non_finite:         true,
-            enabled_escape_sequences:   EscapeSequence::no_escapes(),
+            enabled_escape_sequences:   EnabledEscapeSequences::no_escapes(),
             handle_invalid_escape:      HandleInvalidEscape::Error,
         }
     }
@@ -335,9 +351,11 @@ pub enum HandleInvalidEscape {
 pub struct SnbtWriteOptions {
     /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT,
     /// but will log warnings if escape sequences are used in the `Original` version.
-    // TODO: actually add error logging throughout the crate
+    // TODO: actually add warning and error logging throughout the crate
     pub version: SnbtVersion,
     /// The maximum depth that NBT compounds and tags can be recursively nested.
+    ///
+    /// Default: 512, the limit used by Minecraft.
     pub depth_limit: DepthLimit,
     /// How to print an infinite or NaN float/double tag, or if writing should
     /// halt with an error (if possible).
@@ -369,27 +387,29 @@ pub struct SnbtWriteOptions {
 
 impl SnbtWriteOptions {
     /// The default settings for the `UpdatedJava` version
+    #[inline]
     pub fn default_updated() -> Self {
         Self {
             version:                    SnbtVersion::UpdatedJava,
             depth_limit:                DepthLimit::default(),
             non_finite:                 WriteNonFinite::PrintFloats,
-            enabled_escape_sequences:   enum_map! {
+            enabled_escape_sequences:   EnabledEscapeSequences::from_fn(|e| match e {
                 EscapeSequence::N => false,
                 EscapeSequence::R => false,
                 EscapeSequence::S => false,
                 _ => true
-            }
+            })
         }
     }
 
     /// The default settings for the `Original` version
+    #[inline]
     pub fn default_original() -> Self {
         Self {
             version:                    SnbtVersion::UpdatedJava,
             depth_limit:                DepthLimit::default(),
             non_finite:                 WriteNonFinite::PrintFloats,
-            enabled_escape_sequences:   EscapeSequence::no_escapes(),
+            enabled_escape_sequences:   EnabledEscapeSequences::no_escapes(),
         }
     }
 }
@@ -409,9 +429,10 @@ pub enum WriteNonFinite {
     /// negative infinity as the `MIN` constant, and NaN as `0.`.
     PrintFloats,
     /// Display positive infinity as `Infinityd` or `Infinityf`, negative infinity
-    /// as `-Infinityd` or `-Infinityf`, and an NaN value as `NaN`. Note that `-Infinityd`
-    /// is not a valid unquoted string or a valid float in the `UpdatedJava` version, though
-    /// it is a valid unquoted string in the `Original` version.
+    /// as `-Infinityd` or `-Infinityf`, and an NaN value as `NaNf` or  `NaNd`.
+    /// Note that `-Infinityd` and `-Infinityf` are not valid unquoted strings or valid floats
+    /// in the `UpdatedJava` version, though they are valid unquoted strings
+    /// in the `Original` version.
     PrintStrings,
 }
 
@@ -421,78 +442,65 @@ pub enum WriteNonFinite {
 ///
 /// If the `named_escapes` feature is not enabled, the option for enabling
 /// unicode escapes will be ignored.
-pub type EnabledEscapeSequences = EnumMap<EscapeSequence, bool>;
-
-/// The various escape sequences allowed in SNBT
-#[derive(Enum)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EscapeSequence {
-    /// `\b`, backspace
-    B,
-    /// `\f`, form feed
-    F,
-    /// `\n`, newline
-    N,
-    /// `\r`, carriage return
-    R,
-    /// `\s`, space
-    S,
-    /// `\t`, horizontal tab
-    T,
-    /// `\x--`, two-character unicode escapes
-    UnicodeTwo,
-    /// `\u----`, four-character unicode escapes
-    UnicodeFour,
-    /// `\U--------`, eight-character unicode escapes
-    UnicodeEight,
-    /// `\N{----}`, named unicode escapes. (Note that `----` is a placeholder for a name
-    /// of any length.)
-    ///
-    /// If the `named_escapes` feature is not enabled, this option will be ignored.
-    UnicodeNamed,
-}
+pub struct EnabledEscapeSequences(u16);
 
-impl EscapeSequence {
+impl EnabledEscapeSequences {
+    /// Enables the escape sequences for which the provided function returns `true`.
+    #[inline]
+    pub fn from_fn(f: impl Fn(EscapeSequence) -> bool) -> Self {
+        use EscapeSequence as E;
+
+        let mut bits = 0;
+
+        for escape in [
+            E::B, E::F, E::N, E::R, E::S, E::T,
+            E::UnicodeTwo, E::UnicodeFour, E::UnicodeEight, E::UnicodeNamed
+        ] {
+            if f(escape) {
+                bits |= 1 << (escape as u8)
+            }
+        }
+
+        Self(bits)
+    }
+
     /// Enables all escape sequences.
     #[inline]
-    pub fn all_escapes() -> EnabledEscapeSequences {
-        enum_map! {
-            _ => true
-        }
+    pub fn all_escapes() -> Self {
+        Self(u16::MAX)
     }
 
     /// Disables all escape sequences.
     #[inline]
-    pub fn no_escapes() -> EnabledEscapeSequences {
-        enum_map! {
-            _ => false
-        }
+    pub fn no_escapes() -> Self {
+        Self(0)
     }
 
     /// Enables `\n` (newline), `\r` (carriage return), and `\t` (horizontal tab).
     #[inline]
-    pub fn standard_whitespace_escapes() -> EnabledEscapeSequences {
-        enum_map! {
-            Self::N => true,
-            Self::R => true,
-            Self::T => true,
+    pub fn standard_whitespace_escapes() -> Self {
+        Self::from_fn(|escape| match escape {
+            EscapeSequence::N => true,
+            EscapeSequence::R => true,
+            EscapeSequence::T => true,
             _ => false,
-        }
+        })
     }
 
     /// Enables `\b` (backspace), `\f` (form feed), `\n` (newline),
     /// `\r` (carriage return), `\s` (space), and `\t` (horizontal tab).
     #[inline]
-    pub fn one_character_escapes() -> EnabledEscapeSequences {
-        enum_map! {
-            Self::B => true,
-            Self::F => true,
-            Self::N => true,
-            Self::R => true,
-            Self::S => true,
-            Self::T => true,
+    pub fn one_character_escapes() -> Self {
+        Self::from_fn(|escape| match escape {
+            EscapeSequence::B => true,
+            EscapeSequence::F => true,
+            EscapeSequence::N => true,
+            EscapeSequence::R => true,
+            EscapeSequence::S => true,
+            EscapeSequence::T => true,
             _ => false,
-        }
+        })
     }
 
     /// Enables unicode escapes: `\x`, `\u`, and `\U` for two-, four-, or eight-character
@@ -500,13 +508,48 @@ impl EscapeSequence {
     /// Note that the named escape setting is ignored if the `named_escapes` feature
     /// is not enabled.
     #[inline]
-    pub fn unicode_escapes() -> EnabledEscapeSequences {
-        enum_map! {
-            Self::UnicodeTwo => true,
-            Self::UnicodeFour => true,
-            Self::UnicodeEight => true,
-            Self::UnicodeNamed => true,
+    pub fn unicode_escapes() -> Self {
+        Self::from_fn(|escape| match escape {
+            EscapeSequence::UnicodeTwo => true,
+            EscapeSequence::UnicodeFour => true,
+            EscapeSequence::UnicodeEight => true,
+            EscapeSequence::UnicodeNamed => true,
             _ => false,
-        }
+        })
     }
+
+    /// Whether the provided escape sequence is enabled
+    #[inline]
+    pub fn is_enabled(self, escape: EscapeSequence) -> bool {
+        0 != self.0 & (1 << (escape as u8))
+    }
+}
+
+/// The various escape sequences allowed in SNBT
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum EscapeSequence {
+    /// `\b`, backspace
+    B = 0,
+    /// `\f`, form feed
+    F = 1,
+    /// `\n`, newline
+    N = 2,
+    /// `\r`, carriage return
+    R = 3,
+    /// `\s`, space
+    S = 4,
+    /// `\t`, horizontal tab
+    T = 5,
+    /// `\x--`, two-character unicode escapes
+    UnicodeTwo = 6,
+    /// `\u----`, four-character unicode escapes
+    UnicodeFour = 7,
+    /// `\U--------`, eight-character unicode escapes
+    UnicodeEight = 8,
+    /// `\N{----}`, named unicode escapes. (Note that `----` is a placeholder for a name
+    /// of any length.)
+    ///
+    /// If the `named_escapes` feature is not enabled, this option will be ignored.
+    UnicodeNamed = 9,
 }

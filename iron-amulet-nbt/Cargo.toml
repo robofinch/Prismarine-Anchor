@@ -25,7 +25,6 @@ anyhow.workspace    = true
 byteorder.workspace = true
 cesu8.workspace     = true
 flate2.workspace    = true
-enum-map.workspace  = true
 indexmap            = { workspace = true, optional = true }
 serde               = { workspace = true, optional = true }
 unicode_names2      = { workspace = true, optional = true }
@@ -39,7 +38,7 @@ default = [ "allow_list_root", "named_escapes" ]
 preserve_order      = [ "indexmap" ]
 ## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
 named_escapes       = [ "unicode_names2" ]
-## Adds NBT file parsing and writing functions that allow a List to be the root node.
+## Adds NBT IO parsing and writing functions that allow a List to be the root node.
 ## Such a root node is sometimes used by Minecraft Bedrock Edition.
 allow_list_root     = []
 ## If enabled, the maximum nesting depth limit used when parsing or writing NBT or SNBT data can
@@ -47,27 +46,15 @@ allow_list_root     = []
 ## is what Minecraft uses, 512.
 configurable_depth  = []
 
-
-# Ideas:
-
-# length_limits
-# configurable_limits
-
-# The above would add a limit to the total length of files/strings parsed/written,
-# as well as a limit to the length of each string tag parsed/read
-# (and to each SNBT numeric literal parsed).
-# Issue: that would be a pain to implement. And too much memory usage isn't even likely
-# to be *too* much of a problem thanks to swap space, and catch_unwind is there if needed.
-
-
 #! ### Nonstandard Features
-#! The following features add additional NBT file parsing and writing functions that are not used by
-#! any version of Minecraft, and probably not by any other NBT parsing library.
+#! The following features add additional parsing and writing functions for NBT bytes
+#! (such as NBT files) that are not used by any version of Minecraft, and probably
+#! not by any other NBT parsing library.
 #! Only use these nonstandard options if you have a reason to; they are included here
 #! because they are simple to implement, and plausibly useful, not because they are important.
 
-## Adds functions that read and write NbtTags of any variant to or from a file.
+## Adds functions that read and write NbtTags of any variant to or from bytes (e.g. a file).
 allow_any_root      = [ "allow_list_root" ]
-## Adds functions that read and write NbtTags of any variant to or from an NBT file which
-## do not give the root node a name.
+## Adds functions that read and write NbtTags of any variant to or from NBT bytes
+## (e.g. an NBT file) which do not give the root node a name.
 allow_unnamed_root  = [ "allow_any_root" ]

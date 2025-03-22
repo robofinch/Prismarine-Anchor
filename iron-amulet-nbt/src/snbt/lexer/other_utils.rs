@@ -3,7 +3,7 @@
 
 use std::array;
 
-use crate::{settings::SnbtVersion, snbt::SnbtError};
+use crate::{settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion}, snbt::SnbtError};
 use super::{Lexer, Token, TokenData};
 
 
@@ -96,7 +96,7 @@ impl Lexer<'_> {
         &mut self, start: usize, char_width: usize, token_string: &str
     ) -> Option<Result<TokenData, SnbtError>> {
 
-        if self.version == SnbtVersion::UpdatedJava && token_string.ends_with(FUNC_SUFFIX) {
+        if self.snbt_version() == SnbtVersion::UpdatedJava && token_string.ends_with(FUNC_SUFFIX) {
             if token_string.starts_with(BOOL_FUNC) {
                 return Some(self.parse_bool_func(start, char_width, &token_string));
 
@@ -145,7 +145,7 @@ impl Lexer<'_> {
             ))
         };
 
-        let numeric_tag = match self.version {
+        let numeric_tag = match self.snbt_version() {
             SnbtVersion::UpdatedJava
                 => self.parse_updated_numeric(num_index, num_char_width, arg),
             SnbtVersion::Original
@@ -304,18 +304,10 @@ impl Lexer<'_> {
         // self.peek_stack should be empty if this function is called,
         // but it can't hurt to future-proof this implementation if that assumption changes.
         self.peek_stack.splice(0..0, tokens.into_iter().map(|token| {
-            Ok(TokenData {
-                token,
-                index: start,
-                char_width
-            })
+            Ok(TokenData::new(token, start, char_width))
         }));
 
-        Ok(TokenData {
-            token: first_token,
-            index: start,
-                char_width
-        })
+        Ok(TokenData::new(first_token, start, char_width))
     }
 }
 
@@ -328,197 +320,372 @@ impl Lexer<'_> {
     /// Parses the body of an escape sequence (i.e., excluding the initial backslash),
     /// and returns the character indicated by the escape as well as the number
     /// of characters in the escape sequence's body.
+    /// Returns `Ok(None)` if the escape sequence should be ignored;
+    /// returns `Ok(Some((None, body_char_width)))` if the escape sequence should be
+    /// copied verbatim instead of interpreted as an escaped character.
+    ///
     /// `index` should be the index of the escape sequence's start, i.e., the backslash.
     pub fn parse_escape_sequence(
         &mut self,
         index: usize,
-    ) -> Result<(char, usize), SnbtError> {
+    ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
         // Note that in order to try to produce a more useful error message,
         // the function doesn't try to bail out as soon as possible;
         // instead, it tries to get as far as possible.
 
-        // Also, some of the below char_width usize's for error messages
-        // do NOT exclude the backslash
+        // Also, some of the below char_width usize's
+        // for error messages do NOT exclude the backslash
 
-        let snbt_version = self.version;
+        let escapes = self.opts.enabled_escape_sequences;
+        let handle_invalid = self.opts.handle_invalid_escape;
         // Note that the compiler can inline closures, the below is practically just shorthand.
-        let check_supported: _ = |escaped: char, parsed_width: usize| {
-            match snbt_version {
-                SnbtVersion::UpdatedJava => Ok((escaped, parsed_width)),
-                SnbtVersion::Original    => Err(SnbtError::unsupported_escape_sequence(
-                    self.raw,
-                    index,
-                    parsed_width + 1,
-                ))
+        let check_supported: _ = |escaped: char, escape_type: EscapeSequence, parsed_width: usize| {
+            if escapes.is_enabled(escape_type) {
+                Ok(Some((Some(escaped), parsed_width)))
+            } else {
+                match handle_invalid {
+                    HandleInvalidEscape::CopyVerbatim => Ok(Some((None, parsed_width))),
+                    HandleInvalidEscape::Ignore => Ok(None),
+                    HandleInvalidEscape::Error => Err(SnbtError::unsupported_escape_sequence(
+                        self.raw,
+                        index,
+                        parsed_width + 1,
+                    )),
+                }
             }
         };
 
+        let Some(ch) = self.peek_ch() else {
+            self.next_ch();
+            return match handle_invalid {
+                HandleInvalidEscape::CopyVerbatim => Ok(Some((None, 0))),
+                HandleInvalidEscape::Ignore => Ok(None),
+                HandleInvalidEscape::Error => Err(SnbtError::unexpected_eos(
+                    "a character escape sequence"
+                )),
+            };
+        };
+
+        // Almost *everything* consumes a character, except for an invalid first character
+        // if handle_invalid isn't Error
+        if matches!(
+            ch,
+            '\'' | '"' | '\\'
+                | 'b' | 's' | 't' | 'n' | 'f' | 'r'
+                | 'x' | 'u' | 'U' | 'N'
+        ) {
+            self.next_ch();
+        }
+
         // This massive match is the return value
-        match self.next_ch() {
-            Some(ch @ ('\'' | '"' | '\\')) => Ok((ch, 1)),
-            Some('b') => check_supported('\x08', 1),
-            Some('s') => check_supported('\x20', 1),
-            Some('t') => check_supported('\x09', 1),
-            Some('n') => check_supported('\x0a', 1),
-            Some('f') => check_supported('\x0c', 1),
-            Some('r') => check_supported('\x0d', 1),
-            Some('x') => {
-                // Read two characters and parse
-                // The function calls to create errors are cheap and will probably be inlined
-                #[allow(clippy::or_fun_call)]
-                let chars = [
-                    self.next_ch().ok_or(SnbtError::unexpected_eos(
-                        "two-character hex unicode value",
-                    ))?,
-                    self.next_ch().ok_or(SnbtError::unexpected_eos(
-                        "two-character hex unicode value",
-                    ))?,
-                ];
-
-                let utf_val = chars_to_u8(chars).ok_or_else(|| SnbtError::unexpected_token_at(
-                    self.raw,
-                    index + 2, // Skip the '\\' and 'x', which are each byte length 1
-                    2,
-                    "two hexadecimal digits",
-                ))? as u32;
-
-                let escaped = char::from_u32(utf_val)
-                    .ok_or(SnbtError::unknown_escape_sequence(
+        match ch {
+            // These are, specially, always allowed
+            '\'' | '"' | '\\' => Ok(Some((Some(ch), 1))),
+            'b' => check_supported('\x08', EscapeSequence::B, 1),
+            's' => check_supported('\x20', EscapeSequence::S, 1),
+            't' => check_supported('\x09', EscapeSequence::T, 1),
+            'n' => check_supported('\x0a', EscapeSequence::N, 1),
+            'f' => check_supported('\x0c', EscapeSequence::F, 1),
+            'r' => check_supported('\x0d', EscapeSequence::R, 1),
+            'x' => self.parse_unicode_two(index),
+            'u' => self.parse_unicode_four(index),
+            'U' => self.parse_unicode_eight(index),
+            'N' => self.parse_unicode_named(index),
+            _ => match handle_invalid {
+                HandleInvalidEscape::CopyVerbatim => Ok(Some((None, 0))),
+                HandleInvalidEscape::Ignore => Ok(None),
+                HandleInvalidEscape::Error => {
+                    self.next_ch();
+                    Err(SnbtError::unknown_escape_sequence(
                         self.raw,
                         index,
-                        4,
-                    ))?;
-                check_supported(escaped, 3)
-            }
-            Some('u') => {
-                let mut get_char = || {
-                    // The function calls to create errors are cheap and will probably be inlined
-                    #[allow(clippy::or_fun_call)]
-                    self.next_ch().ok_or(SnbtError::unexpected_eos(
-                        "four-character hex unicode value",
-                    ))
-                };
-
-                let chars = [get_char()?, get_char()?, get_char()?, get_char()?];
-
-                let utf_val = chars_to_u16(chars).ok_or_else(|| {
-                    SnbtError::unexpected_token_at(
-                        self.raw,
-                        index + 2, // Skip the '\\' and 'u', which are each byte length 1
-                        4,
-                        "four hexadecimal digits",
-                    )
-                })? as u32;
-
-                let escaped = char::from_u32(utf_val)
-                    .ok_or(SnbtError::unknown_escape_sequence(
-                        self.raw,
-                        index,
-                        6,
-                    ))?;
-                check_supported(escaped, 5)
-            }
-            Some('U') => {
-                let mut get_char = || {
-                    // The function calls to create errors are cheap and will probably be inlined
-                    #[allow(clippy::or_fun_call)]
-                    self.next_ch().ok_or(SnbtError::unexpected_eos(
-                        "eight-character hex unicode value",
-                    ))
-                };
-
-                let chars = [
-                    get_char()?, get_char()?, get_char()?, get_char()?,
-                    get_char()?, get_char()?, get_char()?, get_char()?,
-                ];
-
-                let utf_val = chars_to_u32(chars).ok_or_else(|| {
-                    SnbtError::unexpected_token_at(
-                        self.raw,
-                        index + 2, // Skip the '\\' and 'U', which are each byte length 1
-                        8,
-                        "eight hexadecimal digits",
-                    )
-                })? as u32;
-
-                let escaped = char::from_u32(utf_val)
-                    .ok_or(SnbtError::unknown_escape_sequence(
-                        self.raw,
-                        index,
-                        10,
-                    ))?;
-                check_supported(escaped, 9)
-            }
-            Some('N') => {
-                // Get the name into a string
-                if let Some(ch) = self.next_ch() {
-                    if ch != '{' {
-                        return Err(SnbtError::unexpected_token_at(
-                            self.raw,
-                            index,
-                            1,
-                            "an opening curly bracket"
-                        ))
-                    }
-                } else {
-                    return Err(SnbtError::unexpected_eos(
-                        "a named unicode character escape"
+                        2
                     ))
                 }
+            }
+        }
+    }
 
-                let mut sequence_char_width = 1;
-                loop {
-                    if let Some(ch) = self.next_ch() {
+    fn parse_unicode_two(
+        &mut self,
+        index: usize
+    ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
 
-                        sequence_char_width += 1;
+        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeTwo);
+        let handle_invalid = self.opts.handle_invalid_escape;
 
+        if !enabled && handle_invalid != HandleInvalidEscape::Error
+        {
+            let mut parsed_width = 0;
+            if self.next_ch().is_some() {
+                parsed_width += 1;
+            }
+            if self.next_ch().is_some() {
+                parsed_width += 1;
+            }
+
+            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
+                return Ok(None);
+            } else {
+                return Ok(Some((None, parsed_width)))
+            }
+        }
+
+        // Read two characters and parse
+        // The function calls to create errors are cheap and will probably be inlined
+        #[allow(clippy::or_fun_call)]
+        let chars = [
+            self.next_ch().ok_or(SnbtError::unexpected_eos(
+                "two-character hex unicode value",
+            ))?,
+            self.next_ch().ok_or(SnbtError::unexpected_eos(
+                "two-character hex unicode value",
+            ))?,
+        ];
+
+        let utf_val = chars_to_u8(chars).ok_or_else(|| SnbtError::unexpected_token_at(
+            self.raw,
+            index + 2, // Skip the '\\' and 'x', which are each byte length 1
+            2,
+            "two hexadecimal digits",
+        ))? as u32;
+
+        let escaped = char::from_u32(utf_val)
+            .ok_or(SnbtError::unknown_escape_sequence(
+                self.raw,
+                index,
+                4,
+            ))?;
+
+        if enabled {
+            Ok(Some((Some(escaped), 3)))
+        } else {
+            Err(SnbtError::unsupported_escape_sequence(
+                self.raw,
+                index,
+                3 + 1,
+            ))
+        }
+    }
+
+    fn parse_unicode_four(
+        &mut self,
+        index: usize
+    ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
+        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeFour);
+        let handle_invalid = self.opts.handle_invalid_escape;
+
+        if !enabled && handle_invalid != HandleInvalidEscape::Error {
+            let mut parsed_width = 0;
+            for _ in 0..4 {
+                if self.next_ch().is_some() {
+                    parsed_width += 1;
+                }
+            }
+
+            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
+                return Ok(None);
+            } else {
+                return Ok(Some((None, parsed_width)))
+            }
+        }
+
+        let mut get_char = || {
+            // The function calls to create errors are cheap and will probably be inlined
+            #[allow(clippy::or_fun_call)]
+            self.next_ch().ok_or(SnbtError::unexpected_eos(
+                "four-character hex unicode value",
+            ))
+        };
+
+        let chars = [get_char()?, get_char()?, get_char()?, get_char()?];
+
+        let utf_val = chars_to_u16(chars).ok_or_else(|| {
+            SnbtError::unexpected_token_at(
+                self.raw,
+                index + 2, // Skip the '\\' and 'u', which are each byte length 1
+                4,
+                "four hexadecimal digits",
+            )
+        })? as u32;
+
+        let escaped = char::from_u32(utf_val)
+            .ok_or(SnbtError::unknown_escape_sequence(
+                self.raw,
+                index,
+                6,
+            ))?;
+
+        if enabled {
+            Ok(Some((Some(escaped), 5)))
+        } else {
+            Err(SnbtError::unsupported_escape_sequence(
+                self.raw,
+                index,
+                5 + 1,
+            ))
+        }
+    }
+
+    fn parse_unicode_eight(
+        &mut self,
+        index: usize
+    ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
+        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeEight);
+        let handle_invalid = self.opts.handle_invalid_escape;
+
+        if !enabled && handle_invalid != HandleInvalidEscape::Error {
+            let mut parsed_width = 0;
+            for _ in 0..8 {
+                if self.next_ch().is_some() {
+                    parsed_width += 1;
+                }
+            }
+
+            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
+                return Ok(None);
+            } else {
+                return Ok(Some((None, parsed_width)))
+            }
+        }
+
+        let mut get_char = || {
+            // The function calls to create errors are cheap and will probably be inlined
+            #[allow(clippy::or_fun_call)]
+            self.next_ch().ok_or(SnbtError::unexpected_eos(
+                "eight-character hex unicode value",
+            ))
+        };
+
+        let chars = [
+            get_char()?, get_char()?, get_char()?, get_char()?,
+            get_char()?, get_char()?, get_char()?, get_char()?,
+        ];
+
+        let utf_val = chars_to_u32(chars).ok_or_else(|| {
+            SnbtError::unexpected_token_at(
+                self.raw,
+                index + 2, // Skip the '\\' and 'U', which are each byte length 1
+                8,
+                "eight hexadecimal digits",
+            )
+        })? as u32;
+
+        let escaped = char::from_u32(utf_val)
+            .ok_or(SnbtError::unknown_escape_sequence(
+                self.raw,
+                index,
+                10,
+            ))?;
+
+        if enabled {
+            Ok(Some((Some(escaped), 9)))
+        } else {
+            Err(SnbtError::unsupported_escape_sequence(
+                self.raw,
+                index,
+                9 + 1,
+            ))
+        }
+    }
+
+    fn parse_unicode_named(
+        &mut self,
+        index: usize
+    ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
+        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeNamed);
+        let handle_invalid = self.opts.handle_invalid_escape;
+
+        if !enabled && handle_invalid != HandleInvalidEscape::Error {
+            let mut parsed_width = 0;
+            if let Some(ch) = self.next_ch() {
+                parsed_width += 1;
+                if ch == '{' {
+                    while let Some(ch) = self.next_ch() {
+                        parsed_width += 1;
                         if ch == '}' {
                             break;
                         }
-
-                    } else {
-                        return Err(SnbtError::unmatched_brace(
-                            self.raw,
-                            // index would be '\\', index+1 is 'N', and index+2 is '{'
-                            index + 2
-                        ))
                     }
                 }
-
-                #[cfg(feature = "named_escapes")]
-                {
-                    // skip '\\', 'N', '{'
-                    let name_start = index + 3;
-                    // ignore '}'
-                    let name_end = self.index - 1;
-
-                    // The function calls to create errors are cheap and will probably be inlined
-                    #[allow(clippy::or_fun_call)]
-                    let escaped = unicode_names2::character(
-                        &self.raw[name_start..name_end]
-                    ).ok_or(SnbtError::unknown_escape_sequence(
-                        self.raw,
-                        index,
-                        sequence_char_width
-                    ))?;
-
-                    check_supported(escaped, sequence_char_width-1)
-                }
-                #[cfg(not(feature = "named_escapes"))]
-                {
-                    Err(SnbtError::named_escape_sequence(
-                        self.raw,
-                        index,
-                        sequence_char_width
-                    ))
-                }
             }
-            Some(_) => Err(SnbtError::unknown_escape_sequence(
+
+            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
+                return Ok(None);
+            } else {
+                return Ok(Some((None, parsed_width)))
+            }
+        }
+
+        // Get the name into a string
+        if let Some(ch) = self.next_ch() {
+            if ch != '{' {
+                return Err(SnbtError::unexpected_token_at(
+                    self.raw,
+                    index,
+                    1,
+                    "an opening curly bracket"
+                ))
+            }
+        } else {
+            return Err(SnbtError::unexpected_eos(
+                "a named unicode character escape"
+            ))
+        }
+
+        let mut total_char_width = 3; // '\\', 'N', and '{'
+        loop {
+            if let Some(ch) = self.next_ch() {
+
+                total_char_width += 1;
+
+                if ch == '}' {
+                    break;
+                }
+
+            } else {
+                return Err(SnbtError::unmatched_brace(
+                    self.raw,
+                    // index would be '\\', index+1 is 'N', and index+2 is '{'
+                    index + 2
+                ))
+            }
+        }
+
+        #[cfg(feature = "named_escapes")]
+        {
+            // skip '\\', 'N', '{'
+            let name_start = index + 3;
+            // ignore '}'
+            let name_end = self.index - 1;
+
+            // The function calls to create errors are cheap and will probably be inlined
+            #[allow(clippy::or_fun_call)]
+            let escaped = unicode_names2::character(
+                &self.raw[name_start..name_end]
+            ).ok_or(SnbtError::unknown_escape_sequence(
                 self.raw,
                 index,
-                2
-            )),
-            None => Err(SnbtError::unexpected_eos("a character escape sequence"))
+                total_char_width
+            ))?;
+
+            if enabled {
+                Ok(Some((Some(escaped), 5)))
+            } else {
+                Err(SnbtError::unsupported_escape_sequence(
+                    self.raw,
+                    index,
+                    total_char_width,
+                ))
+            }
+        }
+        #[cfg(not(feature = "named_escapes"))]
+        {
+            Err(SnbtError::named_escape_sequence(
+                self.raw,
+                index,
+                total_char_width
+            ))
         }
     }
 }

@@ -1,7 +1,3 @@
-#[cfg(feature = "configurable_depth")]
-mod limited;
-
-
 use std::fmt;
 use std::hash::Hash;
 use std::{
@@ -13,12 +9,9 @@ use std::{
 use crate::{raw, snbt};
 use crate::{
     repr::{NbtReprError, NbtStructureError},
-    settings::{DepthLimit, SnbtVersion},
+    settings::{EscapeSequence, SnbtParseOptions, SnbtWriteOptions, WriteNonFinite},
     snbt::{allowed_unquoted, SnbtError, starts_unquoted_number},
 };
-
-#[cfg(feature = "configurable_depth")]
-pub use self::limited::{CompoundWithLimit, ListWithLimit, TagWithLimit};
 
 
 /// The hash map type utilized in this crate. If the feature `preserve_order` is enabled, then this
@@ -108,7 +101,12 @@ impl NbtTag {
 
     /// Converts this NBT tag into a valid, parsable SNBT string with no extraneous spacing. This
     /// method should not be used to generate user-facing text, rather [`to_pretty_snbt`] should
-    /// be used instead. If finer control over the output is desired, then the tag can be formatted
+    /// be used instead. Additionally, this function uses the default `SnbtWriteOptions`
+    /// for the original version of SNBT.
+    ///
+    /// If control over SNBT features is desired, use `to_snbt_with_options`.
+    ///
+    /// If finer control over the output is desired, then the tag can be formatted
     /// via the standard library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_snbt(&self) -> String {
@@ -116,8 +114,14 @@ impl NbtTag {
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with extra spacing for
-    /// readability. If a more compact SNBT representation is desired, then use [`to_snbt`]. If
-    /// finer control over the output is desired, then the tag can be formatted via the standard
+    /// readability. Additionally, this function uses the default `SnbtWriteOptions`
+    /// for the original version of SNBT.
+    ///
+    /// If control over SNBT features is desired, use `to_pretty_snbt_with_options`.
+    ///
+    /// If a more compact SNBT representation is desired, then use [`to_snbt`].
+    ///
+    /// If finer control over the output is desired, then the tag can be formatted via the standard
     /// library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_pretty_snbt(&self) -> String {
@@ -125,25 +129,25 @@ impl NbtTag {
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with no extraneous spacing.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
-    /// This method should not be used to generate user-facing text, rather [`to_pretty_snbt`] should
-    /// be used instead. If finer control over the output is desired, then the tag can be formatted
+    /// This method should not be used to generate user-facing text,
+    /// rather [`to_pretty_snbt`] should be used instead.
+    ///
+    /// If finer control over the output is desired, then the tag can be formatted
     /// via the standard library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
-    #[cfg(feature = "configurable_depth")]
-    pub fn to_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:?}", TagWithLimit::new(&self, depth_limit))
+    pub fn to_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:?}", TagWithOptions::new(&self, opts))
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with extra spacing for readability.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
-    /// If a more compact SNBT representation is desired, then use [`to_snbt`]. If
-    /// finer control over the output is desired, then the tag can be formatted via the standard
+    ///
+    /// If a more compact SNBT representation is desired, then use [`to_snbt`].
+    ///
+    /// If finer control over the output is desired, then the tag can be formatted via the standard
     /// library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
-    #[cfg(feature = "configurable_depth")]
-    pub fn to_pretty_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:#?}", TagWithLimit::new(&self, depth_limit))
+    pub fn to_pretty_snbt_with_limit(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:#?}", TagWithOptions::new(&self, opts))
     }
 
     /// Returns whether or not the given string needs to be quoted to form valid SNBT.
@@ -176,8 +180,10 @@ impl NbtTag {
         false
     }
 
-    /// Wraps the given string in quotes and escapes any quotes contained in the original string.
-    pub fn string_to_snbt(string: &str) -> Cow<'_, str> {
+    /// If necessary, wraps the given string in quotes and escapes any quotes
+    /// contained in the original string.
+    /// May also apply other escape sequences based on provided options.
+    pub fn string_to_snbt(string: &str, opts: SnbtWriteOptions) -> Cow<'_, str> {
         if !Self::should_quote(string) {
             return Cow::Borrowed(string);
         }
@@ -193,31 +199,75 @@ impl NbtTag {
         let mut snbt_string = String::with_capacity(2 + string.len());
         snbt_string.push(surrounding);
 
+        // Note that the newer SNBT version supports more unicode escapes,
+        // but they don't seem to be mandatory, as the strings should already
+        // allow most UTF-8 or CESU-8 characters, at least in theory.
+        let escapes = opts.enabled_escape_sequences;
+
         // Construct the string accounting for escape sequences
         for ch in string.chars() {
             match ch {
-                // Note that the newer SNBT version also supports more unicode escapes,
-                // but those don't seem to be mandatory, as the strings should already
-                // allow most UTF-8 or CESU-8 characters.
+                // Escapes for '\'', '"', and '\\' cannot be controlled by options.
+                _ if ch == surrounding || ch == '\\' => snbt_string.push('\\'),
 
-                // TODO: add option to use escape sequences when possible,
-                // and choose which categories of escapes to use.
-                '\n' => {
+                // Escapes to these characters aren't applied unless directly enabled
+                '\n' => if escapes.is_enabled(EscapeSequence::N) {
                     snbt_string.push_str("\\n");
                     continue;
                 }
-                '\r' => {
+                '\r' => if escapes.is_enabled(EscapeSequence::R) {
                     snbt_string.push_str("\\r");
                     continue;
                 }
-                '\t' => {
+                ' ' => if escapes.is_enabled(EscapeSequence::S) {
+                    snbt_string.push_str("\\s");
+                    continue;
+                }
+                '\t' => if escapes.is_enabled(EscapeSequence::T) {
                     snbt_string.push_str("\\t");
                     continue;
                 }
-                _ =>
-                    if ch == surrounding || ch == '\\' {
-                        snbt_string.push('\\');
-                    },
+
+                // Note the slight difference in syntax; these characters could be escaped
+                // with unicode escapes
+                '\x08' if escapes.is_enabled(EscapeSequence::B) => {
+                    snbt_string.push_str("\\b");
+                    continue;
+                }
+                '\x0c' if escapes.is_enabled(EscapeSequence::F) => {
+                    snbt_string.push_str("\\f");
+                    continue;
+                }
+
+                _ => if !ch.is_ascii_graphic() {
+                    let num = ch as u32;
+                    if escapes.is_enabled(EscapeSequence::UnicodeTwo) && num < (1 << 8) {
+                        snbt_string.push_str(&format!("\\x{:x}{:x}", num >> 4, num % 16));
+                        continue;
+                    } else if escapes.is_enabled(EscapeSequence::UnicodeFour) && num < (1 << 16) {
+                        snbt_string.push_str(&format!(
+                            "\\u{:x}{:x}{:x}{:x}",
+                            num >> 12,
+                            (num >> 8) % 16,
+                            (num >> 4) % 16,
+                            num & 16
+                        ));
+                        continue;
+                    } else if escapes.is_enabled(EscapeSequence::UnicodeEight) {
+                        snbt_string.push_str(&format!(
+                            "\\U{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+                            num >> 28,
+                            (num >> 24) % 16,
+                            (num >> 20) % 16,
+                            (num >> 16) % 16,
+                            (num >> 12) % 16,
+                            (num >> 8) % 16,
+                            (num >> 4) % 16,
+                            num & 16
+                        ));
+                        continue;
+                    }
+                }
             }
             snbt_string.push(ch);
         }
@@ -228,13 +278,13 @@ impl NbtTag {
 
     /// Parses an NBT tag from SNBT
     #[inline]
-    pub fn from_snbt(input: &str, version: SnbtVersion) -> Result<Self, SnbtError> {
-        snbt::parse_any(input, version)
+    pub fn from_snbt(input: &str, opts: SnbtParseOptions) -> Result<Self, SnbtError> {
+        snbt::parse_any(input, opts)
     }
 
     #[inline]
-    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, depth_limit: DepthLimit) -> fmt::Result {
-        self.recursively_format_snbt(&mut String::new(), f, 0, depth_limit)
+    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, opts: SnbtWriteOptions) -> fmt::Result {
+        self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
     #[allow(clippy::write_with_newline)]
@@ -243,7 +293,7 @@ impl NbtTag {
         indent: &mut String,
         f: &mut Formatter<'_>,
         current_depth: u32,
-        depth_limit: DepthLimit,
+        opts: SnbtWriteOptions,
     ) -> fmt::Result {
 
         fn write_list(
@@ -300,15 +350,77 @@ impl NbtTag {
         let ts = self.type_specifier();
 
         match self {
-            NbtTag::Byte(value)      => write(value, ts, f),
-            NbtTag::Short(value)     => write(value, ts, f),
-            NbtTag::Int(value)       => write(value, ts, f),
-            NbtTag::Long(value)      => write(value, ts, f),
-            NbtTag::Float(value)     => write(value, ts, f),
-            NbtTag::Double(value)    => write(value, ts, f),
+            NbtTag::Byte(value)  => write(value, ts, f),
+            NbtTag::Short(value) => write(value, ts, f),
+            NbtTag::Int(value)   => write(value, ts, f),
+            NbtTag::Long(value)  => write(value, ts, f),
+            NbtTag::Float(value) => match opts.non_finite {
+                WriteNonFinite::PrintFloats => {
+                    let float = if value.is_finite() {
+                        value
+                    } else if value.is_infinite() {
+                        if *value > 0. {
+                            &f32::MAX
+                        } else {
+                            &f32::MIN
+                        }
+                    } else {
+                        &f32::NAN
+                    };
+                    write(float, ts, f)
+                }
+                WriteNonFinite::PrintStrings => {
+                    if value.is_finite() {
+                        write(value, ts, f)
+                    } else {
+                        let string = if value.is_infinite() {
+                            if *value > 0. {
+                                "Infinityf"
+                            } else {
+                                "-Infinityf"
+                            }
+                        } else {
+                            "NaNf"
+                        };
+                        write(&string, ts, f)
+                    }
+                }
+            }
+            NbtTag::Double(value) => match opts.non_finite {
+                WriteNonFinite::PrintFloats => {
+                    let float = if value.is_finite() {
+                        value
+                    } else if value.is_infinite() {
+                        if *value > 0. {
+                            &f64::MAX
+                        } else {
+                            &f64::MIN
+                        }
+                    } else {
+                        &f64::NAN
+                    };
+                    write(float, ts, f)
+                }
+                WriteNonFinite::PrintStrings => {
+                    if value.is_finite() {
+                        write(value, ts, f)
+                    } else {
+                        let string = if value.is_infinite() {
+                            if *value > 0. {
+                                "Infinityd"
+                            } else {
+                                "-Infinityd"
+                            }
+                        } else {
+                            "NaNd"
+                        };
+                        write(&string, ts, f)
+                    }
+                }
+            }
             NbtTag::ByteArray(value) => write_list(&**value, indent, ts.unwrap(), f),
-            NbtTag::String(value)    => write!(f, "{}", Self::string_to_snbt(value)),
-            NbtTag::List(value) => if current_depth >= depth_limit.0 {
+            NbtTag::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
+            NbtTag::List(value) => if current_depth >= opts.depth_limit.0 {
                 // Converting to a string should be infallible; we can't simply error out.
                 // Instead, unfortunately, we must just print something that
                 // hopefully indicates the issue.
@@ -319,42 +431,34 @@ impl NbtTag {
                 // we need to stop here.
                 // (We use >= above instead of == just in case, but > should never occur.)
 
-                write!(f, "{}", Self::string_to_snbt(&format!(
-                    "Depth limit of {} reached; could not add List tag",
-                    depth_limit.0
-                )))
+                write!(f, "{}", Self::string_to_snbt(
+                    &format!(
+                        "Depth limit of {} reached; could not add List tag",
+                        opts.depth_limit.0
+                    ),
+                    opts,
+                ))
             } else {
                 // Note that List and Compound increment current_depth for their child members,
                 // so incrementing it here would be a logic error.
                 // Conceptually, current_depth is the depth of that list tag,
                 // and that list tag *is* the current NbtTag, more or less.
-                value.recursively_format_snbt(indent, f, current_depth, depth_limit)
+                value.recursively_format_snbt(indent, f, current_depth, opts)
             },
-            NbtTag::Compound(value) => if current_depth >= depth_limit.0 {
-                write!(f, "{}", Self::string_to_snbt(&format!(
-                    "Depth limit of {} reached; could not add Compound tag",
-                    depth_limit.0
-                )))
+            NbtTag::Compound(value) => if current_depth >= opts.depth_limit.0 {
+                write!(f, "{}", Self::string_to_snbt(
+                    &format!(
+                        "Depth limit of {} reached; could not add Compound tag",
+                        opts.depth_limit.0
+                    ),
+                    opts,
+                ))
             } else {
-                value.recursively_format_snbt(indent, f, current_depth, depth_limit)
+                value.recursively_format_snbt(indent, f, current_depth, opts)
             },
             NbtTag::IntArray(value)  => write_list(&**value, indent, ts.unwrap(), f),
             NbtTag::LongArray(value) => write_list(&**value, indent, ts.unwrap(), f),
         }
-    }
-}
-
-impl Display for NbtTag {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
-    }
-}
-
-impl Debug for NbtTag {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
     }
 }
 
@@ -689,23 +793,21 @@ impl NbtList {
     }
 
     /// Converts this tag list into a valid SNBT string.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
-    /// See `NbtTag::`[`to_pretty_snbt`] for details.
+    /// See `NbtTag::`[`to_snbt`] for details.
     ///
-    /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
+    /// [`to_snbt`]: crate::tag::NbtTag::to_snbt
     #[cfg(feature = "configurable_depth")]
-    pub fn to_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:?}", ListWithLimit::new(&self, depth_limit))
+    pub fn to_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:?}", ListWithOptions::new(&self, opts))
     }
 
     /// Converts this tag list into a valid SNBT string with extra spacing for readability.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
     /// See `NbtTag::`[`to_pretty_snbt`] for details.
     ///
     /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
     #[cfg(feature = "configurable_depth")]
-    pub fn to_pretty_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:#?}", ListWithLimit::new(&self, depth_limit))
+    pub fn to_pretty_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:#?}", ListWithOptions::new(&self, opts))
     }
 
     /// Returns the length of this list.
@@ -762,8 +864,8 @@ impl NbtList {
     }
 
     #[inline]
-    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, depth_limit: DepthLimit) -> fmt::Result {
-        self.recursively_format_snbt(&mut String::new(), f, 0, depth_limit)
+    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, opts: SnbtWriteOptions) -> fmt::Result {
+        self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
     #[allow(clippy::write_with_newline)]
@@ -772,7 +874,7 @@ impl NbtList {
         indent: &mut String,
         f: &mut Formatter<'_>,
         current_depth: u32,
-        depth_limit: DepthLimit,
+        opts: SnbtWriteOptions,
     ) -> fmt::Result {
         if self.is_empty() {
             return write!(f, "[]");
@@ -793,7 +895,7 @@ impl NbtList {
 
             // Conceptually, current_depth is the depth of this List itself;
             // its elements are one recursive tag deeper.
-            element.recursively_format_snbt(indent, f, current_depth+1, depth_limit)?;
+            element.recursively_format_snbt(indent, f, current_depth+1, opts)?;
 
             if index != last_index {
                 if f.alternate() {
@@ -905,20 +1007,6 @@ impl DerefMut for NbtList {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.0
-    }
-}
-
-impl Display for NbtList {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
-    }
-}
-
-impl Debug for NbtList {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
     }
 }
 
@@ -1044,23 +1132,21 @@ impl NbtCompound {
     }
 
     /// Converts this tag compound into a valid SNBT string.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
-    /// See `NbtTag::`[`to_pretty_snbt`] for details.
+    /// See `NbtTag::`[`to_snbt`] for details.
     ///
-    /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
+    /// [`to_snbt`]: crate::tag::NbtTag::to_snbt
     #[cfg(feature = "configurable_depth")]
-    pub fn to_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:?}", CompoundWithLimit::new(&self, depth_limit))
+    pub fn to_snbt_with_limit(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:?}", CompoundWithOptions::new(&self, opts))
     }
 
     /// Converts this tag compound into a valid SNBT string with extra spacing for readability.
-    /// Rather than the default limit on NBT nesting depth, the provided limit will be used.
     /// See `NbtTag::`[`to_pretty_snbt`] for details.
     ///
     /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
     #[cfg(feature = "configurable_depth")]
-    pub fn to_pretty_snbt_with_limit(&self, depth_limit: DepthLimit) -> String {
-        format!("{:#?}", CompoundWithLimit::new(&self, depth_limit))
+    pub fn to_pretty_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
+        format!("{:#?}", CompoundWithOptions::new(&self, opts))
     }
 
     /// Returns the number of tags in this compound.
@@ -1132,13 +1218,13 @@ impl NbtCompound {
 
     /// Parses an NBT compound from SNBT
     #[inline]
-    pub fn from_snbt(input: &str, version: SnbtVersion) -> Result<Self, SnbtError> {
-        snbt::parse_compound(input, version)
+    pub fn from_snbt(input: &str, opts: SnbtParseOptions) -> Result<Self, SnbtError> {
+        snbt::parse_compound(input, opts)
     }
 
     #[inline]
-    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, depth_limit: DepthLimit) -> fmt::Result {
-        self.recursively_format_snbt(&mut String::new(), f, 0, depth_limit)
+    fn to_formatted_snbt(&self, f: &mut Formatter<'_>, opts: SnbtWriteOptions) -> fmt::Result {
+        self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
     #[allow(clippy::write_with_newline)]
@@ -1147,7 +1233,7 @@ impl NbtCompound {
         indent: &mut String,
         f: &mut Formatter<'_>,
         current_depth: u32,
-        depth_limit: DepthLimit,
+        opts: SnbtWriteOptions,
     ) -> fmt::Result {
 
         if self.is_empty() {
@@ -1163,7 +1249,7 @@ impl NbtCompound {
 
         let last_index = self.len() - 1;
         for (index, (key, value)) in self.0.iter().enumerate() {
-            let key = NbtTag::string_to_snbt(key);
+            let key = NbtTag::string_to_snbt(key, opts);
 
             if f.alternate() {
                 write!(f, "{}{}: ", indent, key)?;
@@ -1173,7 +1259,7 @@ impl NbtCompound {
 
             // Conceptually, current_depth is the depth of this Compound itself;
             // its elements are one recursive tag deeper.
-            value.recursively_format_snbt(indent, f, current_depth+1, depth_limit)?;
+            value.recursively_format_snbt(indent, f, current_depth+1, opts)?;
 
             if index != last_index {
                 if f.alternate() {
@@ -1250,26 +1336,60 @@ where
     }
 }
 
-impl Display for NbtCompound {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
-    }
-}
-
-impl Debug for NbtCompound {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.to_formatted_snbt(f, DepthLimit::default())
-    }
-}
-
 impl Extend<(String, NbtTag)> for NbtCompound {
     #[inline]
     fn extend<T: IntoIterator<Item = (String, NbtTag)>>(&mut self, iter: T) {
         self.0.extend(iter);
     }
 }
+
+macro_rules! display_and_debug {
+    ($tag:ty, $name: ident) => {
+        impl Display for $tag {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                self.to_formatted_snbt(f, SnbtWriteOptions::default_original())
+            }
+        }
+
+        impl Debug for $tag {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                self.to_formatted_snbt(f, SnbtWriteOptions::default_original())
+            }
+        }
+
+        pub struct $name<'a> {
+            tag: &'a $tag,
+            opts: SnbtWriteOptions
+        }
+
+        impl<'a> $name<'a> {
+            pub fn new(tag: &'a $tag, opts: SnbtWriteOptions) -> Self {
+                Self { tag, opts }
+            }
+        }
+
+        impl<'a> Display for $name<'a> {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                self.tag.to_formatted_snbt(f, self.opts)
+            }
+        }
+
+        impl<'a> Debug for $name<'a> {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                self.tag.to_formatted_snbt(f, self.opts)
+            }
+        }
+    };
+}
+
+display_and_debug!(NbtTag, TagWithOptions);
+display_and_debug!(NbtList, ListWithOptions);
+display_and_debug!(NbtCompound, CompoundWithOptions);
+
 
 #[cfg(feature = "serde")]
 mod serde_impl {
@@ -1517,5 +1637,3 @@ mod serde_impl {
         }
     }
 }
-
-// Add error type solely for depth limit error

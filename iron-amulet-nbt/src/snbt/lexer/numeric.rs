@@ -11,6 +11,7 @@ use super::{Lexer, Token, TokenData};
 // - Three main numeric parsing functions
 // - Functions for calculating tokens from parsed information
 // - Helper functions
+// - Numeric parse error
 
 #[derive(Debug)]
 enum IntSuffix {
@@ -91,17 +92,13 @@ impl Lexer<'_> {
     ) -> Result<TokenData, SnbtError> {
 
         let result = try_parse_updated_int(num_string)
-            .unwrap_or_else(|| parse_float(num_string, true, true));
+            .unwrap_or_else(||
+                parse_float(num_string, true, true, self.opts.replace_non_finite, true)
+            );
 
-        result.map(|token| TokenData {
-            token,
-            index,
-            char_width
-        }).map_err(|_| SnbtError::invalid_number(
-            num_string,
-            index,
-            char_width
-        ))
+        result
+            .map(|token| TokenData::new(token, index, char_width))
+            .map_err(|_| SnbtError::invalid_number(num_string, index, char_width))
     }
 
     /// Parses a numeric token, in the Original version. See numeric module source for details.
@@ -113,17 +110,13 @@ impl Lexer<'_> {
     ) -> Result<TokenData, SnbtError> {
 
         let result = try_parse_original_int(num_string)
-            .unwrap_or_else(|| parse_float(num_string, false, false));
+            .unwrap_or_else(||
+                parse_float(num_string, false, false, self.opts.replace_non_finite, false)
+            );
 
-        result.map(|token| TokenData {
-            token,
-            index,
-            char_width
-        }).map_err(|_| SnbtError::invalid_number(
-            num_string,
-            index,
-            char_width
-        ))
+        result
+            .map(|token| TokenData::new(token, index, char_width))
+            .map_err(|_| SnbtError::invalid_number(num_string, index, char_width))
     }
 }
 
@@ -279,7 +272,9 @@ fn try_parse_original_int(num_string: &str) -> Option<Result<Token, ()>> {
 fn parse_float(
     num_string: &str,
     allow_underscores: bool,
-    allow_exponent: bool
+    allow_exponent: bool,
+    replace_non_finite: bool,
+    require_finite: bool,
 ) -> Result<Token, ()> {
 
     let mut chars = num_string.chars().peekable();
@@ -394,7 +389,10 @@ fn parse_float(
         return Err(())
     }
 
-    float_value(positive_sign, integral_digits, fractional_digits, exp, is_double, true)
+    float_value(
+        positive_sign, integral_digits, fractional_digits, exp,
+        is_double, replace_non_finite, require_finite
+    )
 }
 
 
@@ -485,6 +483,7 @@ fn float_value(
     fractional_digits: Vec<u8>,
     exp: Option<(bool, Vec<u8>)>,
     is_double: bool,
+    replace_non_finite: bool,
     require_finite: bool,
 ) -> Result<Token, ()> {
 
@@ -510,7 +509,7 @@ fn float_value(
         return Ok(if is_double {
             Token::Double(num)
         } else {
-            Token::Float(num)
+            Token::Float(num as f32)
         })
     }
 
@@ -544,15 +543,57 @@ fn float_value(
         num = num.powi(exponent);
     }
 
-    if !num.is_finite() && require_finite {
-        return Err(())
-    }
+    if is_double {
+        let num = if replace_non_finite {
+            if num.is_finite() {
+                num
 
-    Ok(if is_double {
-        Token::Double(num)
+            } else if num.is_infinite() {
+                if num > 0. {
+                    f64::MAX
+                } else {
+                    f64::MIN
+                }
+
+            } else {
+                // NaN
+                0.
+            }
+        } else {
+            num
+        };
+
+        if !num.is_finite() && require_finite {
+            return Err(())
+        }
+        Ok(Token::Double(num))
+
     } else {
-        Token::Float(num)
-    })
+        let num = num as f32;
+        let num = if replace_non_finite {
+            if num.is_finite() {
+                num
+
+            } else if num.is_infinite() {
+                if num > 0. {
+                    f32::MAX
+                } else {
+                    f32::MIN
+                }
+
+            } else {
+                // NaN
+                0.
+            }
+        } else {
+            num
+        };
+
+        if !num.is_finite() && require_finite {
+            return Err(())
+        }
+        Ok(Token::Float(num))
+    }
 }
 
 // ================================================================
@@ -708,4 +749,12 @@ fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> 
     } else {
         None
     }
+}
+
+// ================================================================
+//      Numeric Parse Error
+// ================================================================
+
+pub enum NumericParseError {
+
 }

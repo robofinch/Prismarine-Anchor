@@ -266,13 +266,14 @@ fn write_tag_body<W: Write>(writer: &mut W, opts: IoOptions, tag: &NbtTag) -> Re
     Ok(())
 }
 
-/// Describes an error which occurred during the reading or writing of NBT data.
+/// Describes an error which occurred during the reading or writing of NBT byte data.
 #[derive(Debug)]
 pub enum NbtIoError {
     /// A native I/O error.
     StdIo(io::Error),
-    /// No root tag was found. All NBT file data must start with a valid compound tag or list tag,
-    /// and in a given context, usually only one of the two is accepted.
+    /// No root tag was found. All NBT byte data must start with a valid root tag,
+    /// which by default means a Compound or List tag.
+    /// If parsing a certain file used by Minecraft, usually only one of the two is accepted.
     /// Java exclusively uses root compound tags, and in most but not all circumstances,
     /// Bedrock uses root compound tags as well.
     MissingRootTag,

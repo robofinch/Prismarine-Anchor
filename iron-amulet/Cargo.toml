@@ -7,5 +7,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+iron-amulet-nbt.workspace = true
+
 rusty-leveldb.workspace = true
 flate2.workspace = true

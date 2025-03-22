@@ -5,12 +5,12 @@
 mod lexer;
 
 
-use std::{char, fmt, mem, str};
+use std::{fmt, mem};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
 use crate::{
-    settings::{DepthLimit, SnbtVersion},
+    settings::{DepthLimit, SnbtParseOptions, SnbtVersion},
     tag::{NbtCompound, NbtList, NbtTag},
 };
 use self::lexer::{Lexer, Token, TokenData};
@@ -32,12 +32,11 @@ pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
 #[inline]
 pub fn parse_any<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
-    version: SnbtVersion,
+    opts: SnbtParseOptions,
 ) -> Result<NbtTag, SnbtError> {
     parse_any_limited(
         string_nbt,
-        version,
-        DepthLimit::default()
+        opts,
     ).map(|(tag, _)| tag)
 }
 
@@ -49,8 +48,7 @@ pub fn parse_any_original<T: AsRef<str> + ?Sized>(
 ) -> Result<NbtTag, SnbtError> {
     parse_any_limited(
         string_nbt,
-        SnbtVersion::Original,
-        DepthLimit::default()
+        SnbtParseOptions::default_original(),
     ).map(|(tag, _)| tag)
 }
 
@@ -62,8 +60,7 @@ pub fn parse_any_updated<T: AsRef<str> + ?Sized>(
 ) -> Result<NbtTag, SnbtError> {
     parse_any_limited(
         string_nbt,
-        SnbtVersion::UpdatedJava,
-        DepthLimit::default()
+        SnbtParseOptions::default_updated(),
     ).map(|(tag, _)| tag)
 }
 
@@ -72,12 +69,11 @@ pub fn parse_any_updated<T: AsRef<str> + ?Sized>(
 #[inline]
 pub fn parse_compound<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
-    version: SnbtVersion,
+    opts: SnbtParseOptions
 ) -> Result<NbtCompound, SnbtError> {
     parse_compound_limited(
         string_nbt,
-        version,
-        DepthLimit::default()
+        opts,
     ).map(|(tag, _)| tag)
 }
 
@@ -89,8 +85,7 @@ pub fn parse_compound_updated<T: AsRef<str> + ?Sized>(
 ) -> Result<NbtCompound, SnbtError> {
     parse_compound_limited(
         string_nbt,
-        SnbtVersion::UpdatedJava,
-        DepthLimit::default()
+        SnbtParseOptions::default_updated(),
     ).map(|(tag, _)| tag)
 }
 
@@ -102,8 +97,7 @@ pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
 ) -> Result<NbtCompound, SnbtError> {
     parse_compound_limited(
         string_nbt,
-        SnbtVersion::Original,
-        DepthLimit::default()
+        SnbtParseOptions::default_original(),
     ).map(|(tag, _)| tag)
 }
 
@@ -115,11 +109,10 @@ pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
 /// but also returns the amount of parsed characters, and takes a `DepthLimit` setting.
 pub fn parse_any_limited<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
-    version: SnbtVersion,
-    depth_limit: DepthLimit,
+    opts: SnbtParseOptions
 ) -> Result<(NbtTag, usize), SnbtError> {
-    let mut tokens = Lexer::new(string_nbt.as_ref(), version);
-    let tag = parse_next_value(&mut tokens, None)?;
+    let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
+    let tag = parse_next_value(&mut tokens, None, false)?;
 
     Ok((tag, tokens.index()))
 }
@@ -128,11 +121,10 @@ pub fn parse_any_limited<T: AsRef<str> + ?Sized>(
 /// but also returns the amount of parsed characters, and takes a `DepthLimit` setting.
 pub fn parse_compound_limited<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
-    version: SnbtVersion,
-    depth_limit: DepthLimit,
+    opts: SnbtParseOptions
 ) -> Result<(NbtCompound, usize), SnbtError> {
-    let mut tokens = Lexer::new(string_nbt.as_ref(), version);
-    let open_curly = tokens.assert_next(Token::OpenCurly)?;
+    let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
+    let open_curly = tokens.assert_next(Token::OpenCurly, false)?;
     parse_compound_tag(&mut tokens, &open_curly)
 }
 
@@ -140,41 +132,40 @@ pub fn parse_compound_limited<T: AsRef<str> + ?Sized>(
 fn parse_next_value(
     tokens: &mut Lexer<'_>,
     delimiter: Option<fn(char) -> bool>,
+    expecting_string: bool,
 ) -> Result<NbtTag, SnbtError> {
-    let token = tokens.next(delimiter).transpose()?;
+    let token = tokens.next(delimiter, expecting_string).transpose()?;
     parse_value(tokens, token)
 }
 
 /// Parses a token into a value
 fn parse_value(tokens: &mut Lexer<'_>, token: Option<TokenData>) -> Result<NbtTag, SnbtError> {
-    match token {
-        // Open curly brace indicates a compound tag is present
-        #[rustfmt::skip]
-        Some(
-            td @ TokenData {
+
+    if let Some(td) = token {
+        match td {
+            // Open curly brace indicates a compound tag is present
+            TokenData {
                 token: Token::OpenCurly,
                 ..
-            },
-        ) => parse_compound_tag(tokens, &td).map(|(tag, _)| tag.into()),
+            } => parse_compound_tag(tokens, &td).map(|(tag, _)| tag.into()),
 
-        // Open square brace indicates that some kind of list is present
-        #[rustfmt::skip]
-        Some(
-            td @ TokenData {
+            // Open square brace indicates that some kind of list is present
+            TokenData {
                 token: Token::OpenSquare,
                 ..
-            },
-        ) => parse_list(tokens, &td),
+            } => parse_list(tokens, &td),
 
-        // Could be a value token or delimiter token
-        Some(td) => {
-            td.into_tag().map_err(|td| {
-                SnbtError::unexpected_token(tokens.raw(), Some(&td), "value")
-            })
-        },
+            // Could be a value token or delimiter token
+            _ => {
+                td.into_tag().map_err(|td| {
+                    SnbtError::unexpected_token(tokens.raw(), Some(&td), "value")
+                })
+            }
+        }
 
+    } else {
         // We expected a value but ran out of data
-        None => Err(SnbtError::unexpected_eos("value")),
+        Err(SnbtError::unexpected_eos("value"))
     }
 }
 
@@ -182,7 +173,7 @@ fn parse_value(tokens: &mut Lexer<'_>, token: Option<TokenData>) -> Result<NbtTa
 fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag, SnbtError> {
     const DELIMITER: Option<fn(char) -> bool> = Some(|ch| matches!(ch, ',' | ']' | ';'));
 
-    match tokens.next(DELIMITER).transpose()? {
+    match tokens.next(DELIMITER, false).transpose()? {
         // Empty list ('[]') with no type specifier is treated as an empty NBT tag list
         Some(TokenData {
             token: Token::ClosedSquare,
@@ -202,7 +193,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
             char_width,
         }) => {
             // Peek at the next token to see if it's a semicolon, which would indicate a primitive vector
-            match tokens.peek(DELIMITER) {
+            match tokens.peek(DELIMITER, false) {
                 // Parse as a primitive vector
                 Some(Ok(TokenData {
                     token: Token::Semicolon,
@@ -218,7 +209,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
                     }
 
                     // Moves past the peeked semicolon
-                    tokens.next(None);
+                    tokens.next(None, false);
 
                     // Determine the primitive type and parse it
                     match string.as_str() {
@@ -241,7 +232,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
 
         // Any other pattern is delegated to the general tag list parser
         td => {
-            let first_element = parse_value(tokens, td, )?;
+            let first_element = parse_value(tokens, td)?;
             parse_tag_list(tokens, first_element).map(Into::into)
         }
     }
@@ -260,7 +251,7 @@ where
     let mut comma: Option<usize> = Some(0);
 
     loop {
-        match tokens.next(Some(|ch| ch == ',' || ch == ']')).transpose()? {
+        match tokens.next(Some(|ch| ch == ',' || ch == ']'), false).transpose()? {
             // Finish off the list
             Some(TokenData {
                 token: Token::ClosedSquare,
@@ -315,12 +306,13 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
     // Construct the list and use the first element to determine the list's type
     let mut list = NbtList::new();
     let mut descrim = mem::discriminant(&first_element);
+    let expecting_strings = matches!(&first_element, &NbtTag::String(_));
     let mut list_holds_compounds = matches!(&first_element, &NbtTag::Compound{..});
     list.push(first_element);
 
     loop {
         // No delimiter needed since we only expect ']' and ','
-        match tokens.next(None).transpose()? {
+        match tokens.next(None, expecting_strings).transpose()? {
             // Finish off the list
             Some(TokenData {
                 token: Token::ClosedSquare,
@@ -332,13 +324,13 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
                 token: Token::Comma,
                 ..
             }) => {
-                let (index, char_width) = match tokens.peek(DELIMITER) {
+                let (index, char_width) = match tokens.peek(DELIMITER, expecting_strings) {
                     Some(&Ok(TokenData {
                         index, char_width, ..
                     })) => (index, char_width),
                     _ => (0, 0),
                 };
-                let element = parse_next_value(tokens, DELIMITER)?;
+                let element = parse_next_value(tokens, DELIMITER, expecting_strings)?;
 
                 if mem::discriminant(&element) == descrim {
                     list.push(element);
@@ -401,65 +393,68 @@ fn parse_compound_tag<'a>(
     let mut comma: Option<usize> = Some(0);
 
     loop {
-        match tokens.next(Some(|ch| ch == ':')).transpose()? {
-            // Finish off the compound tag
-            Some(TokenData {
-                token: Token::ClosedCurly,
-                ..
-            }) => {
-                match comma {
-                    // First loop iteration or no comma
-                    Some(0) | None => return Ok((compound, tokens.index())),
-                    // Later iteration with a trailing comma
-                    Some(index) => return Err(SnbtError::trailing_comma(tokens.raw(), index)),
-                }
-            }
-
-            // Parse a new key-value pair
-            Some(TokenData {
-                token: Token::String { value: key, .. },
-                index,
-                char_width,
-            }) => {
-                match comma {
-                    // First loop iteration or a comma indicated that more data is present
-                    Some(_) => {
-                        tokens.assert_next(Token::Colon)?;
-                        compound.insert(
-                            key,
-                            parse_next_value(tokens, Some(|ch| ch == ',' || ch == '}'))?,
-                        );
-                        comma = None;
+        if let Some(td) = tokens.next(Some(|ch| ch == ':'), true).transpose()? {
+            match td {
+                // Finish off the compound tag
+                TokenData {
+                    token: Token::ClosedCurly,
+                    ..
+                } => {
+                    match comma {
+                        // First loop iteration or no comma
+                        Some(0) | None => return Ok((compound, tokens.index())),
+                        // Later iteration with a trailing comma
+                        Some(index) => return Err(SnbtError::trailing_comma(tokens.raw(), index)),
                     }
-
-                    // There was not a comma before this string so therefore the token is unexpected
-                    None =>
-                        return Err(SnbtError::unexpected_token_at(
-                            tokens.raw(),
-                            index,
-                            char_width,
-                            Token::Comma.as_expectation(),
-                        )),
                 }
+
+                // Parse a new key-value pair
+                TokenData {
+                    token: Token::String { value: key, .. },
+                    index,
+                    char_width,
+                } => {
+                    match comma {
+                        // First loop iteration or a comma indicated that more data is present
+                        Some(_) => {
+                            tokens.assert_next(Token::Colon, false)?;
+                            compound.insert(
+                                key,
+                                parse_next_value(tokens, Some(|ch| ch == ',' || ch == '}'), false)?,
+                            );
+                            comma = None;
+                        }
+
+                        // There was not a comma before this string so therefore the token is unexpected
+                        None =>
+                            return Err(SnbtError::unexpected_token_at(
+                                tokens.raw(),
+                                index,
+                                char_width,
+                                Token::Comma.as_expectation(),
+                            )),
+                    }
+                }
+
+                // Denote that another key-value pair is anticipated
+                TokenData {
+                    token: Token::Comma,
+                    index,
+                    ..
+                } => comma = Some(index),
+
+                // Catch-all for unexpected tokens
+                td =>
+                    return Err(SnbtError::unexpected_token(
+                        tokens.raw(),
+                        Some(&td),
+                        "compound key, '}', or ','",
+                    )),
             }
 
-            // Denote that another key-value pair is anticipated
-            Some(TokenData {
-                token: Token::Comma,
-                index,
-                ..
-            }) => comma = Some(index),
-
-            // Catch-all for unexpected tokens
-            Some(td) =>
-                return Err(SnbtError::unexpected_token(
-                    tokens.raw(),
-                    Some(&td),
-                    "compound key, '}', or ','",
-                )),
-
-            // End of file / unmatched brace
-            None => return Err(SnbtError::unmatched_brace(tokens.raw(), open_curly.index)),
+        } else {
+            // End of input / unmatched brace
+            return Err(SnbtError::unmatched_brace(tokens.raw(), open_curly.index))
         }
     }
 }
@@ -558,6 +553,14 @@ impl SnbtError {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
             error: ParserErrorType::InvalidUUID,
+        }
+    }
+
+    fn ambiguous_token(input: &str, index: usize, char_width: usize) -> Self {
+        Self {
+            segment: Self::segment(input, index, char_width, 0, 0),
+            index,
+            error: ParserErrorType::AmbiguousToken,
         }
     }
 
@@ -661,6 +664,8 @@ impl Display for SnbtError {
                 => write!(f, "Invalid number: {}", self.segment),
             ParserErrorType::InvalidUUID
                 => write!(f, "Invalid string representation of a UUID: {}", self.segment),
+            ParserErrorType::AmbiguousToken
+                => write!(f, "Ambiguous token '{}' at column {}", self.segment, self.index),
             ParserErrorType::TrailingComma
                 => write!(f, "Forbidden trailing comma at column {}: '{}'", self.index, self.segment),
             ParserErrorType::UnmatchedQuote
@@ -723,6 +728,9 @@ pub enum ParserErrorType {
     InvalidNumber,
     /// An invalid string representation of a UUID.
     InvalidUUID,
+    /// An unquoted token which could be numeric or a string,
+    /// which was prohibited in parsing options.
+    AmbiguousToken,
     /// A trailing comma was encountered in a list or compound when it shouldn't have been.
     TrailingComma,
     /// An unmatched single or double quote was encountered.
