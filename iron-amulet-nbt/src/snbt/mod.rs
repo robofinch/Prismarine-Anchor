@@ -15,6 +15,7 @@ use self::lexer::{FromExact, FromLossless, Lexer, Token, TokenData};
 
 
 pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
+pub(crate) use self::lexer::is_ambiguous;
 
 
 // Should add module-wide documentation about the specification and implementation.
@@ -515,10 +516,10 @@ pub struct SnbtError {
 }
 
 impl SnbtError {
-    fn exceeded_depth_limit(limit: DepthLimit) -> Self {
+    fn exceeded_depth_limit(input: &str, index: usize, limit: DepthLimit) -> Self {
         Self {
-            segment: String::new(),
-            index: 0,
+            segment: Self::segment(input, index, 1, 4, 4),
+            index,
             error: ParserErrorType::ExceededDepthLimit { limit }
         }
     }

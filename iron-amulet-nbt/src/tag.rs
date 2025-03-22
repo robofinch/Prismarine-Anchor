@@ -10,7 +10,7 @@ use crate::{raw, snbt};
 use crate::{
     repr::{NbtReprError, NbtStructureError},
     settings::{EscapeSequence, SnbtParseOptions, SnbtWriteOptions, WriteNonFinite},
-    snbt::{allowed_unquoted, SnbtError, starts_unquoted_number},
+    snbt::{allowed_unquoted, is_ambiguous, SnbtError, starts_unquoted_number},
 };
 
 
@@ -171,13 +171,17 @@ impl NbtTag {
             }
         }
 
+        // If any of the characters aren't allowed to be unquoted, then the string must
+        // be quoted
         for ch in string.chars() {
             if !allowed_unquoted(ch)  {
                 return true;
             }
         }
 
-        false
+        // If the string would have ambiguous type if it were unquoted, like "true",
+        // then it should be quoted.
+        is_ambiguous(string)
     }
 
     /// If necessary, wraps the given string in quotes and escapes any quotes
@@ -240,33 +244,21 @@ impl NbtTag {
                 }
 
                 _ => if !ch.is_ascii_graphic() {
-                    let num = ch as u32;
-                    if escapes.is_enabled(EscapeSequence::UnicodeTwo) && num < (1 << 8) {
-                        snbt_string.push_str(&format!("\\x{:x}{:x}", num >> 4, num % 16));
-                        continue;
-                    } else if escapes.is_enabled(EscapeSequence::UnicodeFour) && num < (1 << 16) {
-                        snbt_string.push_str(&format!(
-                            "\\u{:x}{:x}{:x}{:x}",
-                            num >> 12,
-                            (num >> 8) % 16,
-                            (num >> 4) % 16,
-                            num & 16
-                        ));
-                        continue;
-                    } else if escapes.is_enabled(EscapeSequence::UnicodeEight) {
-                        snbt_string.push_str(&format!(
-                            "\\U{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
-                            num >> 28,
-                            (num >> 24) % 16,
-                            (num >> 20) % 16,
-                            (num >> 16) % 16,
-                            (num >> 12) % 16,
-                            (num >> 8) % 16,
-                            (num >> 4) % 16,
-                            num & 16
-                        ));
-                        continue;
-                    }
+                    let num = format!("{:x}", ch as u32);
+                    // Note that each hex digit has a length of 1 byte
+                    snbt_string.push_str(match num.len() {
+                        1 => "\\x0",
+                        2 => "\\x",
+                        3 => "\\u0",
+                        4 => "\\u",
+                        5 => "\\U000",
+                        6 => "\\U00",
+                        7 => "\\U0",
+                        // 0 and strictly greater than 8 are impossible,
+                        // but might as well throw them in this case.
+                        _ => "\\U",
+                    });
+                    snbt_string.push_str(&num);
                 }
             }
             snbt_string.push(ch);

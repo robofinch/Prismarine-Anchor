@@ -41,6 +41,12 @@ impl DepthLimit {
 // And too much heap memory usage isn't even likely to be *too* much of a problem
 // thanks to swap space, and catch_unwind is there if needed (if panic isn't set to abort).
 // Stack memory usage is worse, we can limit that with DepthLimit.
+// Might need to place a TotalLengthLimit on parsing files, though, or place a limit
+// on how many items can be in a compound tag or list tag and have an option to ignore ones
+// that are too long, in case a user is trying to handle some really bad NBT data,
+// trying to delete parts of it. Likewise, perhaps this library could use features to try to
+// recover corrupt NBT byte data as much as possible...
+// but until that becomes a problem someone has, it doesn't seem worth tackling.
 
 
 // ================================

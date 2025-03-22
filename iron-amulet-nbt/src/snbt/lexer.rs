@@ -562,6 +562,10 @@ impl FromLossless<Token> for i64 {
     }
 }
 
+pub(crate) fn is_ambiguous(string: &str) -> bool {
+    AmbiguousWord::new(string).is_some()
+}
+
 #[derive(Debug)]
 pub enum AmbiguousWord {
     True,
