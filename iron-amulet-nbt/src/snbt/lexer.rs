@@ -52,13 +52,12 @@ impl<'a> Lexer<'a> {
 
     pub fn peek(
         &mut self,
-        delimiter: Option<fn(char) -> bool>,
         expecting_string: bool,
     ) -> Option<&Result<TokenData, SnbtError>> {
 
         if self.peek_stack.is_empty() {
 
-            if let Some(res) = self.next(delimiter, expecting_string) {
+            if let Some(res) = self.next(expecting_string) {
                 self.peek_stack.push(res);
 
             } else {
@@ -75,7 +74,6 @@ impl<'a> Lexer<'a> {
 
     pub fn next(
         &mut self,
-        delimiter: Option<fn(char) -> bool>,
         expecting_string: bool,
     ) -> Option<Result<TokenData, SnbtError>> {
         // Manage the peeking function
@@ -97,7 +95,7 @@ impl<'a> Lexer<'a> {
             ',' => TokenData::new(Token::Comma, self.index, 1),
             ':' => TokenData::new(Token::Colon, self.index, 1),
             ';' => TokenData::new(Token::Semicolon, self.index, 1),
-            _ => return Some(self.slurp_token(delimiter, expecting_string)),
+            _ => return Some(self.slurp_token(expecting_string)),
         };
 
         self.next_ch();
@@ -125,7 +123,7 @@ impl<'a> Lexer<'a> {
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
 
-        match self.next(None, expecting_string).transpose()? {
+        match self.next(expecting_string).transpose()? {
             // We found a token so check the token type
             Some(td) =>
                 if mem::discriminant(&td.token) == mem::discriminant(&token) {
@@ -147,7 +145,6 @@ impl<'a> Lexer<'a> {
     /// with `parse_token`.
     fn slurp_token(
         &mut self,
-        delimiter: Option<fn(char) -> bool>,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
 

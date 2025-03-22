@@ -33,7 +33,7 @@ pub fn parse_any<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     opts: SnbtParseOptions,
 ) -> Result<NbtTag, SnbtError> {
-    parse_any_limited(
+    parse_any_and_size(
         string_nbt,
         opts,
     ).map(|(tag, _)| tag)
@@ -45,7 +45,7 @@ pub fn parse_any<T: AsRef<str> + ?Sized>(
 pub fn parse_any_original<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
 ) -> Result<NbtTag, SnbtError> {
-    parse_any_limited(
+    parse_any_and_size(
         string_nbt,
         SnbtParseOptions::default_original(),
     ).map(|(tag, _)| tag)
@@ -57,7 +57,7 @@ pub fn parse_any_original<T: AsRef<str> + ?Sized>(
 pub fn parse_any_updated<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
 ) -> Result<NbtTag, SnbtError> {
-    parse_any_limited(
+    parse_any_and_size(
         string_nbt,
         SnbtParseOptions::default_updated(),
     ).map(|(tag, _)| tag)
@@ -70,7 +70,7 @@ pub fn parse_compound<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     opts: SnbtParseOptions
 ) -> Result<NbtCompound, SnbtError> {
-    parse_compound_limited(
+    parse_compound_and_size(
         string_nbt,
         opts,
     ).map(|(tag, _)| tag)
@@ -82,7 +82,7 @@ pub fn parse_compound<T: AsRef<str> + ?Sized>(
 pub fn parse_compound_updated<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
 ) -> Result<NbtCompound, SnbtError> {
-    parse_compound_limited(
+    parse_compound_and_size(
         string_nbt,
         SnbtParseOptions::default_updated(),
     ).map(|(tag, _)| tag)
@@ -94,7 +94,7 @@ pub fn parse_compound_updated<T: AsRef<str> + ?Sized>(
 pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
 ) -> Result<NbtCompound, SnbtError> {
-    parse_compound_limited(
+    parse_compound_and_size(
         string_nbt,
         SnbtParseOptions::default_original(),
     ).map(|(tag, _)| tag)
@@ -105,20 +105,20 @@ pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
 // ================================
 
 /// Parses the given string into a tag just like [`parse_any`],
-/// but also returns the amount of parsed characters, and takes a `DepthLimit` setting.
-pub fn parse_any_limited<T: AsRef<str> + ?Sized>(
+/// but also returns the number of parsed characters.
+pub fn parse_any_and_size<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     opts: SnbtParseOptions
 ) -> Result<(NbtTag, usize), SnbtError> {
     let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
-    let tag = parse_next_value(&mut tokens, None, false)?;
+    let tag = parse_next_value(&mut tokens, false)?;
 
     Ok((tag, tokens.index()))
 }
 
 /// Parses the given string just like [`parse_compound`],
-/// but also returns the amount of parsed characters, and takes a `DepthLimit` setting.
-pub fn parse_compound_limited<T: AsRef<str> + ?Sized>(
+/// but also returns the number of parsed characters.
+pub fn parse_compound_and_size<T: AsRef<str> + ?Sized>(
     string_nbt: &T,
     opts: SnbtParseOptions
 ) -> Result<(NbtCompound, usize), SnbtError> {
@@ -130,10 +130,9 @@ pub fn parse_compound_limited<T: AsRef<str> + ?Sized>(
 // Parses the next value in the token stream
 fn parse_next_value(
     tokens: &mut Lexer<'_>,
-    delimiter: Option<fn(char) -> bool>,
     expecting_string: bool,
 ) -> Result<NbtTag, SnbtError> {
-    let token = tokens.next(delimiter, expecting_string).transpose()?;
+    let token = tokens.next(expecting_string).transpose()?;
     parse_value(tokens, token)
 }
 
@@ -170,9 +169,7 @@ fn parse_value(tokens: &mut Lexer<'_>, token: Option<TokenData>) -> Result<NbtTa
 
 // Parses a list, which can be either a generic tag list or vector of primitives
 fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag, SnbtError> {
-    const DELIMITER: Option<fn(char) -> bool> = Some(|ch| matches!(ch, ',' | ']' | ';'));
-
-    match tokens.next(DELIMITER, false).transpose()? {
+    match tokens.next(false).transpose()? {
         // Empty list ('[]') with no type specifier is treated as an empty NBT tag list
         Some(TokenData {
             token: Token::ClosedSquare,
@@ -192,7 +189,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
             char_width,
         }) => {
             // Peek at the next token to see if it's a semicolon, which would indicate a primitive vector
-            match tokens.peek(DELIMITER, false) {
+            match tokens.peek(false) {
                 // Parse as a primitive vector
                 Some(Ok(TokenData {
                     token: Token::Semicolon,
@@ -208,7 +205,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
                     }
 
                     // Moves past the peeked semicolon
-                    tokens.next(None, false);
+                    tokens.next(false);
 
                     // Determine the primitive type and parse it
                     match string.as_str() {
@@ -250,7 +247,7 @@ where
     let mut comma: Option<usize> = Some(0);
 
     loop {
-        match tokens.next(Some(|ch| ch == ',' || ch == ']'), false).transpose()? {
+        match tokens.next(false).transpose()? {
             // Finish off the list
             Some(TokenData {
                 token: Token::ClosedSquare,
@@ -325,8 +322,6 @@ where
 }
 
 fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtList, SnbtError> {
-    const DELIMITER: Option<fn(char) -> bool> = Some(|ch| ch == ',' || ch == ']');
-
     // Construct the list and use the first element to determine the list's type
     let mut list = NbtList::new();
     let mut descrim = mem::discriminant(&first_element);
@@ -335,8 +330,7 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
     list.push(first_element);
 
     loop {
-        // No delimiter needed since we only expect ']' and ','
-        match tokens.next(None, expecting_strings).transpose()? {
+        match tokens.next(expecting_strings).transpose()? {
             // Finish off the list
             Some(TokenData {
                 token: Token::ClosedSquare,
@@ -348,7 +342,7 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
                 token: Token::Comma,
                 ..
             }) => {
-                let (index, char_width) = match tokens.peek(DELIMITER, expecting_strings) {
+                let (index, char_width) = match tokens.peek(expecting_strings) {
                     // The comma could be a trailing comma at the end of the list
                     Some(&Ok(TokenData {
                         index, token: Token::ClosedSquare, ..
@@ -363,7 +357,7 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
                     })) => (index, char_width),
                     _ => (0, 0),
                 };
-                let element = parse_next_value(tokens, DELIMITER, expecting_strings)?;
+                let element = parse_next_value(tokens, expecting_strings)?;
 
                 if mem::discriminant(&element) == descrim {
                     list.push(element);
@@ -426,7 +420,7 @@ fn parse_compound_tag<'a>(
     let mut comma: Option<usize> = Some(0);
 
     loop {
-        if let Some(td) = tokens.next(Some(|ch| ch == ':'), true).transpose()? {
+        if let Some(td) = tokens.next(true).transpose()? {
             match td {
                 // Finish off the compound tag
                 TokenData {
@@ -455,7 +449,7 @@ fn parse_compound_tag<'a>(
                             tokens.assert_next(Token::Colon, false)?;
                             compound.insert(
                                 key,
-                                parse_next_value(tokens, Some(|ch| ch == ',' || ch == '}'), false)?,
+                                parse_next_value(tokens, false)?,
                             );
                             comma = None;
                         }
