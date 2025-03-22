@@ -18,6 +18,7 @@ enum IntSuffix {
     B,
     S,
     I,
+    None,
     L,
 }
 
@@ -160,10 +161,11 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
                     if let Some((_, suffix)) = finish_integer(chars, 10) {
                         return Some(Ok(
                             match suffix {
-                                IntSuffix::B => Token::Byte(0),
-                                IntSuffix::S => Token::Short(0),
-                                IntSuffix::I => Token::Int(0),
-                                IntSuffix::L => Token::Long(0),
+                                IntSuffix::B    => Token::Byte(0),
+                                IntSuffix::S    => Token::Short(0),
+                                IntSuffix::I    => Token::int(0, true),
+                                IntSuffix::None => Token::int(0, false),
+                                IntSuffix::L    => Token::Long(0),
                             }
                         ));
                     } else {
@@ -174,7 +176,7 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
                 None => {
                     // The input is [+ | -]0 with no other digits.
                     // This is indeed an integer, it's zero.
-                    return Some(Ok(Token::Int(0)))
+                    return Some(Ok(Token::int(0, false)))
                 }
             }
         }
@@ -421,28 +423,31 @@ fn integral_value(
         // The int has to fit in a smaller number.
         // Note that the "as i8/i16/i32" are no-ops added to make "as i64" sign-extend.
         (true, true) => match suffix {
-            IntSuffix::B => Token::Byte(  u8::try_from(num).map_err(|_| ())? as i8),
-            IntSuffix::S => Token::Short(u16::try_from(num).map_err(|_| ())? as i16),
-            IntSuffix::I => Token::Int(  u32::try_from(num).map_err(|_| ())? as i32),
+            IntSuffix::B    => Token::Byte(  u8::try_from(num).map_err(|_| ())? as i8),
+            IntSuffix::S    => Token::Short(u16::try_from(num).map_err(|_| ())? as i16),
+            IntSuffix::I    => Token::int(  u32::try_from(num).map_err(|_| ())? as i32, true),
+            IntSuffix::None => Token::int(  u32::try_from(num).map_err(|_| ())? as i32, false),
             // The full range is allowed
-            IntSuffix::L => Token::Long(num as i64),
+            IntSuffix::L    => Token::Long(num as i64),
         },
 
         // The negative half of the range would have a minus sign
         (true, false) => match suffix {
-            IntSuffix::B => Token::Byte(  i8::try_from(num).map_err(|_| ())?),
-            IntSuffix::S => Token::Short(i16::try_from(num).map_err(|_| ())?),
-            IntSuffix::I => Token::Int(  i32::try_from(num).map_err(|_| ())?),
-            IntSuffix::L => Token::Long( i64::try_from(num).map_err(|_| ())?),
+            IntSuffix::B    => Token::Byte(  i8::try_from(num).map_err(|_| ())?),
+            IntSuffix::S    => Token::Short(i16::try_from(num).map_err(|_| ())?),
+            IntSuffix::I    => Token::int(  i32::try_from(num).map_err(|_| ())?, true),
+            IntSuffix::None => Token::int(  i32::try_from(num).map_err(|_| ())?, false),
+            IntSuffix::L    => Token::Long( i64::try_from(num).map_err(|_| ())?),
         }
 
         // -0 is the only unsigned integer with a minus sign
         (false, true) => if num == 0 {
             match suffix {
-                IntSuffix::B => Token::Byte(0),
-                IntSuffix::S => Token::Short(0),
-                IntSuffix::I => Token::Int(0),
-                IntSuffix::L => Token::Long(0),
+                IntSuffix::B    => Token::Byte(0),
+                IntSuffix::S    => Token::Short(0),
+                IntSuffix::I    => Token::int(0, true),
+                IntSuffix::None => Token::int(0, false),
+                IntSuffix::L    => Token::Long(0),
             }
         } else {
             return Err(())
@@ -463,7 +468,12 @@ fn integral_value(
                 return Err(())
             },
             IntSuffix::I => if num <= i32::MAX as u64 + 1 {
-                Token::Int((num as i32).wrapping_neg())
+                Token::int((num as i32).wrapping_neg(), true)
+            } else {
+                return Err(())
+            },
+            IntSuffix::None => if num <= i32::MAX as u64 + 1 {
+                Token::int((num as i32).wrapping_neg(), false)
             } else {
                 return Err(())
             },
@@ -720,15 +730,16 @@ fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> 
     // because a single 'S' should be interpreted as a Short (of some signedness),
     // not a Signed [integer].
     let suffix = match input.next_back() {
-        Some('b' | 'B')        => IntSuffix::B,
-        Some('s' | 'S')        => IntSuffix::S,
-        Some('i' | 'I') | None => IntSuffix::I,
-        Some('l' | 'L')        => IntSuffix::L,
+        Some('b' | 'B') => IntSuffix::B,
+        Some('s' | 'S') => IntSuffix::S,
+        Some('i' | 'I') => IntSuffix::I,
+        None            => IntSuffix::None,
+        Some('l' | 'L') => IntSuffix::L,
         Some('u' | 'U') => {
             // If we finished reading the characters, then good, we read the 'U' a bit early,
-            // but that's fine. Also, suffix is `None`, indicating `IntSuffix::I`
+            // but that's fine. Also, suffix is `None`
             return if input.next().is_none() {
-                Some((true, IntSuffix::I))
+                Some((true, IntSuffix::None))
             } else {
                 // Failed to parse
                 None

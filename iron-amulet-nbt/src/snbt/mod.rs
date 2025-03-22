@@ -1,7 +1,5 @@
 //! Module for parsing SNBT into NBT data
 
-// Note to anyone reading the source: parsing functions begin at around line 400.
-
 mod lexer;
 
 
@@ -13,7 +11,7 @@ use crate::{
     settings::{DepthLimit, SnbtParseOptions, SnbtVersion},
     tag::{NbtCompound, NbtList, NbtTag},
 };
-use self::lexer::{Lexer, Token, TokenData};
+use self::lexer::{FromExact, FromLossless, Lexer, Token, TokenData};
 
 
 pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
@@ -213,7 +211,7 @@ fn parse_list(tokens: &mut Lexer<'_>, open_square: &TokenData) -> Result<NbtTag,
 
                     // Determine the primitive type and parse it
                     match string.as_str() {
-                        "b" | "B" => parse_prim_list::<u8>(tokens, open_square),
+                        "b" | "B" => parse_prim_list::<i8>(tokens, open_square),
                         "i" | "I" => parse_prim_list::<i32>(tokens, open_square),
                         "l" | "L" => parse_prim_list::<i64>(tokens, open_square),
                         _ => Err(SnbtError::unexpected_token_at(
@@ -243,7 +241,7 @@ fn parse_prim_list<'a, T>(
     open_square: &TokenData,
 ) -> Result<NbtTag, SnbtError>
 where
-    Token: Into<Result<T, Token>>,
+    T: FromExact<TokenData> + FromLossless<TokenData>,
     NbtTag: From<Vec<T>>,
 {
     let mut list: Vec<T> = Vec::new();
@@ -258,6 +256,8 @@ where
                 ..
             }) => match comma {
                 Some(0) | None => return Ok(list.into()),
+                // For some reason, even in the updated version, trailing commas are
+                // still not allowed for numeric arrays, if I'm reading the spec correctly.
                 Some(index) => return Err(SnbtError::trailing_comma(tokens.raw(), index)),
             },
 
@@ -273,14 +273,37 @@ where
                 // Make sure a value was expected
                 match comma {
                     Some(_) => {
-                        match td.into_value::<T>() {
-                            Ok(value) => list.push(value),
-                            Err(td) =>
-                                return Err(SnbtError::non_homogenous_numeric_list(
-                                    tokens.raw(),
-                                    td.index,
-                                    td.char_width,
-                                )),
+                        match tokens.snbt_version() {
+                            // The numeric array can accept data of the same size or smaller
+                            SnbtVersion::UpdatedJava => {
+                                match T::from_lossless(td) {
+                                    Ok(value) => list.push(value),
+                                    Err((td, true)) =>
+                                        return Err(SnbtError::invalid_number(
+                                            tokens.raw(),
+                                            td.index,
+                                            td.char_width,
+                                        )),
+                                    Err((td, false)) =>
+                                        return Err(SnbtError::non_homogenous_numeric_list(
+                                            tokens.raw(),
+                                            td.index,
+                                            td.char_width,
+                                        )),
+                                }
+                            }
+                            // The numeric array can accept data only of the same size
+                            SnbtVersion::Original => {
+                                match T::from_exact(td) {
+                                    Ok(value) => list.push(value),
+                                    Err(td) =>
+                                        return Err(SnbtError::non_homogenous_numeric_list(
+                                            tokens.raw(),
+                                            td.index,
+                                            td.char_width,
+                                        )),
+                                }
+                            }
                         }
 
                         comma = None;
@@ -325,6 +348,15 @@ fn parse_tag_list(tokens: &mut Lexer<'_>, first_element: NbtTag) -> Result<NbtLi
                 ..
             }) => {
                 let (index, char_width) = match tokens.peek(DELIMITER, expecting_strings) {
+                    // The comma could be a trailing comma at the end of the list
+                    Some(&Ok(TokenData {
+                        index, token: Token::ClosedSquare, ..
+                    })) => match tokens.snbt_version() {
+                        SnbtVersion::UpdatedJava => return Ok(list),
+                        SnbtVersion::Original => return Err(
+                            SnbtError::trailing_comma(tokens.raw(), index)
+                        ),
+                    }
                     Some(&Ok(TokenData {
                         index, char_width, ..
                     })) => (index, char_width),
@@ -404,7 +436,9 @@ fn parse_compound_tag<'a>(
                         // First loop iteration or no comma
                         Some(0) | None => return Ok((compound, tokens.index())),
                         // Later iteration with a trailing comma
-                        Some(index) => return Err(SnbtError::trailing_comma(tokens.raw(), index)),
+                        Some(index) => if tokens.snbt_version() == SnbtVersion::Original {
+                            return Err(SnbtError::trailing_comma(tokens.raw(), index));
+                        }
                     }
                 }
 
@@ -425,7 +459,8 @@ fn parse_compound_tag<'a>(
                             comma = None;
                         }
 
-                        // There was not a comma before this string so therefore the token is unexpected
+                        // There was not a comma before this string
+                        // so therefore the token is unexpected
                         None =>
                             return Err(SnbtError::unexpected_token_at(
                                 tokens.raw(),
@@ -441,7 +476,18 @@ fn parse_compound_tag<'a>(
                     token: Token::Comma,
                     index,
                     ..
-                } => comma = Some(index),
+                } => match comma {
+                    None => comma = Some(index),
+                    // This comma came before any valid element, or after another comma;
+                    // this is not valid in either version.
+                    Some(_) =>
+                        return Err(SnbtError::unexpected_token_at(
+                            tokens.raw(),
+                            index,
+                            1,
+                            "compound key or '}'",
+                        )),
+                }
 
                 // Catch-all for unexpected tokens
                 td =>

@@ -356,6 +356,24 @@ impl<'a> Lexer<'a> {
     }
 }
 
+/// Intended for converting an integer-valued token into the integer type
+/// of the same size.
+pub trait FromExact<T>: Sized {
+    /// Intended for converting an integer-valued token into the integer type
+    /// of the same size.
+    fn from_exact(value: T) -> Result<Self, T>;
+}
+
+/// Intended for converting an integer-valued token into the integer type
+/// of the same or greater size.
+pub trait FromLossless<T>: Sized {
+    /// Intended for converting an integer-valued token into the integer type
+    /// of the same or greater size.
+    /// The return value being `Err((_, true))` should indicate that the token
+    /// had no suffix, but was too large to fit into this integer type.
+    fn from_lossless(value: T) -> Result<Self, (T, bool)>;
+}
+
 #[derive(Debug)]
 pub struct TokenData {
     pub token: Token,
@@ -364,6 +382,7 @@ pub struct TokenData {
 }
 
 impl TokenData {
+    #[inline]
     fn new(token: Token, index: usize, char_width: usize) -> Self {
         TokenData {
             token,
@@ -378,12 +397,25 @@ impl TokenData {
             Err(tk) => Err(Self::new(tk, self.index, self.char_width)),
         }
     }
+}
 
-    pub fn into_value<T>(self) -> Result<T, Self>
-    where Token: Into<Result<T, Token>> {
-        match self.token.into() {
+impl<T: FromExact<Token>> FromExact<TokenData> for T {
+    fn from_exact(td: TokenData) -> Result<Self, TokenData> {
+        match T::from_exact(td.token) {
             Ok(value) => Ok(value),
-            Err(tk) => Err(Self::new(tk, self.index, self.char_width)),
+            Err(tk) => Err(TokenData::new(tk, td.index, td.char_width)),
+        }
+    }
+}
+
+impl<T: FromLossless<Token>> FromLossless<TokenData> for T {
+    fn from_lossless(td: TokenData) -> Result<Self, (TokenData, bool)> {
+        match T::from_lossless(td.token) {
+            Ok(value) => Ok(value),
+            Err((tk, cause)) => Err((
+                TokenData::new(tk, td.index, td.char_width),
+                cause
+            )),
         }
     }
 }
@@ -400,13 +432,18 @@ pub enum Token {
     String { value: String, quoted: bool },
     Byte(i8),
     Short(i16),
-    Int(i32),
+    Int { value: i32, suffixed: bool },
     Long(i64),
     Float(f32),
     Double(f64),
 }
 
 impl Token {
+    #[inline]
+    pub fn int(value: i32, suffixed: bool) -> Self {
+        Self::Int { value, suffixed }
+    }
+
     pub fn as_expectation(&self) -> &'static str {
         match self {
             Token::OpenCurly    => "'{'",
@@ -423,12 +460,12 @@ impl Token {
     pub fn into_tag(self) -> Result<NbtTag, Self> {
         match self {
             Token::String { value, .. } => Ok(NbtTag::String(value)),
-            Token::Byte(value)   => Ok(NbtTag::Byte(value)),
-            Token::Short(value)  => Ok(NbtTag::Short(value)),
-            Token::Int(value)    => Ok(NbtTag::Int(value)),
-            Token::Long(value)   => Ok(NbtTag::Long(value)),
-            Token::Float(value)  => Ok(NbtTag::Float(value)),
-            Token::Double(value) => Ok(NbtTag::Double(value)),
+            Token::Byte(value)          => Ok(NbtTag::Byte(value)),
+            Token::Short(value)         => Ok(NbtTag::Short(value)),
+            Token::Int { value, .. }    => Ok(NbtTag::Int(value)),
+            Token::Long(value)          => Ok(NbtTag::Long(value)),
+            Token::Float(value)         => Ok(NbtTag::Float(value)),
+            Token::Double(value)        => Ok(NbtTag::Double(value)),
             tk => Err(tk),
         }
     }
@@ -443,44 +480,87 @@ impl From<Token> for Result<String, Token> {
     }
 }
 
-macro_rules! opt_int_from_token {
-    ($int:ty) => {
-        impl From<Token> for Result<$int, Token> {
-            fn from(tk: Token) -> Self {
+macro_rules! impl_from_exact {
+    ($int:ty, $token:ident) => {
+        impl FromExact<Token> for $int {
+            fn from_exact(tk: Token) -> Result<Self, Token> {
                 match tk {
-                    Token::Byte(x)  => Ok(x as $int),
-                    Token::Short(x) => Ok(x as $int),
-                    Token::Int(x)   => Ok(x as $int),
-                    Token::Long(x)  => Ok(x as $int),
-                    tk => Err(tk),
+                    Token::$token(value) => Ok(value),
+                    _ => Err(tk),
                 }
             }
         }
     };
 }
 
-opt_int_from_token!(i8);
-opt_int_from_token!(u8);
-opt_int_from_token!(i16);
-opt_int_from_token!(i32);
-opt_int_from_token!(i64);
+impl_from_exact!(i8,  Byte);
+impl_from_exact!(i16, Short);
+impl_from_exact!(i64, Long);
 
-macro_rules! opt_float_from_token {
-    ($float:ty) => {
-        impl From<Token> for Result<$float, Token> {
-            fn from(tk: Token) -> Self {
-                match tk {
-                    Token::Float(x)  => Ok(x as $float),
-                    Token::Double(x) => Ok(x as $float),
-                    tk => Err(tk),
-                }
-            }
+impl FromExact<Token> for i32 {
+    fn from_exact(tk: Token) -> Result<Self, Token> {
+        match tk {
+            Token::Int { value, .. } => Ok(value),
+            _ => Err(tk),
         }
-    };
+    }
 }
 
-opt_float_from_token!(f32);
-opt_float_from_token!(f64);
+impl FromLossless<Token> for i8 {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+        match tk {
+            Token::Byte(value) => Ok(value),
+            Token::Int { value, suffixed: false } => {
+                if value < 1 << 8 {
+                    Ok(value as i8)
+                } else {
+                    Err((tk, true))
+                }
+            }
+            _ => Err((tk, false)),
+        }
+    }
+}
+
+impl FromLossless<Token> for i16 {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+        match tk {
+            Token::Byte(value)  => Ok(value as i16),
+            Token::Short(value) => Ok(value),
+            Token::Int { value, suffixed: false } => {
+                if value < 1 << 16 {
+                    Ok(value as i16)
+                } else {
+                    Err((tk, true))
+                }
+            }
+            _ => Err((tk, false)),
+        }
+    }
+}
+
+impl FromLossless<Token> for i32 {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+        match tk {
+            Token::Byte(value)       => Ok(value as i32),
+            Token::Short(value)      => Ok(value as i32),
+            Token::Int { value, .. } => Ok(value),
+            _ => Err((tk, false)),
+        }
+    }
+}
+
+impl FromLossless<Token> for i64 {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+        match tk {
+            Token::Byte(value)       => Ok(value as i64),
+            Token::Short(value)      => Ok(value as i64),
+            Token::Int { value, .. } => Ok(value as i64),
+            Token::Long(value)       => Ok(value),
+            _ => Err((tk, false)),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum AmbiguousWord {

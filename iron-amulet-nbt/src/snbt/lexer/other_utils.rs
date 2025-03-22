@@ -155,7 +155,7 @@ impl Lexer<'_> {
         let nonzero = match numeric_tag.token {
             Token::Byte(n)   => n != 0,
             Token::Short(n)  => n != 0,
-            Token::Int(n)    => n != 0,
+            Token::Int { value, .. } => value != 0,
             Token::Long(n)   => n != 0,
             Token::Float(n)  => n != 0.,
             Token::Double(n) => n != 0.,
@@ -286,13 +286,13 @@ impl Lexer<'_> {
         // so the tokens are in reverse order compared to how they will be read.
         let tokens = [
             Token::ClosedSquare,
-            Token::Int(int_array[3]),
+            Token::int(int_array[3], true),
             Token::Comma,
-            Token::Int(int_array[2]),
+            Token::int(int_array[2], true),
             Token::Comma,
-            Token::Int(int_array[1]),
+            Token::int(int_array[1], true),
             Token::Comma,
-            Token::Int(int_array[0]),
+            Token::int(int_array[0], true),
             Token::Semicolon,
             Token::String {
                 value: "I".to_owned(),
