@@ -13,6 +13,7 @@ use crate::settings::{
 use super::SnbtError;
 
 
+pub use self::numeric::NumericParseError;
 pub use self::other_utils::{allowed_unquoted, starts_unquoted_number};
 
 
@@ -373,7 +374,7 @@ pub trait FromLossless<T>: Sized {
     /// of the same or greater size.
     /// The return value being `Err((_, true))` should indicate that the token
     /// had no suffix, but was too large to fit into this integer type.
-    fn from_lossless(value: T) -> Result<Self, (T, bool)>;
+    fn from_lossless(value: T) -> Result<Self, (T, Option<NumericParseError>)>;
 }
 
 #[derive(Debug)]
@@ -411,7 +412,7 @@ impl<T: FromExact<Token>> FromExact<TokenData> for T {
 }
 
 impl<T: FromLossless<Token>> FromLossless<TokenData> for T {
-    fn from_lossless(td: TokenData) -> Result<Self, (TokenData, bool)> {
+    fn from_lossless(td: TokenData) -> Result<Self, (TokenData, Option<NumericParseError>)> {
         match T::from_lossless(td.token) {
             Ok(value) => Ok(value),
             Err((tk, cause)) => Err((
@@ -434,18 +435,14 @@ pub enum Token {
     String { value: String, quoted: bool },
     Byte(i8),
     Short(i16),
-    Int { value: i32, suffixed: bool },
+    Int(i32),
     Long(i64),
+    UnsuffixedInt(i64),
     Float(f32),
     Double(f64),
 }
 
 impl Token {
-    #[inline]
-    pub fn int(value: i32, suffixed: bool) -> Self {
-        Self::Int { value, suffixed }
-    }
-
     pub fn as_expectation(&self) -> &'static str {
         match self {
             Token::OpenCurly    => "'{'",
@@ -464,7 +461,7 @@ impl Token {
             Token::String { value, .. } => Ok(NbtTag::String(value)),
             Token::Byte(value)          => Ok(NbtTag::Byte(value)),
             Token::Short(value)         => Ok(NbtTag::Short(value)),
-            Token::Int { value, .. }    => Ok(NbtTag::Int(value)),
+            Token::Int(value)           => Ok(NbtTag::Int(value)),
             Token::Long(value)          => Ok(NbtTag::Long(value)),
             Token::Float(value)         => Ok(NbtTag::Float(value)),
             Token::Double(value)        => Ok(NbtTag::Double(value)),
@@ -502,56 +499,71 @@ impl_from_exact!(i64, Long);
 impl FromExact<Token> for i32 {
     fn from_exact(tk: Token) -> Result<Self, Token> {
         match tk {
-            Token::Int { value, .. } => Ok(value),
+            Token::Int(value) => Ok(value),
+            Token::UnsuffixedInt(value) => i32::try_from(value).map_err(|_| tk),
             _ => Err(tk),
         }
     }
 }
 
+fn out_of_range(
+    tk: Token, value: i64, expected_type: &'static str
+) -> (Token, Option<NumericParseError>) {
+    (
+        tk,
+        Some(NumericParseError::OutOfRangeInteger {
+            negative: value < 0,
+            num: value.unsigned_abs(),
+            expected_type,
+        })
+    )
+}
+
 impl FromLossless<Token> for i8 {
-    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value) => Ok(value),
-            Token::Int { value, suffixed: false } => {
-                i8::try_from(value).map_err(|_| (tk, true))
-            }
-            _ => Err((tk, false)),
+            Token::UnsuffixedInt(value) => i8::try_from(value)
+                .map_err(|_| out_of_range(tk, value, "i8")),
+            _ => Err((tk, None)),
         }
     }
 }
 
 impl FromLossless<Token> for i16 {
-    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value)  => Ok(i16::from(value)),
             Token::Short(value) => Ok(value),
-            Token::Int { value, suffixed: false } => {
-                i16::try_from(value).map_err(|_| (tk, true))
-            }
-            _ => Err((tk, false)),
+            Token::UnsuffixedInt(value) => i16::try_from(value)
+                .map_err(|_| out_of_range(tk, value, "i16")),
+            _ => Err((tk, None)),
         }
     }
 }
 
 impl FromLossless<Token> for i32 {
-    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
-            Token::Byte(value)       => Ok(i32::from(value)),
-            Token::Short(value)      => Ok(i32::from(value)),
-            Token::Int { value, .. } => Ok(value),
-            _ => Err((tk, false)),
+            Token::Byte(value)  => Ok(i32::from(value)),
+            Token::Short(value) => Ok(i32::from(value)),
+            Token::Int(value)   => Ok(value),
+            Token::UnsuffixedInt(value) => i32::try_from(value)
+                .map_err(|_| out_of_range(tk, value, "i32")),
+            _ => Err((tk, None)),
         }
     }
 }
 
 impl FromLossless<Token> for i64 {
-    fn from_lossless(tk: Token) -> Result<Self, (Token, bool)> {
+    fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
-            Token::Byte(value)       => Ok(i64::from(value)),
-            Token::Short(value)      => Ok(i64::from(value)),
-            Token::Int { value, .. } => Ok(i64::from(value)),
-            Token::Long(value)       => Ok(value),
-            _ => Err((tk, false)),
+            Token::Byte(value)          => Ok(i64::from(value)),
+            Token::Short(value)         => Ok(i64::from(value)),
+            Token::Int(value)           => Ok(i64::from(value)),
+            Token::Long(value)          => Ok(value),
+            Token::UnsuffixedInt(value) => Ok(value),
+            _ => Err((tk, None)),
         }
     }
 }
@@ -669,9 +681,9 @@ impl AmbiguousWord {
                             char_width,
                         })
                     } else if opts.version == SnbtVersion::UpdatedJava {
-                        // TODO: Need to implement NumericParseError
-                        Err(SnbtError::invalid_number(input, index, char_width))
-
+                        Err(SnbtError::invalid_number(
+                            input, index, char_width, NumericParseError::NonfiniteFloat
+                        ))
                     } else {
                         Ok(TokenData::new(self.numeric_val(), index, char_width))
                     }

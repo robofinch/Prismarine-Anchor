@@ -2,6 +2,8 @@
 
 use std::{str::Chars, iter::Peekable};
 
+use thiserror::Error;
+
 use super::super::SnbtError;
 use super::{Lexer, Token, TokenData};
 
@@ -18,8 +20,8 @@ enum IntSuffix {
     B,
     S,
     I,
-    None,
     L,
+    None,
 }
 
 type CharIter<'a> = Peekable<Chars<'a>>;
@@ -99,7 +101,7 @@ impl Lexer<'_> {
 
         result
             .map(|token| TokenData::new(token, index, char_width))
-            .map_err(|_| SnbtError::invalid_number(num_string, index, char_width))
+            .map_err(|err| SnbtError::invalid_number(num_string, index, char_width, err))
     }
 
     /// Parses a numeric token, in the Original version. See numeric module source for details.
@@ -117,7 +119,7 @@ impl Lexer<'_> {
 
         result
             .map(|token| TokenData::new(token, index, char_width))
-            .map_err(|_| SnbtError::invalid_number(num_string, index, char_width))
+            .map_err(|err| SnbtError::invalid_number(num_string, index, char_width, err))
     }
 }
 
@@ -130,14 +132,14 @@ impl Lexer<'_> {
 /// as whether it returns `None` or `Some(Err(..))`
 /// depends on whether the value can be confirmed invalid for only integers
 /// or for both floats and integers. Integer parsing should occur before float parsing.
-fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
+fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, NumericParseError>> {
 
     let mut chars = num_string.chars().peekable();
 
     let positive_sign = match read_sign(&mut chars) {
         Some(s) => s,
         // Empty `num_string` is invalid
-        None => return Some(Err(()))
+        None => return Some(Err(NumericParseError::EmptyString))
     };
 
     // Hilariously, the bulk of the `try_parse_int` function is actually just reading the radix
@@ -163,9 +165,9 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
                             match suffix {
                                 IntSuffix::B    => Token::Byte(0),
                                 IntSuffix::S    => Token::Short(0),
-                                IntSuffix::I    => Token::int(0, true),
-                                IntSuffix::None => Token::int(0, false),
+                                IntSuffix::I    => Token::Int(0),
                                 IntSuffix::L    => Token::Long(0),
+                                IntSuffix::None => Token::UnsuffixedInt(0),
                             }
                         ));
                     } else {
@@ -176,14 +178,14 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
                 None => {
                     // The input is [+ | -]0 with no other digits.
                     // This is indeed an integer, it's zero.
-                    return Some(Ok(Token::int(0, false)))
+                    return Some(Ok(Token::UnsuffixedInt(0)))
                 }
             }
         }
         Some(_) => 10,
         // The entire string is just [+ | -] (it's nonempty, but empty after
         // we read a plus or minux). That's not a valid number.
-        None => return Some(Err(()))
+        None => return Some(Err(NumericParseError::NoDigits))
     };
 
     // Notice that if we get here, we've only consumed the [+ | -]
@@ -199,14 +201,14 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
     match read_result {
         // We reached the end, the string is [+ | -][0x | 0b],
         // which isn't a valid integer or float.
-        ReadDigitsResult::FirstPeekedNone   => return Some(Err(())),
+        ReadDigitsResult::FirstPeekedNone => return Some(Err(NumericParseError::NoDigits)),
         // Either we read a sign/suffix or a completely invalid character.
         // We haven't read any digits yet, and underscores may only come between digits.
         // This is an error, but it could be a valid float.
-        ReadDigitsResult::FirstUnlistedChar => return None,
+        ReadDigitsResult::FirstUnlistedChar(_) => return None,
         // The function reached its final loop and halted normally, either cause is fine.
-        ReadDigitsResult::LoopPeekedNone    => {},
-        ReadDigitsResult::LoopNonDigit      => {},
+        ReadDigitsResult::LoopPeekedNone => {},
+        ReadDigitsResult::LoopNonDigit   => {},
         // An underscore happened at the start or end of a sequence of digits.
         // The digits ending right after an underscore are probably an issue for floats, too,
         // since the only edge case is probably hex or binary (e.g., `1_2` would be an issue in
@@ -226,14 +228,14 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, ()>> {
 /// as whether it returns `None` or `Some(Err(..))`
 /// depends on whether the value can be confirmed invalid for only integers
 /// or for both floats and integers. Integer parsing should occur before float parsing.
-fn try_parse_original_int(num_string: &str) -> Option<Result<Token, ()>> {
+fn try_parse_original_int(num_string: &str) -> Option<Result<Token, NumericParseError>> {
 
     let mut chars = num_string.chars().peekable();
 
     let positive_sign = match read_sign(&mut chars) {
         Some(s) => s,
         // Empty `num_string` is invalid
-        None => return Some(Err(()))
+        None => return Some(Err(NumericParseError::EmptyString))
     };
 
     // Read digits
@@ -244,24 +246,29 @@ fn try_parse_original_int(num_string: &str) -> Option<Result<Token, ()>> {
     match read_result {
         // We don't read a single character before reaching end of input;
         // the string is [+ | -] which is invalid for floats as well.
-        ReadDigitsResult::FirstPeekedNone   => return Some(Err(())),
+        ReadDigitsResult::FirstPeekedNone => return Some(Err(
+            NumericParseError::NoDigits
+        )),
         // We read some other character before a digit.
         // Could be a period, which floats could handle.
-        ReadDigitsResult::FirstUnlistedChar => return None,
+        ReadDigitsResult::FirstUnlistedChar(_) => return None,
         // We read at least one character, and then entered and exited the loop normally.
         // Either cause is fine.
-        ReadDigitsResult::LoopPeekedNone    => {},
-        ReadDigitsResult::LoopNonDigit      => {},
+        ReadDigitsResult::LoopPeekedNone => {},
+        ReadDigitsResult::LoopNonDigit   => {},
         // The original SNBT version does not permit underscores at all
-        ReadDigitsResult::InvalidUnderscore => return Some(Err(())),
+        ReadDigitsResult::InvalidUnderscore => return Some(Err(
+            NumericParseError::InvalidUnderscore
+        )),
     }
 
     // Read the suffix
     let suffix = match chars.next() {
-        Some('b' | 'B')        => IntSuffix::B,
-        Some('s' | 'S')        => IntSuffix::S,
-        Some('i' | 'I') | None => IntSuffix::I,
-        Some('l' | 'L')        => IntSuffix::L,
+        Some('b' | 'B') => IntSuffix::B,
+        Some('s' | 'S') => IntSuffix::S,
+        Some('i' | 'I') => IntSuffix::I,
+        Some('l' | 'L') => IntSuffix::L,
+        None            => IntSuffix::None,
         // Some sort of invalid character (for an integer, anyway).
         // Could be a period, which floats could handle.
         Some(_) => return None
@@ -277,12 +284,12 @@ fn parse_float(
     allow_exponent: bool,
     replace_non_finite: bool,
     require_finite: bool,
-) -> Result<Token, ()> {
+) -> Result<Token, NumericParseError> {
 
     let mut chars = num_string.chars().peekable();
 
     // Empty `num_string` is invalid.
-    let positive_sign = read_sign(&mut chars).ok_or(())?;
+    let positive_sign = read_sign(&mut chars).ok_or(NumericParseError::EmptyString)?;
 
     // Read the digits before the decimal point
     let (integral_digits, read_result) = read_digits(
@@ -291,16 +298,16 @@ fn parse_float(
 
     match read_result {
         // We reached the end, the string is [+ | -], which isn't a valid float.
-        ReadDigitsResult::FirstPeekedNone   => return Err(()),
+        ReadDigitsResult::FirstPeekedNone => return Err(NumericParseError::NoDigits),
         // Either we read 'e', a suffix, or a completely invalid character.
         // We hadn't read any digits yet, so this is invalid syntax.
-        ReadDigitsResult::FirstUnlistedChar => return Err(()),
+        ReadDigitsResult::FirstUnlistedChar(_) => return Err(NumericParseError::NoDigits),
         // The function reached its final loop and halted normally, either cause is fine.
-        ReadDigitsResult::LoopPeekedNone    => {},
-        ReadDigitsResult::LoopNonDigit      => {},
+        ReadDigitsResult::LoopPeekedNone => {},
+        ReadDigitsResult::LoopNonDigit   => {},
         // Underscores are not allowed to be the first or last character of a sequence
         // of digits and underscores, and might be disallowed altogether
-        ReadDigitsResult::InvalidUnderscore => return Err(()),
+        ReadDigitsResult::InvalidUnderscore => return Err(NumericParseError::InvalidUnderscore),
     }
 
     // We've read the sign (if any), and the integral digits (if any).
@@ -325,20 +332,22 @@ fn parse_float(
 
     match read_result {
         // `integral_digits` was empty, and we read `None`.
-        ReadDigitsResult::FirstPeekedNone   => return Err(()),
+        ReadDigitsResult::FirstPeekedNone => return Err(NumericParseError::NoDigits),
         // We read some invalid character (not 'e', a suffix, an underscore, a digit)
-        ReadDigitsResult::FirstUnlistedChar => return Err(()),
+        ReadDigitsResult::FirstUnlistedChar(ch) => return Err(
+            NumericParseError::InvalidFloatCharacter(ch)
+        ),
         // We read at least one character and halted in the loop as normal. That's fine.
-        ReadDigitsResult::LoopPeekedNone    => {},
-        ReadDigitsResult::LoopNonDigit      => {},
+        ReadDigitsResult::LoopPeekedNone => {},
+        ReadDigitsResult::LoopNonDigit   => {},
         // Underscores are not allowed to be the first or last character of a sequence
         // of digits and underscores, and might be disallowed altogether
-        ReadDigitsResult::InvalidUnderscore => return Err(()),
+        ReadDigitsResult::InvalidUnderscore => return Err(NumericParseError::InvalidUnderscore),
     }
 
     // We might have read no digits by reading 'e' or a suffix as the first character
     if integral_digits.is_empty() && fractional_digits.is_empty() {
-        return Err(())
+        return Err(NumericParseError::InvalidUnderscore)
     }
 
     // We've read [+ | -][digits][.][digits] and the digits aren't both empty.
@@ -346,14 +355,14 @@ fn parse_float(
     let exp = if matches!(chars.peek(), Some(&'e' | &'E')) {
         // Check if the exponent is allowed.
         if !allow_exponent {
-            return Err(())
+            return Err(NumericParseError::ExponentProhibited)
         }
 
         // consume the 'e'. Begin parsing the exponent by checking its sign
         chars.next();
 
         // An empty exponent is invalid
-        let exp_sign = read_sign(&mut chars).ok_or(())?;
+        let exp_sign = read_sign(&mut chars).ok_or(NumericParseError::EmptyExponent)?;
 
         let (exp_digits, read_result) = read_digits(
             &mut chars,
@@ -365,13 +374,18 @@ fn parse_float(
 
         match read_result {
             // In either of these first two cases, `exp_digits` is empty, which isn't allowed
-            ReadDigitsResult::FirstPeekedNone   => return Err(()),
+            ReadDigitsResult::FirstPeekedNone   => return Err(NumericParseError::NoExponentDigits),
             // We either read a suffix or an invalid character.
-            ReadDigitsResult::FirstUnlistedChar => return Err(()),
+            ReadDigitsResult::FirstUnlistedChar(ch) => {
+                return Err(match ch {
+                    'f' | 'F' | 'd' | 'D' => NumericParseError::NoExponentDigits,
+                    _ => NumericParseError::InvalidExponentCharacter(ch),
+                })
+            }
             // These last three are the same as usual
             ReadDigitsResult::LoopPeekedNone    => {},
             ReadDigitsResult::LoopNonDigit      => {},
-            ReadDigitsResult::InvalidUnderscore => return Err(()),
+            ReadDigitsResult::InvalidUnderscore => return Err(NumericParseError::InvalidUnderscore),
         }
 
         Some((exp_sign, exp_digits))
@@ -383,12 +397,12 @@ fn parse_float(
     let is_double = match chars.next() {
         Some('d' | 'D') | None => true,
         Some('f' | 'F') => false,
-        Some(_) => return Err(())
+        Some(ch) => return Err(NumericParseError::InvalidFloatSuffix(ch)),
     };
 
     // If there's any characters left, that's an error.
     if chars.next().is_some() {
-        return Err(())
+        return Err(NumericParseError::AdditionalCharacters(1 + chars.count()))
     }
 
     float_value(
@@ -408,36 +422,52 @@ fn integral_value(
     digits: Vec<u8>,
     unsigned: bool,
     suffix: IntSuffix,
-) -> Result<Token, ()> {
+) -> Result<Token, NumericParseError> {
 
     // First, try to read the digits into a u64. We can worry about the rest later.
     let mut num: u64 = 0;
     for digit in digits {
         num = num
-            .checked_mul(u64::from(radix)).ok_or(())?
-            .checked_add(u64::from(digit)).ok_or(())?;
+            .checked_mul(u64::from(radix)).ok_or(NumericParseError::IntegerTooLarge)?
+            .checked_add(u64::from(digit)).ok_or(NumericParseError::IntegerTooLarge)?;
     }
 
-    Ok(match (positive_sign, unsigned) {
+    let pos_oor = |expected_type: &'static str| {
+        NumericParseError::OutOfRangeInteger {
+            negative: false,
+            num,
+            expected_type,
+        }
+    };
+    let neg_oor = |expected_type: &'static str| {
+        NumericParseError::OutOfRangeInteger {
+            negative: false,
+            num,
+            expected_type,
+        }
+    };
 
+    Ok(match (positive_sign, unsigned) {
         // The int has to fit in a smaller number.
         // Note that the "as i8/i16/i32" are no-ops added to make "as i64" sign-extend.
         (true, true) => match suffix {
-            IntSuffix::B    => Token::Byte(  u8::try_from(num).map_err(|_| ())? as i8),
-            IntSuffix::S    => Token::Short(u16::try_from(num).map_err(|_| ())? as i16),
-            IntSuffix::I    => Token::int(  u32::try_from(num).map_err(|_| ())? as i32, true),
-            IntSuffix::None => Token::int(  u32::try_from(num).map_err(|_| ())? as i32, false),
+            IntSuffix::B => Token::Byte(  u8::try_from(num).map_err(|_| pos_oor("u8"))? as i8),
+            IntSuffix::S => Token::Short(u16::try_from(num).map_err(|_| pos_oor("u16"))? as i16),
+            IntSuffix::I => Token::Int(  u32::try_from(num).map_err(|_| pos_oor("u32"))? as i32),
             // The full range is allowed
-            IntSuffix::L    => Token::Long(num as i64),
+            IntSuffix::L => Token::Long(num as i64),
+            IntSuffix::None => Token::UnsuffixedInt(num as i64),
         },
 
         // The negative half of the range would have a minus sign
         (true, false) => match suffix {
-            IntSuffix::B    => Token::Byte(  i8::try_from(num).map_err(|_| ())?),
-            IntSuffix::S    => Token::Short(i16::try_from(num).map_err(|_| ())?),
-            IntSuffix::I    => Token::int(  i32::try_from(num).map_err(|_| ())?, true),
-            IntSuffix::None => Token::int(  i32::try_from(num).map_err(|_| ())?, false),
-            IntSuffix::L    => Token::Long( i64::try_from(num).map_err(|_| ())?),
+            IntSuffix::B => Token::Byte(  i8::try_from(num).map_err(|_| pos_oor("i8"))?),
+            IntSuffix::S => Token::Short(i16::try_from(num).map_err(|_| pos_oor("i16"))?),
+            IntSuffix::I => Token::Int(  i32::try_from(num).map_err(|_| pos_oor("i32"))?),
+            IntSuffix::L => Token::Long( i64::try_from(num).map_err(|_| pos_oor("i64"))?),
+            IntSuffix::None => Token::UnsuffixedInt(
+                i64::try_from(num).map_err(|_| pos_oor("i64"))?
+            ),
         }
 
         // -0 is the only unsigned integer with a minus sign
@@ -445,12 +475,12 @@ fn integral_value(
             match suffix {
                 IntSuffix::B    => Token::Byte(0),
                 IntSuffix::S    => Token::Short(0),
-                IntSuffix::I    => Token::int(0, true),
-                IntSuffix::None => Token::int(0, false),
+                IntSuffix::I    => Token::Int(0),
                 IntSuffix::L    => Token::Long(0),
+                IntSuffix::None => Token::UnsuffixedInt(0),
             }
         } else {
-            return Err(())
+            return Err(NumericParseError::NegativeUnsignedInteger(num))
         },
 
         // The value is signed and has a minus sign in front. We can have, speaking in
@@ -460,28 +490,28 @@ fn integral_value(
             IntSuffix::B => if num <= i8::MAX as u64 + 1 {
                 Token::Byte((num as i8).wrapping_neg())
             } else {
-                return Err(())
+                return Err(neg_oor("i8"))
             },
             IntSuffix::S => if num <= i16::MAX as u64 + 1 {
                 Token::Short((num as i16).wrapping_neg())
             } else {
-                return Err(())
+                return Err(neg_oor("i16"))
             },
             IntSuffix::I => if num <= i32::MAX as u64 + 1 {
-                Token::int((num as i32).wrapping_neg(), true)
+                Token::Int((num as i32).wrapping_neg())
             } else {
-                return Err(())
-            },
-            IntSuffix::None => if num <= i32::MAX as u64 + 1 {
-                Token::int((num as i32).wrapping_neg(), false)
-            } else {
-                return Err(())
+                return Err(neg_oor("i32"))
             },
             // Note i64::MAX is less than u64::MAX, this doesn't overflow
             IntSuffix::L => if num <= i64::MAX as u64 + 1 {
                 Token::Long((num as i64).wrapping_neg())
             } else {
-                return Err(())
+                return Err(neg_oor("i64"))
+            },
+            IntSuffix::None => if num <= i64::MAX as u64 + 1 {
+                Token::UnsuffixedInt((num as i64).wrapping_neg())
+            } else {
+                return Err(neg_oor("i64"))
             },
         }
     })
@@ -495,7 +525,7 @@ fn float_value(
     is_double: bool,
     replace_non_finite: bool,
     require_finite: bool,
-) -> Result<Token, ()> {
+) -> Result<Token, NumericParseError> {
 
     let mut num: f64 = 0.;
 
@@ -574,7 +604,7 @@ fn float_value(
         };
 
         if !num.is_finite() && require_finite {
-            return Err(())
+            return Err(NumericParseError::NonfiniteFloat)
         }
         Ok(Token::Double(num))
 
@@ -600,7 +630,7 @@ fn float_value(
         };
 
         if !num.is_finite() && require_finite {
-            return Err(())
+            return Err(NumericParseError::NonfiniteFloat)
         }
         Ok(Token::Float(num))
     }
@@ -631,7 +661,7 @@ fn read_sign(chars: &mut CharIter) -> Option<bool> {
 #[derive(Debug)]
 enum ReadDigitsResult {
     FirstPeekedNone,
-    FirstUnlistedChar,
+    FirstUnlistedChar(char),
     LoopPeekedNone,
     LoopNonDigit,
     InvalidUnderscore,
@@ -677,7 +707,7 @@ fn read_digits(
             } else if ch == '_' {
                 return (digits, ReadDigitsResult::InvalidUnderscore)
             } else {
-                return (digits, ReadDigitsResult::FirstUnlistedChar)
+                return (digits, ReadDigitsResult::FirstUnlistedChar(ch))
             }
         }
 
@@ -722,9 +752,11 @@ fn read_digits(
     (digits, halt_cause)
 }
 
+/// Helper function for UpdatedJava integer parsing.
 /// If successful, returns whether the integer is unsigned and what its suffix is.
 /// (True indicates unsigned, false indicates signed.)
-/// Helper function for UpdatedJava integer parsing.
+/// A `None` return value indicates that no suffix could be parsed,
+/// and this may or may not be an error.
 fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> {
     // Read the suffix before the 'U' or 'S' that might prefix it,
     // because a single 'S' should be interpreted as a Short (of some signedness),
@@ -766,7 +798,45 @@ fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> 
 //      Numeric Parse Error
 // ================================================================
 
-// TODO: thiserror
+#[derive(Error, Debug, Clone)]
 pub enum NumericParseError {
-
+    // Initial parsing
+    #[error("empty strings are not valid numbers")]
+    EmptyString,
+    #[error("the numeric literal had no digits, only a sign, suffix, invalid characters, and similar")]
+    NoDigits,
+    #[error("underscores are only permitted in the UpdatedJava version, and must be between digits")]
+    InvalidUnderscore,
+    #[error("the numeric literal was not a valid integer, and '{0}' cannot occur in floats")]
+    InvalidFloatCharacter(char),
+    #[error(
+        "the numeric literal was not a valid integer, and found '{0}' when expecting a float or double suffix")]
+    InvalidFloatSuffix(char),
+    #[error("the numeric literal was nearly parsed as a valid float, but had {0} additional characters at the end")]
+    AdditionalCharacters(usize),
+    #[error("an exponent occurred in a float literal, which the Original version does not permit")]
+    ExponentProhibited,
+    #[error("an empty string is not a valid exponent")]
+    EmptyExponent,
+    #[error("the exponent had no digits, only a sign")]
+    NoExponentDigits,
+    #[error("invalid character '{0}' occurred in the exponent of a float literal")]
+    InvalidExponentCharacter(char),
+    // Computing values
+    #[error("value is a syntactically correct integer, but out of range of any integer type")]
+    IntegerTooLarge,
+    #[error("parsed value -{0} is not in the range of any unsigned integer")]
+    NegativeUnsignedInteger(u64),
+    #[error(
+        "parsed value {}{} is not in the range of the expected {} type",
+        if *negative { "-" } else { "" },
+        num, expected_type
+    )]
+    OutOfRangeInteger {
+        negative: bool,
+        num: u64,
+        expected_type: &'static str,
+    },
+    #[error("the floating-point value was infinite or NaN, but was required to be finite")]
+    NonfiniteFloat,
 }

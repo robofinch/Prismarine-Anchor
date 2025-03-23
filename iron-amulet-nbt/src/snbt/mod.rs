@@ -14,7 +14,7 @@ use crate::{
 use self::lexer::{FromExact, FromLossless, Lexer, Token, TokenData};
 
 
-pub use self::lexer::{allowed_unquoted, starts_unquoted_number};
+pub use self::lexer::{allowed_unquoted, NumericParseError, starts_unquoted_number};
 pub(crate) use self::lexer::is_ambiguous;
 
 
@@ -308,13 +308,14 @@ where
                             SnbtVersion::UpdatedJava => {
                                 match T::from_lossless(td) {
                                     Ok(value) => list.push(value),
-                                    Err((td, true)) =>
+                                    Err((td, Some(numeric_err))) =>
                                         return Err(SnbtError::invalid_number(
                                             tokens.raw(),
                                             td.index,
                                             td.char_width,
+                                            numeric_err,
                                         )),
-                                    Err((td, false)) =>
+                                    Err((td, None)) =>
                                         return Err(SnbtError::non_homogenous_numeric_list(
                                             tokens.raw(),
                                             td.index,
@@ -611,10 +612,14 @@ pub enum SnbtError {
     },
     /// An invalid number.
     // TODO: make numeric parsing errors more detailed
-    #[error("Invalid number at column {index}: '{segment}'")]
+    #[error(
+        "Numeric literal at column {} was invalid because {}. Literal began with '{}'",
+        index, cause, segment
+    )]
     InvalidNumber {
         segment: String,
         index: usize,
+        cause: NumericParseError,
     },
     /// An invalid string representation of a UUID.
     #[error("Invalid string representation of a UUID at column {index}: '{segment}'")]
@@ -729,10 +734,13 @@ impl SnbtError {
         }
     }
 
-    fn invalid_number(input: &str, index: usize, char_width: usize) -> Self {
+    fn invalid_number(
+        input: &str, index: usize, char_width: usize, cause: NumericParseError
+    ) -> Self {
         Self::InvalidNumber {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
+            cause,
         }
     }
 
