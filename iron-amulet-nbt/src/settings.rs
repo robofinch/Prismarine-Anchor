@@ -1,5 +1,6 @@
 use flate2::Compression;
 
+// todo: derive serde for these when the serde feature is enabled
 
 // ================================
 //      Limits
@@ -18,6 +19,12 @@ impl Default for DepthLimit {
     /// The maximum depth that NBT compounds and tags can be nested in the standard Minecraft specification.
     fn default() -> Self {
         Self(512)
+    }
+}
+
+impl DepthLimit {
+    pub fn limit(self) -> u32 {
+        self.0
     }
 }
 
@@ -359,9 +366,9 @@ pub enum HandleInvalidEscape {
 /// for information about the two versions of SNBT.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SnbtWriteOptions {
-    /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT,
-    /// but will log warnings if escape sequences are used in the `Original` version.
-    // TODO: actually add warning and error logging throughout the crate
+    /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT.
+    // TODO: add warning and error logging throughout the crate, such as
+    // warnings if escape sequences are used in the `Original` version.
     pub version: SnbtVersion,
     /// The maximum depth that NBT compounds and tags can be recursively nested.
     ///

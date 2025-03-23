@@ -1,15 +1,14 @@
-use std::{fmt, io};
-use std::error::Error;
-use std::{
-    fmt::{Display, Formatter},
-    io::{Read, Write},
-};
+use std::io;
+use std::io::{Read, Write};
+#[cfg(feature = "serde")]
+use std::fmt::Display;
 
 use flate2::Compression;
 use flate2::{
     read::{GzDecoder, ZlibDecoder},
     write::{GzEncoder, ZlibEncoder},
 };
+use thiserror::Error;
 
 use crate::raw;
 use crate::{
@@ -78,12 +77,12 @@ fn read_tag_body_const<R: Read, const TAG_ID: u8>(
 ) -> Result<NbtTag, NbtIoError> {
 
     let tag = match TAG_ID {
-        0x1 => NbtTag::Byte  ( raw::read_i8 ( reader, opts )?),
-        0x2 => NbtTag::Short ( raw::read_i16( reader, opts )?),
-        0x3 => NbtTag::Int   ( raw::read_i32( reader, opts )?),
-        0x4 => NbtTag::Long  ( raw::read_i64( reader, opts )?),
-        0x5 => NbtTag::Float ( raw::read_f32( reader, opts )?),
-        0x6 => NbtTag::Double( raw::read_f64( reader, opts )?),
+        0x1 => NbtTag::Byte   (raw::read_i8 (reader, opts)?),
+        0x2 => NbtTag::Short  (raw::read_i16(reader, opts)?),
+        0x3 => NbtTag::Int    (raw::read_i32(reader, opts)?),
+        0x4 => NbtTag::Long   (raw::read_i64(reader, opts)?),
+        0x5 => NbtTag::Float  (raw::read_f32(reader, opts)?),
+        0x6 => NbtTag::Double (raw::read_f64(reader, opts)?),
         0x7 => {
             let len = raw::read_i32_as_usize(reader, opts)?;
             let mut array = vec![0u8; len];
@@ -305,23 +304,30 @@ fn write_tag_body<W: Write>(
 }
 
 /// Describes an error which occurred during the reading or writing of NBT byte data.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum NbtIoError {
     /// A native I/O error.
-    StdIo(io::Error),
+    #[error(transparent)]
+    StdIo(#[from] io::Error),
     /// No root tag was found. All NBT byte data must start with a valid root tag,
     /// which by default means a Compound or List tag.
     /// If parsing a certain file used by Minecraft, usually only one of the two is accepted.
     /// Java exclusively uses root compound tags, and in most but not all circumstances,
     /// Bedrock uses root compound tags as well.
+    #[error("NBT tree does not start with a valid root tag")]
     MissingRootTag,
     /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
+    #[error("Exceeded depth limit {} for nested tag lists and compound tags", limit.0)]
     ExceededDepthLimit {
         /// The limit which was exceeded.
         limit: DepthLimit
     },
     /// A sequential data structure was found to be non-homogenous. All sequential structures
     /// in NBT data are homogenous.
+    #[error(
+        "Encountered non-homogenous list or sequential type: \
+        expected 0x{list_type:X} but found 0x{encountered_type:X}"
+    )]
     NonHomogenousList {
         /// The list type.
         list_type: u8,
@@ -331,17 +337,26 @@ pub enum NbtIoError {
     /// A type requested an option to be read from a list. Since options are indicated by the
     /// absence or presence of a tag, and since all sequential types are length-prefixed,
     /// options cannot exists within arrays in NBT data.
+    #[error("Minecraft's NBT format cannot support options in sequential data structures")]
     OptionInList,
     /// A sequential type without a definite length was passed to a serializer.
+    #[error("Sequential types must have an initial computable length to be serializable")]
     MissingLength,
     /// The length of a string or sequential length was too large to fit in the numeric type
     /// it needed to.
+    #[error(
+        "Length of a string or sequential type must fit in an i16, i32, or usize, \
+        depending on situation"
+    )]
     ExcessiveLength,
     /// The length of a string or sequential length was negative.
+    #[error("Length of a string or sequential type must be nonnegative")]
     NegativeLength,
     /// An invalid tag ID was encountered.
+    #[error("Encountered invalid tag ID 0x{0:X} during deserialization")]
     InvalidTagId(u8),
     /// The first tag ID was expected, but the second was found.
+    #[error("Tag type mismatch: expected 0x{expected:X} but found 0x{found:X}")]
     TagTypeMismatch {
         /// The expected ID.
         expected: u8,
@@ -349,24 +364,34 @@ pub enum NbtIoError {
         found: u8,
     },
     /// A sequential type was expected, but another was found.
+    #[error("Expected sequential tag type (array)")]
     ExpectedSeq,
     /// An enum representation was expected, but another was found.
+    #[error("Encountered invalid enum representation in the NBT tag tree")]
     ExpectedEnum,
     /// An invalid map key was encountered.
+    #[error("Map keys must be a valid string")]
     InvalidKey,
     /// An invalid enum variant was encountered.
+    #[error("Encountered invalid enum variant while deserializing")]
     InvalidEnumVariant,
     /// An invalid CESU-8 string was encountered.
+    #[error("Encountered invalid CESU-8 string")]
     InvalidCesu8String,
     /// An invalid UTF-8 string was encountered.
+    #[error("Encountered invalid UTF-8 string")]
     InvalidUtf8String,
     /// Bytes forming an invalid Network-Endian i32 were encountered.
+    #[error("Encountered bytes that formed an invalid Network-Endian i32")]
     InvalidNetI32,
     /// Bytes forming an invalid Network-Endian i64 were encountered.
+    #[error("Encountered bytes that formed an invalid Network-Endian i64")]
     InvalidNetI64,
     /// An unsupported type was passed to a serializer or queried from a deserializer.
+    #[error("Type {0} is not supported by Minecraft's NBT format")]
     UnsupportedType(&'static str),
     /// A custom error message.
+    #[error("{0}")]
     Custom(Box<str>),
 }
 
@@ -385,79 +410,3 @@ impl serde::de::Error for NbtIoError {
         NbtIoError::Custom(msg.to_string().into_boxed_str())
     }
 }
-
-impl From<io::Error> for NbtIoError {
-    fn from(error: io::Error) -> Self {
-        NbtIoError::StdIo(error)
-    }
-}
-
-impl Display for NbtIoError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            NbtIoError::StdIo(error) => write!(f, "{}", error),
-            NbtIoError::MissingRootTag
-                => write!(f, "NBT tree does not start with a valid root tag."),
-            NbtIoError::ExceededDepthLimit { limit }
-                => write!(
-                    f, "Exceeded depth limit {} for nested tag lists and compound tags",
-                    limit.0
-                ),
-            &NbtIoError::NonHomogenousList {
-                list_type,
-                encountered_type,
-            } => write!(
-                f,
-                "Encountered non-homogenous list or sequential type: expected {:X} but found {:X}",
-                list_type, encountered_type
-            ),
-            NbtIoError::OptionInList => write!(
-                f,
-                "Minecraft's NBT format cannot support options in sequential data structures"
-            ),
-            NbtIoError::MissingLength => write!(
-                f,
-                "Sequential types must have an initial computable length to be serializable"
-            ),
-            NbtIoError::ExcessiveLength => write!(
-                f,
-                "Length of a string or sequential type must fit in an i16, i32, or usize, depending on situation"
-            ),
-            NbtIoError::NegativeLength => write!(
-                f,
-                "Length of a string or sequential type must be nonnegative"
-            ),
-            &NbtIoError::InvalidTagId(id) => write!(
-                f,
-                "Encountered invalid tag ID 0x{:X} during deserialization",
-                id
-            ),
-            &NbtIoError::TagTypeMismatch { expected, found } => write!(
-                f,
-                "Tag type mismatch: expected 0x{:X} but found 0x{:X}",
-                expected, found
-            ),
-            NbtIoError::ExpectedSeq
-                => write!(f, "Expected sequential tag type (array)"),
-            NbtIoError::ExpectedEnum
-                => write!(f, "Encountered invalid enum representation in the NBT tag tree"),
-            NbtIoError::InvalidKey
-                => write!(f, "Map keys must be a valid string"),
-            NbtIoError::InvalidEnumVariant
-                => write!(f, "Encountered invalid enum variant while deserializing"),
-            NbtIoError::InvalidCesu8String
-                => write!(f, "Encountered invalid CESU8 string"),
-            NbtIoError::InvalidUtf8String
-                => write!(f, "Encountered invalid UTF8 string"),
-            NbtIoError::InvalidNetI32
-                => write!(f, "Encountered bytes that formed an invalid Network-Endian i32"),
-            NbtIoError::InvalidNetI64
-                => write!(f, "Encountered bytes that formed an invalid Network-Endian i64"),
-            NbtIoError::UnsupportedType(ty)
-                => write!(f, "Type {} is not supported by Minecraft's NBT format", ty),
-            NbtIoError::Custom(msg) => write!(f, "{}", msg),
-        }
-    }
-}
-
-impl Error for NbtIoError {}

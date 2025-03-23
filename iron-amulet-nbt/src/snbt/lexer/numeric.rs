@@ -766,6 +766,7 @@ fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> 
 //      Numeric Parse Error
 // ================================================================
 
+// TODO: thiserror
 pub enum NumericParseError {
 
 }

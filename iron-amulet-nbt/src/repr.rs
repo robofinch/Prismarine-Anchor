@@ -1,6 +1,7 @@
-use std::fmt;
-use std::error::Error;
+use std::{fmt, error};
 use std::fmt::{Debug, Display, Formatter};
+
+use thiserror::Error;
 
 
 #[derive(Debug)]
@@ -57,8 +58,8 @@ impl Display for NbtReprError {
     }
 }
 
-impl Error for NbtReprError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+impl error::Error for NbtReprError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
             NbtReprError::Structure(error) => Some(error),
             NbtReprError::Custom(custom) => Some(&**custom),
@@ -68,68 +69,36 @@ impl Error for NbtReprError {
 
 /// An error associated with the structure of an NBT tag tree. This error represents a conflict
 /// between the expected and actual structure of an NBT tag tree.
-#[repr(transparent)]
-pub struct NbtStructureError {
-    repr: NbtStructureErrorRepr,
-}
-
-impl NbtStructureError {
-    pub(crate) fn missing_tag<T: Into<String>>(tag_name: T) -> Self {
-        NbtStructureError {
-            repr: NbtStructureErrorRepr::MissingTag {
-                tag_name: tag_name.into().into_boxed_str(),
-            },
-        }
-    }
-
-    pub(crate) fn invalid_index(index: usize, length: usize) -> Self {
-        NbtStructureError {
-            repr: NbtStructureErrorRepr::InvalidIndex { index, length },
-        }
-    }
-
-    pub(crate) fn type_mismatch(expected: &'static str, found: &'static str) -> Self {
-        NbtStructureError {
-            repr: NbtStructureErrorRepr::TypeMismatch { expected, found },
-        }
-    }
-}
-
-impl Debug for NbtStructureError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.repr, f)
-    }
-}
-
-impl Display for NbtStructureError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match &self.repr {
-            NbtStructureErrorRepr::MissingTag { tag_name } =>
-                write!(f, "Missing tag \"{}\"", tag_name),
-            NbtStructureErrorRepr::InvalidIndex { index, length } =>
-                write!(f, "Index out of range: {} >= {}", index, length),
-            NbtStructureErrorRepr::TypeMismatch { expected, found } => write!(
-                f,
-                "Tag type mismatch: expected {} but found {}",
-                expected, found
-            ),
-        }
-    }
-}
-
-impl Error for NbtStructureError {}
-
-#[derive(Debug)]
-enum NbtStructureErrorRepr {
+#[derive(Error, Debug, Clone)]
+pub enum NbtStructureError {
+    #[error("Missing tag \"{tag_name}\"")]
     MissingTag {
         tag_name: Box<str>,
     },
+    #[error("Index out of range: {index} >= {length}")]
     InvalidIndex {
         index: usize,
         length: usize,
     },
+    #[error("Tag type mismatch: expected {expected} but found {found}")]
     TypeMismatch {
         expected: &'static str,
         found: &'static str,
     },
+}
+
+impl NbtStructureError {
+    pub fn missing_tag<T: Into<String>>(tag_name: T) -> Self {
+        Self::MissingTag {
+            tag_name: tag_name.into().into_boxed_str(),
+        }
+    }
+
+    pub fn invalid_index(index: usize, length: usize) -> Self {
+        Self::InvalidIndex { index, length }
+    }
+
+    pub fn type_mismatch(expected: &'static str, found: &'static str) -> Self {
+        Self::TypeMismatch { expected, found }
+    }
 }

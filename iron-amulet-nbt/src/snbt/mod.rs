@@ -3,9 +3,9 @@
 mod lexer;
 
 
-use std::{fmt, mem};
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
+use std::mem;
+
+use thiserror::Error;
 
 use crate::{
     settings::{DepthLimit, SnbtParseOptions, SnbtVersion},
@@ -548,30 +548,133 @@ fn parse_compound_tag<'a>(
     }
 }
 
-/// An error that occurs during the parsing process. This error contains a copy of a segment
-/// of the input where the error occurred as well as metadata about the specific error. See
-/// [`ParserErrorType`](crate::snbt::ParserErrorType) for the different error types.
-pub struct SnbtError {
-    segment: String,
-    index: usize,
-    error: ParserErrorType,
+/// An error that occurs during the parsing process. Most errors contain a copy of a segment
+/// of the input where the error occurred, and each has metadata about the specific error.
+#[derive(Error, Debug, Clone)]
+pub enum SnbtError {
+    /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
+    #[error(
+        "Exceeded depth limit {} for nested compound and list tags at column {} near '{}'",
+        limit.0, index, segment
+    )]
+    ExceededDepthLimit {
+        segment: String,
+        index: usize,
+        /// The limit which was exceeded.
+        limit: DepthLimit
+    },
+    /// The end of the string (EOS) was encountered before it was expected.
+    #[error("Reached end of input but expected {expected}")]
+    UnexpectedEOS {
+        /// The expected token or sequence of tokens.
+        expected: &'static str,
+    },
+    /// An unexpected token was encountered.
+    #[error("Unexpected token at column {index} near '{segment}', expected {expected}")]
+    UnexpectedToken {
+        segment: String,
+        index: usize,
+        /// The expected token or sequence of tokens.
+        expected: &'static str,
+    },
+    /// An escape sequence supported in some SNBT version, but not the one selected.
+    #[error(
+        "Escape sequence only supported in a different SNBT version at column {index}: '{segment}'"
+    )]
+    UnsupportedEscapeSequence {
+        segment: String,
+        index: usize,
+    },
+    /// A named escape sequence was encountered, but named escape sequence support wasn't enabled.
+    #[error(
+        "Named sequence support is not enabled; could not parse escape sequence '{}' at column {}",
+        segment, index
+    )]
+    NamedEscapeSequence {
+        segment: String,
+        index: usize,
+    },
+    /// An unknown or invalid escape sequence.
+    #[error("Unknown escape sequence at column {index}: '{segment}'")]
+    UnknownEscapeSequence {
+        segment: String,
+        index: usize,
+    },
+    /// A non-alphanumeric character other than `_`, `-`, `.`, or `+`
+    /// appeared in an unquoted string.
+    #[error("Character '{ch}' disallowed in unquoted strings at column {index} near '{segment}'")]
+    InvalidUnquotedCharacter {
+        segment: String,
+        index: usize,
+        /// The encountered character which should not appear in unquoted strings.
+        ch: char
+    },
+    /// An invalid number.
+    // TODO: make numeric parsing errors more detailed
+    #[error("Invalid number at column {index}: '{segment}'")]
+    InvalidNumber {
+        segment: String,
+        index: usize,
+    },
+    /// An invalid string representation of a UUID.
+    #[error("Invalid string representation of a UUID at column {index}: '{segment}'")]
+    InvalidUUID {
+        segment: String,
+        index: usize,
+    },
+    /// An unquoted token which could be numeric or a string,
+    /// which was prohibited in parsing options.
+    #[error("Ambiguous token '{segment}' at column {index}")]
+    AmbiguousToken {
+        segment: String,
+        index: usize,
+    },
+    /// A trailing comma was encountered in a list or compound when it shouldn't have been.
+    #[error("Forbidden trailing comma at column {index}: '{segment}'")]
+    TrailingComma {
+        segment: String,
+        index: usize,
+    },
+    /// An unmatched single or double quote was encountered.
+    #[error("Unmatched quote at column {index} near '{segment}'")]
+    UnmatchedQuote {
+        segment: String,
+        index: usize,
+    },
+    /// An unmatched curly bracket, square bracket, or parenthesis was encountered.
+    #[error("Unmatched brace at column {index} near '{segment}'")]
+    UnmatchedBrace {
+        segment: String,
+        index: usize,
+    },
+    /// A non-homogenous array of numbers was encountered.
+    #[error("Non-homogenous typed array of numbers at column {index} near '{segment}'")]
+    NonHomogenousNumericList {
+        segment: String,
+        index: usize,
+    },
+    /// A non-homogenous array of NBT tags was encountered.
+    #[error(
+        "Non-homogenous tag list (only supported in new SNBT version) at column {} near '{}'",
+        index, segment
+    )]
+    NonHomogenousTagList {
+        segment: String,
+        index: usize,
+    },
 }
 
 impl SnbtError {
     fn exceeded_depth_limit(input: &str, index: usize, limit: DepthLimit) -> Self {
-        Self {
+        Self::ExceededDepthLimit {
             segment: Self::segment(input, index, 1, 4, 4),
             index,
-            error: ParserErrorType::ExceededDepthLimit { limit }
+            limit,
         }
     }
 
     fn unexpected_eos(expected: &'static str) -> Self {
-        Self {
-            segment: String::new(),
-            index: 0,
-            error: ParserErrorType::UnexpectedEOS { expected },
-        }
+        Self::UnexpectedEOS { expected }
     }
 
     fn unexpected_token(input: &str, token: Option<&TokenData>, expected: &'static str) -> Self {
@@ -589,107 +692,96 @@ impl SnbtError {
         char_width: usize,
         expected: &'static str,
     ) -> Self {
-        Self {
+        Self::UnexpectedToken {
             segment: Self::segment(input, index, char_width, 15, 0),
             index,
-            error: ParserErrorType::UnexpectedToken { expected },
+            expected,
         }
     }
 
     fn unsupported_escape_sequence(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::UnsupportedEscapeSequence {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::UnsupportedEscapeSequence,
         }
     }
 
     #[cfg(not(feature = "named_escapes"))]
     fn named_escape_sequence(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::NamedEscapeSequence {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::NamedEscapeSequence,
         }
     }
 
     fn unknown_escape_sequence(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::UnknownEscapeSequence {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::UnknownEscapeSequence,
         }
     }
 
     fn invalid_unquoted_character(input: &str, index: usize, char_width: usize, ch: char) -> Self {
-        Self {
+        Self::InvalidUnquotedCharacter {
             segment: Self::segment(input, index, char_width, 10, 5),
             index,
-            error: ParserErrorType::InvalidUnquotedCharacter { ch }
+            ch,
         }
     }
 
     fn invalid_number(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::InvalidNumber {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::InvalidNumber,
         }
     }
 
     fn invalid_uuid(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::InvalidUUID {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::InvalidUUID,
         }
     }
 
     fn ambiguous_token(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::AmbiguousToken {
             segment: Self::segment(input, index, char_width, 0, 0),
             index,
-            error: ParserErrorType::AmbiguousToken,
         }
     }
 
     fn trailing_comma(input: &str, index: usize) -> Self {
-        Self {
+        Self::TrailingComma {
             segment: Self::segment(input, index, 1, 15, 1),
             index,
-            error: ParserErrorType::TrailingComma,
         }
     }
 
     fn unmatched_quote(input: &str, index: usize) -> Self {
-        Self {
+        Self::UnmatchedQuote {
             segment: Self::segment(input, index, 1, 7, 7),
             index,
-            error: ParserErrorType::UnmatchedQuote,
         }
     }
 
     fn unmatched_brace(input: &str, index: usize) -> Self {
-        Self {
+        Self::UnmatchedBrace {
             segment: Self::segment(input, index, 1, 0, 15),
             index,
-            error: ParserErrorType::UnmatchedBrace,
         }
     }
 
     fn non_homogenous_numeric_list(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::NonHomogenousNumericList {
             segment: Self::segment(input, index, char_width, 15, 0),
             index,
-            error: ParserErrorType::NonHomogenousNumericList,
         }
     }
 
     fn non_homogenous_tag_list(input: &str, index: usize, char_width: usize) -> Self {
-        Self {
+        Self::NonHomogenousTagList {
             segment: Self::segment(input, index, char_width, 15, 0),
             index,
-            error: ParserErrorType::NonHomogenousTagList,
         }
     }
 
@@ -715,119 +807,4 @@ impl SnbtError {
 
         input[start .. end].to_owned()
     }
-}
-
-impl Display for SnbtError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.error {
-            ParserErrorType::ExceededDepthLimit { limit }
-                => write!(
-                    f, "Exceeded depth limit {} for nested tag lists and compound tags",
-                    limit.0
-                ),
-            ParserErrorType::UnexpectedEOS { expected }
-                => write!(f, "Reached end of input but expected {}", expected),
-            ParserErrorType::UnexpectedToken { expected }
-                => write!(
-                    f, "Unexpected token at column {} near '{}', expected {}",
-                    self.index, self.segment, expected
-                ),
-            ParserErrorType::UnsupportedEscapeSequence
-                => write!(
-                    f, "Escape sequence only supported in a different SNBT version: '{}'",
-                    self.segment
-                ),
-            ParserErrorType::NamedEscapeSequence
-            => write!(
-                f, "Named sequence support is not enabled; could not parse escape sequence '{}'",
-                self.segment
-            ),
-            ParserErrorType::UnknownEscapeSequence
-                => write!(f, "Unknown escape sequence: '{}'", self.segment),
-            ParserErrorType::InvalidUnquotedCharacter { ch }
-                => write!(
-                    f, "Character '{}' disallowed in unquoted strings at column {} near '{}'",
-                    ch, self.index, self.segment
-                ),
-            ParserErrorType::InvalidNumber
-                => write!(f, "Invalid number: {}", self.segment),
-            ParserErrorType::InvalidUUID
-                => write!(f, "Invalid string representation of a UUID: {}", self.segment),
-            ParserErrorType::AmbiguousToken
-                => write!(f, "Ambiguous token '{}' at column {}", self.segment, self.index),
-            ParserErrorType::TrailingComma
-                => write!(f, "Forbidden trailing comma at column {}: '{}'", self.index, self.segment),
-            ParserErrorType::UnmatchedQuote
-                => write!(f, "Unmatched quote: column {} near '{}'", self.index, self.segment),
-            ParserErrorType::UnmatchedBrace
-                => write!(f, "Unmatched brace at column {} near '{}'", self.index, self.segment),
-            ParserErrorType::NonHomogenousNumericList
-                => write!(
-                    f, "Non-homogenous typed array of numbers at column {} near '{}'",
-                    self.index, self.segment
-                ),
-            ParserErrorType::NonHomogenousTagList
-                => write!(
-                    f,
-                    "Heterogenous tag list (only supported in new SNBT version) at column {} near '{}'",
-                    self.index, self.segment
-                ),
-        }
-    }
-}
-
-impl Debug for SnbtError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.error, f)
-    }
-}
-
-impl Error for SnbtError {}
-
-/// A specific type of parser error.
-#[derive(Debug, Clone)]
-pub enum ParserErrorType {
-    /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
-    ExceededDepthLimit {
-        /// The limit which was exceeded.
-        limit: DepthLimit
-    },
-    /// The end of the string (EOS) was encountered before it was expected.
-    UnexpectedEOS {
-        /// The expected token or sequence of tokens.
-        expected: &'static str,
-    },
-    /// An unexpected token was encountered.
-    UnexpectedToken {
-        /// The expected token or sequence of tokens.
-        expected: &'static str,
-    },
-    /// An escape sequence supported in some SNBT version, but not the one selected.
-    UnsupportedEscapeSequence,
-    /// A named escape sequence was encountered, but named escape sequence support wasn't enabled.
-    NamedEscapeSequence,
-    /// An unknown or invalid escape sequence.
-    UnknownEscapeSequence,
-    /// A non-alphanumeric character other than `_`, `-`, `.`, or `+` appeared in an unquoted string.
-    InvalidUnquotedCharacter {
-        /// The encountered character which should not appear in unquoted strings.
-        ch: char
-    },
-    /// An invalid number.
-    InvalidNumber,
-    /// An invalid string representation of a UUID.
-    InvalidUUID,
-    /// An unquoted token which could be numeric or a string,
-    /// which was prohibited in parsing options.
-    AmbiguousToken,
-    /// A trailing comma was encountered in a list or compound when it shouldn't have been.
-    TrailingComma,
-    /// An unmatched single or double quote was encountered.
-    UnmatchedQuote,
-    /// An unmatched curly bracket, square bracket, or parenthesis was encountered.
-    UnmatchedBrace,
-    /// A non-homogenous array of numbers was encountered.
-    NonHomogenousNumericList,
-    /// A non-homogenous array of NBT tags was encountered.
-    NonHomogenousTagList,
 }
