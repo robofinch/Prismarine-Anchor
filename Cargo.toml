@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "iron-amulet", "iron-amulet-nbt" ]
+members = [ "prismarine-editor", "prismarine-nbt" ]
 
 [workspace.package]
 # No license provided to anyone for now; all rights reserved. See README for more.
@@ -20,7 +20,7 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 
 # debug = true # include debug symbols, useful when profiling wasm
 
-# Note: will probably not use this for Iron Amulet, we should instead catch the unwind
+# Note: will probably not use this for Prismarine Editor, we should instead catch the unwind
 # and try to save data to avoid losing everything from a crash.
 panic = "abort" # This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
 
@@ -36,8 +36,8 @@ opt-level = 2
 
 # TODO: support wasm. maybe some of the below deps will only work on non-wasm targets.
 [workspace.dependencies]
-iron-amulet             = { version = "0.1.0", path = "./iron-amulet" }
-iron-amulet-nbt         = { version = "0.1.0", path = "./iron-amulet-nbt" }
+prismarine-editor = { version = "0.1.0", path = "./prismarine-editor" }
+prismarine-nbt    = { version = "0.1.0", path = "./prismarine-nbt" }
 
 anyhow = "1"
 byteorder = "1.5.0"

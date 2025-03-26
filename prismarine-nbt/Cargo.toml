@@ -1,5 +1,5 @@
 [package]
-name = "iron-amulet-nbt"
+name = "prismarine-nbt"
 authors = ["Finley Huggins"]
 version.workspace = true
 edition.workspace = true

@@ -1,4 +1,4 @@
-# Iron Amulet
+# Prismarine Editor
 In-progress reimplementation of [Amulet Editor](https://www.amuletmc.com/) in Rust.
 (Might end up very different, though, as perfectly matching Amulet is not a priority,
 and this is a clean-room-style reimplementation not based on Amulet's source.)
@@ -16,7 +16,7 @@ Don't let it concern you very much, this is a "just in case" sort of thing.
 Most of this project will likely not be open source,
 and will prohibit competing with Amulet similarly to the
 [Amulet Team License 1.0.0](https://github.com/Amulet-Team/Amulet-NBT/blob/4.0/LICENSE),
-with only the NBT crate (iron-amulet-nbt) open-sourced.
+with only the NBT crate (prismarine-nbt) open-sourced.
 
 The licensing of previous versions of this repo may or may not be legally accurate, and if
 you are viewing the history of this repo, you should not rely on everything actually being

@@ -157,30 +157,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
-name = "iron-amulet"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "iron-amulet-nbt",
- "rusty-leveldb",
-]
-
-[[package]]
-name = "iron-amulet-nbt"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "byteorder",
- "cesu8",
- "flate2",
- "indexmap",
- "serde",
- "thiserror",
- "unicode_names2",
- "varint-rs",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.170"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -255,6 +231,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "prismarine-editor"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "prismarine-nbt",
+ "rusty-leveldb",
+]
+
+[[package]]
+name = "prismarine-nbt"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "cesu8",
+ "flate2",
+ "indexmap",
+ "serde",
+ "thiserror",
+ "unicode_names2",
+ "varint-rs",
 ]
 
 [[package]]

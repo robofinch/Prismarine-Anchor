@@ -1,5 +1,5 @@
 [package]
-name = "iron-amulet"
+name = "prismarine-editor"
 authors = ["Finley Huggins"]
 license.workspace = true
 version.workspace = true
@@ -7,7 +7,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-iron-amulet-nbt.workspace = true
+prismarine-nbt.workspace = true
 
 rusty-leveldb.workspace = true
 flate2.workspace = true
