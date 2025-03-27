@@ -40,7 +40,8 @@ pub fn new_leveldb(
 pub enum DBCompressor {
     None,
     ZlibWithHeader,
-    ZlibWithoutHeader
+    /// Also known by terms like ZlibRaw
+    ZlibWithoutHeader,
 }
 
 impl Default for DBCompressor {

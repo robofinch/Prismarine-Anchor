@@ -4,10 +4,6 @@ authors = ["Finley Huggins"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-
-# Eventually won't be the same license as the rest of the workspace, so
-# might as well turn off license.workspace = true for now,
-# even if they're still the same string
 license = "" # Will probably be MIT OR Apache-2.0.
 
 # Note that licenses of dependencies include:
@@ -21,15 +17,16 @@ license = "" # Will probably be MIT OR Apache-2.0.
 # Zlib              - no req's if you don't modify their code
 
 [dependencies]
-anyhow.workspace    = true
-byteorder.workspace = true
-cesu8.workspace     = true
-flate2.workspace    = true
-indexmap            = { workspace = true, optional = true }
-serde               = { workspace = true, optional = true }
-thiserror.workspace = true
-unicode_names2      = { workspace = true, optional = true }
-varint-rs.workspace = true
+anyhow      .workspace = true
+byteorder   .workspace = true
+cesu8       .workspace = true
+flate2      .workspace = true
+thiserror   .workspace = true
+varint-rs   .workspace = true
+
+indexmap        = { workspace = true, optional = true }
+serde           = { workspace = true, optional = true }
+unicode_names2  = { workspace = true, optional = true }
 
 [features]
 default = [ "allow_list_root", "named_escapes" ]

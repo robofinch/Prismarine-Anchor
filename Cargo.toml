@@ -1,15 +1,17 @@
 [workspace]
 resolver = "2"
-members = [ "prismarine-editor", "prismarine-nbt" ]
+members = ["prismarine-editor", "prismarine-nbt" , "prismarine-world"]
 
 [workspace.package]
 # No license provided to anyone for now; all rights reserved. See README for more.
+# Note that some crates in this workspace don't use license.workspace = true
 license = ""
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 
-# Some of this toml is copied from egui's repository, it's my go-to large multicrate example project
+# Some of this toml is copied from egui's repository,
+# it's my go-to large multicrate example project
 
 [profile.release]
 # lto = true # VERY slightly smaller wasm
@@ -22,11 +24,13 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 
 # Note: will probably not use this for Prismarine Editor, we should instead catch the unwind
 # and try to save data to avoid losing everything from a crash.
-panic = "abort" # This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
-
+# Original comment:
+# This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
+panic = "abort"
 
 [profile.dev]
-# Can't leave this on by default, because it breaks the Windows build. Related: https://github.com/rust-lang/cargo/issues/4897
+# Can't leave this on by default, because it breaks the Windows build.
+# Related: https://github.com/rust-lang/cargo/issues/4897
 # split-debuginfo = "unpacked" # faster debug builds on mac
 # opt-level = 1                # Make debug builds run faster
 
@@ -34,20 +38,35 @@ panic = "abort" # This leads to better optimizations and smaller binaries (and i
 # Optimize all dependencies even in debug builds (does not affect workspace packages):
 opt-level = 2
 
-# TODO: support wasm. maybe some of the below deps will only work on non-wasm targets.
 [workspace.dependencies]
-prismarine-editor = { version = "0.1.0", path = "./prismarine-editor" }
-prismarine-nbt    = { version = "0.1.0", path = "./prismarine-nbt" }
+prismarine-editor   = { version = "0.1.0", path = "./prismarine-editor" }
+prismarine-nbt      = { version = "0.1.0", path = "./prismarine-nbt" }
+prismarine-world    = { version = "0.1.0", path = "./prismarine-world" }
 
-anyhow = "1"
-byteorder = "1.5.0"
-cesu8 = "1.1.0"
-flate2 = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+anyhow              = "1"
+byteorder           = "1.5.0"
+cesu8               = "1.1.0"
+flate2              = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+indexmap            = { version = "2.7.1", features = ["serde"] }
+rusty-leveldb       = { version = "3.0.2", default-features = false }
+serde               = { version = "1", features = ["serde_derive"] }
+thiserror           = "2"
+unicode_names2      = "1.3.0"
+varint-rs           = "2.2.0" # Appears to be taken off GitHub? Can still read source on docs.rs
+web-time            = "1.1.0"
+zip                 = { version = "2.5.0", default-features = false, features = [
+                        "deflate-flate2", "flate2"
+                    ] }
+
+
 # enum-map = "2.7.3"
-indexmap = { version = "2.7.1", features = ["serde"] }
-rusty-leveldb = "3.0.2"
-serde = { version = "1", features = ["serde_derive"] }
 # smallvec = "1.14.0"
-thiserror = "2"
-unicode_names2 = "1.3.0"
-varint-rs = "2.2.0" # Appears to be taken off GitHub? Can still read source on docs.rs
+
+
+# I don't know how to get the below to work, or if it's even possible.
+# Therefore, it's copied-and-pasted everywhere else.
+
+# [workspace.target.'cfg(target_arch = "wasm32")'.dependencies]
+# # We don't directly use this, but our deps do, and it needs to have the js feature enabled.
+# getrandom = { version = "0.2", features = ["js"] }
+

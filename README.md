@@ -3,6 +3,16 @@ In-progress reimplementation of [Amulet Editor](https://www.amuletmc.com/) in Ru
 (Might end up very different, though, as perfectly matching Amulet is not a priority,
 and this is a clean-room-style reimplementation not based on Amulet's source.)
 
+
+Note that may lead me to change my mind on the below: I've discovered Team-Lodestone
+and their awesome documentation for various Minecraft versions' formats.
+They seem to be doing something similar to me, but with much more ambitious cross-platform goals,
+and with editors for a wide variety of data, not just Minecraft worlds.
+They also use more open source licensing, it seems.
+I might ultimately end up relying more on their docs than on referencing Amulet's
+application's UI, which could shift what I thought my ethical obligations to Amulet would be.
+
+
 ### Licensing
 
 Licensing details are in progress. Do not interpret any of the following as providing you
@@ -45,4 +55,4 @@ of trust and goodwill, but I do hope that trust and goodwill is still present.
 
 Again, even if this project does not include data or code copied or modified from Amulet codebases,
 and successfully avoids running afoul of the noncompete, the noncompete will still apply
-to users or derivatives of this project.
+to users or derivatives of this project. (If that license is used here.)
