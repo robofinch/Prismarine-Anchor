@@ -6,11 +6,12 @@ mod bedrock;
 // back from there at some point after I get visible output (a MVP of sorts).
 
 
-// Also, I'll probably use PosixMemEnv and ZipEnv for both bedrock and java;
+// Also, I'll probably use PosixMemEnv and MemEnv for both bedrock and java;
 // even though Java has nothing to do with rusty_leveldb, its env trait is convenient.
 // Probably.
 
-// Specifically, in the case of a native app, it can use a PosixMemEnv, or ZipEnv with root "".
-// in the case of wasm, it can be ZipEnv.
+// Specifically, in the case of a native app, it can use a PosixMemEnv, or MemEnv with root "".
+// in the case of wasm, it can be MemEnv.
+// Definitely want to support converting MemEnv to and from zip
 // Might also want to support the ability to read in a world folder with the webkitdirectory
 // option of the web filesystem API, eventually.

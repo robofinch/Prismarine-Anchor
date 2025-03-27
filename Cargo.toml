@@ -55,7 +55,7 @@ unicode_names2      = "1.3.0"
 varint-rs           = "2.2.0" # Appears to be taken off GitHub? Can still read source on docs.rs
 web-time            = "1.1.0"
 zip                 = { version = "2.5.0", default-features = false, features = [
-                        "deflate-flate2", "flate2"
+                        "deflate-flate2", "flate2", "time"
                     ] }
 
 
