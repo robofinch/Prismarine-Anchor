@@ -8,9 +8,9 @@ use serde::de::{EnumAccess, Error, MapAccess, SeqAccess, Visitor};
 use crate::raw;
 
 
-pub(crate) const BYTE_ARRAY_NICHE: &str = "b_prismarine_nbt_array";
-pub(crate) const INT_ARRAY_NICHE:  &str = "i_prismarine_nbt_array";
-pub(crate) const LONG_ARRAY_NICHE: &str = "l_prismarine_nbt_array";
+pub(crate) const BYTE_ARRAY_NICHE: &str = "b_nbt_array";
+pub(crate) const INT_ARRAY_NICHE:  &str = "i_nbt_array";
+pub(crate) const LONG_ARRAY_NICHE: &str = "l_nbt_array";
 
 
 /// A transparent wrapper around sequential types to allow the NBT serializer to automatically
@@ -273,7 +273,7 @@ pub(crate) struct TypeHint {
     pub hint: Option<u8>,
 }
 
-pub(crate) const TYPE_HINT_NICHE: &str = "__prismarine_nbt_array_type_hint";
+pub(crate) const TYPE_HINT_NICHE: &str = "__nbt_array_type_hint";
 
 impl<'de> Deserialize<'de> for TypeHint {
     #[inline]
@@ -291,7 +291,7 @@ impl<'de> Visitor<'de> for TypeHintVisitor {
     type Value = Option<u8>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "A prismarine-nbt array type hint")
+        write!(formatter, "A prismarine-anchor-nbt array type hint")
     }
 
     #[inline]

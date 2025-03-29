@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["prismarine-editor", "prismarine-nbt" , "prismarine-world"]
+members = ["prismarine-anchor-editor", "prismarine-anchor-nbt" , "prismarine-anchor-world"]
 
 [workspace.package]
 # No license provided to anyone for now; all rights reserved. See README for more.
@@ -22,8 +22,9 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 
 # debug = true # include debug symbols, useful when profiling wasm
 
-# Note: will probably not use this for Prismarine Editor, we should instead catch the unwind
-# and try to save data to avoid losing everything from a crash.
+# Note: will probably not ultimately use this for Prismarine Anchor,
+# we should instead catch the unwind and try to save data to avoid losing everything from a crash,
+# maybe. For now, whatever.
 # Original comment:
 # This leads to better optimizations and smaller binaries (and is the default in Wasm anyways).
 panic = "abort"
@@ -39,9 +40,9 @@ panic = "abort"
 opt-level = 2
 
 [workspace.dependencies]
-prismarine-editor   = { version = "0.1.0", path = "./prismarine-editor" }
-prismarine-nbt      = { version = "0.1.0", path = "./prismarine-nbt" }
-prismarine-world    = { version = "0.1.0", path = "./prismarine-world" }
+prismarine-anchor-editor   = { version = "0.1.0", path = "./prismarine-anchor-editor" }
+prismarine-anchor-nbt      = { version = "0.1.0", path = "./prismarine-anchor-nbt" }
+prismarine-anchor-world    = { version = "0.1.0", path = "./prismarine-anchor-world" }
 
 anyhow              = "1"
 byteorder           = "1.5.0"

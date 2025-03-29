@@ -271,17 +271,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "prismarine-editor"
+name = "prismarine-anchor-editor"
 version = "0.1.0"
 dependencies = [
  "flate2",
  "getrandom",
- "prismarine-nbt",
+ "prismarine-anchor-nbt",
  "rusty-leveldb",
 ]
 
 [[package]]
-name = "prismarine-nbt"
+name = "prismarine-anchor-nbt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -296,12 +296,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "prismarine-world"
+name = "prismarine-anchor-world"
 version = "0.1.0"
 dependencies = [
  "flate2",
  "getrandom",
- "prismarine-nbt",
+ "prismarine-anchor-nbt",
  "rusty-leveldb",
  "thiserror",
  "web-time",

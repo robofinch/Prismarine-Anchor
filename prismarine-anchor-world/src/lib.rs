@@ -1,6 +1,8 @@
 mod zip_env;
 mod bedrock;
 
+mod chunk_data;
+
 // Right now this is focused on Bedrock Edition, and only the newest version.
 // Support *will* be added for the newest version of Java, and then I'll work
 // back from there at some point after I get visible output (a MVP of sorts).

@@ -7,3 +7,15 @@
 
 // given an env, world path, create_if_missing, error_if_exists, and compressor:
 // read db
+
+// pub struct LevelDat {
+
+// }
+
+// pub struct LevelName(pub String);
+// pub struct WorldIcon();
+
+// IIRC, other player data is in LevelDB
+
+
+// need to design universal structs for world block data

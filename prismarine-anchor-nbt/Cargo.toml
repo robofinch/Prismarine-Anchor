@@ -1,5 +1,5 @@
 [package]
-name = "prismarine-nbt"
+name = "prismarine-anchor-nbt"
 authors = ["Finley Huggins"]
 version.workspace = true
 edition.workspace = true
