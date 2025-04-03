@@ -1,6 +1,11 @@
+use std::mem::size_of;
+use prismarine_anchor_nbt::{settings, snbt};
+
 fn main() {
     println!("Hello, world!");
-    println!("{}", std::mem::size_of::<prismarine_anchor_nbt::settings::SnbtParseOptions>());
-    println!("{}", std::mem::size_of::<prismarine_anchor_nbt::settings::SnbtWriteOptions>());
-    println!("{}", std::mem::size_of::<prismarine_anchor_nbt::settings::EnabledEscapeSequences>());
+    println!("{}", size_of::<settings::SnbtParseOptions>());
+    println!("{}", size_of::<settings::SnbtWriteOptions>());
+    println!("{}", size_of::<settings::EnabledEscapeSequences>());
+    println!("{}", size_of::<snbt::VerifiedSnbt>());
+    println!("{}", size_of::<Option<snbt::VerifiedSnbt>>());
 }
