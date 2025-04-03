@@ -1,0 +1,22 @@
+[package]
+name = "prismarine-anchor-translators"
+authors = ["Finley Huggins"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "" # Will probably be MIT OR Apache-2.0.
+
+[dependencies]
+prismarine-anchor-nbt           .workspace = true
+prismarine-anchor-translation   .workspace = true
+
+anyhow          .workspace = true
+serde           .workspace = true
+serde_json      .workspace = true
+thiserror       .workspace = true
+
+[features]
+default         = ["py_mc_translate"]
+
+py_mc_translate = []
+minecraft_data  = []
