@@ -160,6 +160,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
+name = "itoa"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
+
+[[package]]
 name = "js-sys"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -271,6 +277,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-derive"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "prismarine-anchor-editor"
 version = "0.1.0"
 dependencies = [
@@ -296,13 +312,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-translation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "prismarine-anchor-nbt",
+ "thiserror",
+]
+
+[[package]]
+name = "prismarine-anchor-translators"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "prismarine-anchor-nbt",
+ "prismarine-anchor-translation",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "prismarine-anchor-world"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "flate2",
  "getrandom",
  "prismarine-anchor-nbt",
+ "prismarine-anchor-translation",
+ "prismarine-anchor-translators",
  "rusty-leveldb",
+ "serde",
+ "serde_json",
  "thiserror",
  "web-time",
  "zip",
@@ -369,6 +411,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ryu"
+version = "1.0.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
+
+[[package]]
 name = "serde"
 version = "1.0.218"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -386,6 +434,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.140"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
+dependencies = [
+ "itoa",
+ "memchr",
+ "ryu",
+ "serde",
 ]
 
 [[package]]

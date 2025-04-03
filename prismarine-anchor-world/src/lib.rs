@@ -1,7 +1,10 @@
+// Reading world files
 mod zip_env;
 mod bedrock;
+// mod java;
 
-mod chunk_data;
+pub mod translation;
+
 
 // Right now this is focused on Bedrock Edition, and only the newest version.
 // Support *will* be added for the newest version of Java, and then I'll work

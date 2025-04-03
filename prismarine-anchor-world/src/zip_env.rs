@@ -35,6 +35,21 @@ impl ZipEnv {
         ZipEnv(MemFS::new())
     }
 
+    pub fn try_into_bytes(self) -> Result<Vec<u8>, ZipEnvError> {
+        let mut writer: _ = ZipWriter::new(Cursor::new(Vec::new()));
+
+        for (key, entry) in self.0.store.lock().unwrap().iter() {
+            let file = &entry.f.0.lock().unwrap().0;
+            let is_large = u32::try_from(file.len()).is_err();
+            let opts = SimpleFileOptions::default().large_file(is_large);
+
+            writer.start_file(key, opts)?;
+            io::copy(&mut Cursor::new(file), &mut writer).map_err(ZipError::Io)?;
+        }
+
+        writer.finish().map(|c| c.into_inner()).map_err(ZipEnvError::Zip)
+    }
+
     pub fn try_into_archive(self) -> Result<ZipArchive<impl Read>, ZipEnvError> {
         let mut writer: _ = ZipWriter::new(Cursor::new(Vec::new()));
 
