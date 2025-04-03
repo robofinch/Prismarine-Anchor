@@ -1,3 +1,9 @@
+#[cfg(feature = "comparable")]
+pub mod comparable;
+#[cfg(all(feature = "preserve_order", feature = "comparable"))]
+mod index_btree;
+
+
 use std::fmt;
 use std::hash::Hash;
 use std::{
@@ -14,17 +20,38 @@ use crate::{
 };
 
 
-/// The hash map type utilized in this crate. If the feature `preserve_order` is enabled, then this
+/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
+/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
+/// Otherwise, if the feature `preserve_order` is enabled, then this
 /// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// Otherwise, this type defaults to `std`'s `HashMap`.
-#[cfg(feature = "preserve_order")]
+/// If neither is enabled, this type defaults to `std`'s `HashMap`.
+#[cfg(all(feature = "preserve_order", not(feature = "comparable")))]
 pub type Map<T> = indexmap::IndexMap<String, T>;
 
-/// The hash map type utilized in this crate. If the feature `preserve_order` is enabled, then this
+/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
+/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
+/// Otherwise, if the feature `preserve_order` is enabled, then this
 /// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// Otherwise, this type defaults to `std`'s `HashMap`.
-#[cfg(not(feature = "preserve_order"))]
+/// If neither is enabled, this type defaults to `std`'s `HashMap`.
+#[cfg(all(not(feature = "preserve_order"), not(feature = "comparable")))]
 pub type Map<T> = std::collections::HashMap<String, T>;
+
+/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
+/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
+/// Otherwise, if the feature `preserve_order` is enabled, then this
+/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
+/// If neither is enabled, this type defaults to `std`'s `HashMap`.
+#[cfg(all(not(feature = "preserve_order"), feature = "comparable"))]
+pub type Map<T> = std::collections::BTreeMap<String, T>;
+
+/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
+/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
+/// Otherwise, if the feature `preserve_order` is enabled, then this
+/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
+/// If neither is enabled, this type defaults to `std`'s `HashMap`.
+#[cfg(all(feature = "preserve_order", feature = "comparable"))]
+pub type Map<T> = index_btree::Map<T>;
+
 
 /// The generic NBT tag type, containing all supported tag variants which wrap around a corresponding
 /// rust type.
@@ -65,19 +92,74 @@ pub enum NbtTag {
     LongArray(Vec<i64>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NbtContainerType {
+    Compound,
+    List,
+    ByteArray,
+    IntArray,
+    LongArray,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NbtType {
+    Byte,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    ByteArray,
+    String,
+    List,
+    Compound,
+    IntArray,
+    LongArray,
+}
+
 impl NbtTag {
     /// Returns the single character denoting this tag's type, or `None` if this tag has no type
     /// specifier.
     pub fn type_specifier(&self) -> Option<&'static str> {
         match self {
-            NbtTag::Byte(_) => Some("B"),
-            NbtTag::Short(_) => Some("S"),
-            NbtTag::Long(_) => Some("L"),
-            NbtTag::Float(_) => Some("F"),
-            NbtTag::Double(_) => Some("D"),
-            NbtTag::ByteArray(_) => Some("B"),
-            NbtTag::IntArray(_) => Some("I"),
-            NbtTag::LongArray(_) => Some("L"),
+            Self::Byte(_)      => Some("B"),
+            Self::Short(_)     => Some("S"),
+            Self::Long(_)      => Some("L"),
+            Self::Float(_)     => Some("F"),
+            Self::Double(_)    => Some("D"),
+            Self::ByteArray(_) => Some("B"),
+            Self::IntArray(_)  => Some("I"),
+            Self::LongArray(_) => Some("L"),
+            _ => None,
+        }
+    }
+
+    /// Returns this tag's type.
+    pub fn tag_type(&self) -> NbtType {
+        match self {
+            Self::Byte(_)      => NbtType::Byte,
+            Self::Short(_)     => NbtType::Short,
+            Self::Int(_)       => NbtType::Int,
+            Self::Long(_)      => NbtType::Long,
+            Self::Float(_)     => NbtType::Float,
+            Self::Double(_)    => NbtType::Double,
+            Self::ByteArray(_) => NbtType::ByteArray,
+            Self::String(_)    => NbtType::String,
+            Self::List(_)      => NbtType::List,
+            Self::Compound(_)  => NbtType::Compound,
+            Self::IntArray(_)  => NbtType::IntArray,
+            Self::LongArray(_) => NbtType::LongArray,
+        }
+    }
+
+    /// Returns which type of container this tag is, or `None` if it is not a container.
+    pub fn container_type(&self) -> Option<NbtContainerType> {
+        match self {
+            Self::Compound(_)  => Some(NbtContainerType::Compound),
+            Self::List(_)      => Some(NbtContainerType::List),
+            Self::ByteArray(_) => Some(NbtContainerType::ByteArray),
+            Self::IntArray(_)  => Some(NbtContainerType::IntArray),
+            Self::LongArray(_) => Some(NbtContainerType::LongArray),
             _ => None,
         }
     }
@@ -1063,10 +1145,19 @@ impl NbtCompound {
         self.0
     }
 
-    /// Returns a new NBT tag compound with the given initial capacity.
+    /// Returns a new NBT tag compound with the given initial capacity, unless the `comparable`
+    /// feature is enabled, in which case no allocation is performed.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        NbtCompound(Map::with_capacity(capacity))
+        #[cfg(not(feature = "comparable"))]
+        {
+            NbtCompound(Map::with_capacity(capacity))
+        }
+        #[cfg(feature = "comparable")]
+        {
+            let _ = capacity;
+            NbtCompound(Map::new())
+        }
     }
 
     /// Clones the data in the given map and converts it into an [`NbtCompound`](crate::tag::NbtCompound).
@@ -1160,7 +1251,7 @@ impl NbtCompound {
     pub fn get<'a, 'b, K, T>(&'a self, name: &'b K) -> Result<T, NbtReprError>
     where
         String: Borrow<K>,
-        K: Hash + Eq + ?Sized,
+        K: Hash + Ord + Eq + ?Sized,
         &'b K: Into<String>,
         T: TryFrom<&'a NbtTag>,
         T::Error: Into<anyhow::Error>,
@@ -1179,7 +1270,7 @@ impl NbtCompound {
     pub fn get_mut<'a, 'b, K, T>(&'a mut self, name: &'b K) -> Result<T, NbtReprError>
     where
         String: Borrow<K>,
-        K: Hash + Eq + ?Sized,
+        K: Hash + Ord + Eq + ?Sized,
         &'b K: Into<String>,
         T: TryFrom<&'a mut NbtTag>,
         T::Error: Into<anyhow::Error>,
@@ -1197,7 +1288,7 @@ impl NbtCompound {
     pub fn contains_key<K>(&self, key: &K) -> bool
     where
         String: Borrow<K>,
-        K: Hash + Eq + ?Sized,
+        K: Hash + Ord + Eq + ?Sized,
     {
         self.0.contains_key(key)
     }
@@ -1318,7 +1409,7 @@ impl FromIterator<(String, NbtTag)> for NbtCompound {
 impl<Q: ?Sized> Index<&Q> for NbtCompound
 where
     String: Borrow<Q>,
-    Q: Eq + Hash,
+    Q: Eq + Hash + Ord,
 {
     type Output = NbtTag;
 
@@ -1507,7 +1598,17 @@ mod serde_impl {
         fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
         where A: MapAccess<'de> {
             let mut dest = match map.size_hint() {
-                Some(hint) => Map::with_capacity(hint),
+                Some(hint) => {
+                    #[cfg(not(feature = "comparable"))]
+                    {
+                        Map::with_capacity(hint)
+                    }
+                    #[cfg(feature = "comparable")]
+                    {
+                        let _ = hint;
+                        Map::new()
+                    }
+                }
                 None => Map::new(),
             };
             while let Some((key, tag)) = map.next_entry::<String, NbtTag>()? {

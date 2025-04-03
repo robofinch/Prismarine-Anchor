@@ -23,8 +23,38 @@ pub(crate) use self::lexer::is_ambiguous;
 
 
 // ================================
-//      Convenience functions
+//      Utilities
 // ================================
+
+/// Stores SNBT data which is verified to be valid
+// PartialEq and Eq are not implemented due to different SnbtParseOptions
+// having unpredictable effects.
+#[derive(Debug, Clone)]
+pub struct VerifiedSnbt {
+    snbt: String,
+    parse_options: SnbtParseOptions,
+}
+
+impl VerifiedSnbt {
+    /// Verify that the passed SNBT data is valid, and then store it in SNBT form.
+    pub fn new(snbt: String, opts: SnbtParseOptions) -> Result<Self, SnbtError> {
+        parse_any(&snbt, opts).map(|_| Self {
+            snbt,
+            parse_options: opts
+        })
+    }
+
+    /// Access the stored SNBT data
+    pub fn snbt(&self) -> &str {
+        &self.snbt
+    }
+
+    /// Parse the SNBT data to NBT
+    pub fn to_nbt(&self) -> NbtTag {
+        parse_any(&self.snbt, self.parse_options)
+            .expect("VerifiedSnbt should only error on creation if given invalid SNBT")
+    }
+}
 
 /// Parses the given string into an NBT tag.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
@@ -555,7 +585,7 @@ fn parse_compound_tag<'a>(
 pub enum SnbtError {
     /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
     #[error(
-        "Exceeded depth limit {} for nested compound and list tags at column {} near '{}'",
+        "exceeded depth limit {} for nested compound and list tags at column {} near '{}'",
         limit.0, index, segment
     )]
     ExceededDepthLimit {
@@ -565,13 +595,13 @@ pub enum SnbtError {
         limit: DepthLimit
     },
     /// The end of the string (EOS) was encountered before it was expected.
-    #[error("Reached end of input but expected {expected}")]
+    #[error("reached end of input but expected {expected}")]
     UnexpectedEOS {
         /// The expected token or sequence of tokens.
         expected: &'static str,
     },
     /// An unexpected token was encountered.
-    #[error("Unexpected token at column {index} near '{segment}', expected {expected}")]
+    #[error("unexpected token at column {index} near '{segment}', expected {expected}")]
     UnexpectedToken {
         segment: String,
         index: usize,
@@ -580,7 +610,7 @@ pub enum SnbtError {
     },
     /// An escape sequence supported in some SNBT version, but not the one selected.
     #[error(
-        "Escape sequence only supported in a different SNBT version at column {index}: '{segment}'"
+        "escape sequence only supported in a different SNBT version at column {index}: '{segment}'"
     )]
     UnsupportedEscapeSequence {
         segment: String,
@@ -588,7 +618,7 @@ pub enum SnbtError {
     },
     /// A named escape sequence was encountered, but named escape sequence support wasn't enabled.
     #[error(
-        "Named sequence support is not enabled; could not parse escape sequence '{}' at column {}",
+        "named sequence support is not enabled; could not parse escape sequence '{}' at column {}",
         segment, index
     )]
     NamedEscapeSequence {
@@ -596,14 +626,14 @@ pub enum SnbtError {
         index: usize,
     },
     /// An unknown or invalid escape sequence.
-    #[error("Unknown escape sequence at column {index}: '{segment}'")]
+    #[error("unknown escape sequence at column {index}: '{segment}'")]
     UnknownEscapeSequence {
         segment: String,
         index: usize,
     },
     /// A non-alphanumeric character other than `_`, `-`, `.`, or `+`
     /// appeared in an unquoted string.
-    #[error("Character '{ch}' disallowed in unquoted strings at column {index} near '{segment}'")]
+    #[error("character '{ch}' disallowed in unquoted strings at column {index} near '{segment}'")]
     InvalidUnquotedCharacter {
         segment: String,
         index: usize,
@@ -611,9 +641,8 @@ pub enum SnbtError {
         ch: char
     },
     /// An invalid number.
-    // TODO: make numeric parsing errors more detailed
     #[error(
-        "Numeric literal at column {} was invalid because {}. Literal began with '{}'",
+        "numeric literal at column {} was invalid because {}. Literal began with '{}'",
         index, cause, segment
     )]
     InvalidNumber {
@@ -622,45 +651,45 @@ pub enum SnbtError {
         cause: NumericParseError,
     },
     /// An invalid string representation of a UUID.
-    #[error("Invalid string representation of a UUID at column {index}: '{segment}'")]
+    #[error("invalid string representation of a UUID at column {index}: '{segment}'")]
     InvalidUUID {
         segment: String,
         index: usize,
     },
     /// An unquoted token which could be numeric or a string,
     /// which was prohibited in parsing options.
-    #[error("Ambiguous token '{segment}' at column {index}")]
+    #[error("ambiguous token '{segment}' at column {index}")]
     AmbiguousToken {
         segment: String,
         index: usize,
     },
     /// A trailing comma was encountered in a list or compound when it shouldn't have been.
-    #[error("Forbidden trailing comma at column {index}: '{segment}'")]
+    #[error("forbidden trailing comma at column {index}: '{segment}'")]
     TrailingComma {
         segment: String,
         index: usize,
     },
     /// An unmatched single or double quote was encountered.
-    #[error("Unmatched quote at column {index} near '{segment}'")]
+    #[error("unmatched quote at column {index} near '{segment}'")]
     UnmatchedQuote {
         segment: String,
         index: usize,
     },
     /// An unmatched curly bracket, square bracket, or parenthesis was encountered.
-    #[error("Unmatched brace at column {index} near '{segment}'")]
+    #[error("unmatched brace at column {index} near '{segment}'")]
     UnmatchedBrace {
         segment: String,
         index: usize,
     },
     /// A non-homogenous array of numbers was encountered.
-    #[error("Non-homogenous typed array of numbers at column {index} near '{segment}'")]
+    #[error("non-homogenous typed array of numbers at column {index} near '{segment}'")]
     NonHomogenousNumericList {
         segment: String,
         index: usize,
     },
     /// A non-homogenous array of NBT tags was encountered.
     #[error(
-        "Non-homogenous tag list (only supported in new SNBT version) at column {} near '{}'",
+        "non-homogenous tag list (only supported in new SNBT version) at column {} near '{}'",
         index, segment
     )]
     NonHomogenousTagList {
