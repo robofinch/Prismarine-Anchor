@@ -384,7 +384,7 @@ fn parse_map_nbt(
 
             let key = snbt::parse_any(&key, opts.snbt_options)
                 .map_err(MappingParseError::InvalidSnbtKey)?;
-            let key = ComparableNbtTag::new(key, f64::EPSILON);
+            let key = ComparableNbtTag::new(key);
 
             Ok((Some(key), FunctionJson::parse_multiple(function_vec, opts)?))
         }).collect::<Result<_, MappingParseError>>()?
@@ -482,7 +482,7 @@ fn parse_carry_properties(
             let tag = snbt::parse_any(&snbt, opts.snbt_options)
                 .map_err(MappingParseError::InvalidSnbt)?;
 
-            Ok(ComparableNbtTag::new(tag, f64::EPSILON))
+            Ok(ComparableNbtTag::new(tag))
         }).collect::<Result<_, MappingParseError>>()?;
 
         Ok((key.into_boxed_str(), nbt_vec))

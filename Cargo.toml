@@ -59,6 +59,8 @@ anyhow              = "1"
 byteorder           = "1.5.0"
 cesu8               = "1.1.0"
 flate2              = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+float-cmp           = { version = "0.10.0", default-features = false, features = ["num-traits"] }
+getrandom           = { version = "0.2", default-features = false }
 indexmap            = { version = "2.7.1", features = ["serde"] }
 rusty-leveldb       = { version = "3.0.2", default-features = false }
 proc-macro2         = "1"
@@ -83,11 +85,3 @@ zip                 = { version = "2.5.0", default-features = false, features = 
 
 # enum-map = "2.7.3"
 # smallvec = "1.14.0"
-
-
-# I don't know how to get the below to work, or if it's even possible.
-# Therefore, it's copied-and-pasted everywhere else.
-
-# [workspace.target.'cfg(target_arch = "wasm32")'.dependencies]
-# # We don't directly use this, but our deps do, and it needs to have the js feature enabled.
-# getrandom = { version = "0.2", features = ["js"] }

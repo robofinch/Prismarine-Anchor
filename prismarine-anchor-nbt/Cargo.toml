@@ -24,6 +24,7 @@ flate2      .workspace = true
 thiserror   .workspace = true
 varint-rs   .workspace = true
 
+float-cmp       = { workspace = true, optional = true }
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
 unicode_names2  = { workspace = true, optional = true }
@@ -34,9 +35,11 @@ default = [ "allow_list_root", "named_escapes" ]
 
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "indexmap" ]
-## Provides an NBT tag variant implementing Ord and Hash,
-## and makes Compound tags use an ordered map. (Still compatible with preserve_order.)
+## Provides an NBT tag wrapper implementing `Eq`, `Ord`, and `Hash`.
 comparable          = []
+## Provides approximate float comparisons for `ComparableNbtTag`.
+float_cmp           = [ "comparable", "float-cmp" ]
+
 ## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
 named_escapes       = [ "unicode_names2" ]
 ## Adds NBT IO parsing and writing functions that allow a List to be the root node.

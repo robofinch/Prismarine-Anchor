@@ -1,7 +1,5 @@
 #[cfg(feature = "comparable")]
 pub mod comparable;
-#[cfg(all(feature = "preserve_order", feature = "comparable"))]
-mod index_btree;
 
 
 use std::fmt;
@@ -20,37 +18,21 @@ use crate::{
 };
 
 
-/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
-/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
-/// Otherwise, if the feature `preserve_order` is enabled, then this
-/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// If neither is enabled, this type defaults to `std`'s `HashMap`.
-#[cfg(all(feature = "preserve_order", not(feature = "comparable")))]
+/// The hash map type utilized in this crate.
+/// If `preserve_order` is enabled, the map will iterate over keys and values
+/// in the order they were inserted by using the `IndexMap` type
+/// from the crate <https://docs.rs/indexmap/latest/indexmap/>.
+/// Otherwise, `std`'s `HashMap` is used.
+#[cfg(feature = "preserve_order")]
 pub type Map<T> = indexmap::IndexMap<String, T>;
 
-/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
-/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
-/// Otherwise, if the feature `preserve_order` is enabled, then this
-/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// If neither is enabled, this type defaults to `std`'s `HashMap`.
-#[cfg(all(not(feature = "preserve_order"), not(feature = "comparable")))]
+/// The hash map type utilized in this crate.
+/// If `preserve_order` is enabled, the map will iterate over keys and values
+/// in the order they were inserted by using the `IndexMap` type
+/// from the crate <https://docs.rs/indexmap/latest/indexmap/>.
+/// Otherwise, `std`'s `HashMap` is used.
+#[cfg(not(feature = "preserve_order"))]
 pub type Map<T> = std::collections::HashMap<String, T>;
-
-/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
-/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
-/// Otherwise, if the feature `preserve_order` is enabled, then this
-/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// If neither is enabled, this type defaults to `std`'s `HashMap`.
-#[cfg(all(not(feature = "preserve_order"), feature = "comparable"))]
-pub type Map<T> = std::collections::BTreeMap<String, T>;
-
-/// The hash map type utilized in this crate. If 'comparable' is enabled, then this
-/// uses either `std's `BTreeMap` or a wrapper around `BTreeMap` to implement `preserve_order`.
-/// Otherwise, if the feature `preserve_order` is enabled, then this
-/// will use the `IndexMap` type from the crate <https://docs.rs/indexmap/latest/indexmap/>.
-/// If neither is enabled, this type defaults to `std`'s `HashMap`.
-#[cfg(all(feature = "preserve_order", feature = "comparable"))]
-pub type Map<T> = index_btree::Map<T>;
 
 
 /// The generic NBT tag type, containing all supported tag variants which wrap around a corresponding

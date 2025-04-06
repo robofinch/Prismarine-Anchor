@@ -14,4 +14,4 @@ flate2          .workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # We don't directly use this, but our deps do, and it needs to have the js feature enabled.
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { workspace = true, features = ["js"] }
