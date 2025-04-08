@@ -10,7 +10,7 @@ use flate2::{
 };
 use thiserror::Error;
 
-use crate::raw;
+use crate::raw::{self, read_i32};
 use crate::{
     settings::{DepthLimit, IoOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
@@ -18,6 +18,16 @@ use crate::{
 
 
 // todo: implement allow_*_root features
+
+/// Read the Bedrock Edition NBT header. The first number is the version of `level.dat` format
+/// if reading that file, and is otherwise always `8`. The second number is the length
+/// of the NBT file, excluding the header.
+pub fn read_bedrock_header<R: Read>(
+    reader: &mut R,
+    opts: IoOptions
+) -> Result<(i32, i32), NbtIoError> {
+    Ok((read_i32(reader, opts)?, read_i32(reader, opts)?))
+}
 
 /// Reads the given encoding of NBT data from the given reader, returning the resulting NBT
 /// compound and associated root name.
