@@ -12,11 +12,11 @@ prismarine-anchor-translation   .workspace = true
 
 anyhow          .workspace = true
 serde           .workspace = true
-serde_json      .workspace = true
+serde_json      = { workspace = true, features = ["raw_value"] }
 thiserror       .workspace = true
 
 [features]
-default         = ["py_mc_translate"]
+default         = [ "py_mc_translate" ]
 
 py_mc_translate = []
 minecraft_data  = []

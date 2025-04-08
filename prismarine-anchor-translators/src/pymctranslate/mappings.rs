@@ -1,8 +1,7 @@
-use std::io::Read;
 use std::collections::{BTreeMap, HashMap};
 
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
+use serde_json::value::RawValue;
 
 use prismarine_anchor_nbt::snbt;
 use prismarine_anchor_nbt::{
@@ -34,12 +33,12 @@ impl MappingFile {
     // Having this function be separate from parse_mapping_file could maybe reduce binary size
     // from monomorphization
     #[inline]
-    pub fn from_json<R: Read>(
-        reader: &mut R,
+    pub fn from_json<>(
+        json: &str,
         opts: MappingParseOptions,
     ) -> Result<MappingFile, MappingParseError> {
 
-        parse_mapping_file(serde_json::from_reader(reader)?, opts)
+        parse_mapping_file(serde_json::from_str(json)?, opts)
     }
 }
 
@@ -49,38 +48,8 @@ impl MappingFile {
 
 #[derive(Debug, Clone)]
 pub enum Index {
-    String(Box<str>),
     Number(usize),
-}
-
-impl TryFrom<Value> for Index {
-    type Error = MappingParseError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::String(string) => Ok(Index::String(string.into_boxed_str())),
-            Value::Number(number) => {
-                let index = match number.as_u64() {
-                    Some(index) => index,
-                    None => return Err(MappingParseError::InvalidNumber(
-                        number.clone(),
-                        "a nonnegative integer number",
-                    )),
-                };
-
-                let index = usize::try_from(index)
-                    .map_err(|_| MappingParseError::InvalidNumber(
-                        number,
-                        "an integer which fits in a usize"
-                    ))?;
-                Ok(Index::Number(index))
-            },
-            other => Err(MappingParseError::wrong_value(
-                other,
-                "a string or nonnegative integer index"
-            ))
-        }
-    }
+    String(Box<str>),
 }
 
 /// A single mapping function (may be nested)
@@ -204,6 +173,22 @@ pub enum IndexedNested {
 //   JSON structures
 // ================================================================
 
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum IndexJson {
+    Number(usize),
+    String(String),
+}
+
+impl From<IndexJson> for Index {
+    fn from(value: IndexJson) -> Self {
+        match value {
+            IndexJson::Number(n) => Index::Number(n),
+            IndexJson::String(string) => Index::String(string.into_boxed_str()),
+        }
+    }
+}
+
 fn parse_mapping_file(
     json: MappingJson, opts: MappingParseOptions,
 ) -> Result<MappingFile, MappingParseError> {
@@ -219,16 +204,18 @@ fn parse_mapping_file(
 
 /// A not-yet-validated mapping file
 #[derive(Serialize, Deserialize)]
-struct MappingJson(Vec<FunctionJson>);
+struct MappingJson<'a>(#[serde(borrow)] Vec<FunctionJson<'a>>);
 
 #[derive(Serialize, Deserialize)]
-struct FunctionJson {
+struct FunctionJson<'a> {
     function: MappingFunctionType,
-    path: Option<Value>, // Special case for one function
-    options: Value,
+    #[serde(borrow)]
+    path: Option<&'a RawValue>, // Special case for one function
+    #[serde(borrow)]
+    options: &'a RawValue,
 }
 
-impl FunctionJson {
+impl<'a> FunctionJson<'a> {
     fn parse_multiple(
         function_vec: Vec<FunctionJson>, opts: MappingParseOptions,
     ) -> Result<Box<[MappingFunction]>, MappingParseError> {
@@ -244,44 +231,48 @@ impl FunctionJson {
 
         // More or less, the shorter functions are inlined below,
         // the longer ones get their own function called from here.
+        let options_json = self.options.get();
+
         match self.function {
             MappingFunctionType::NewBlock => {
+                let identifier: String = serde_json::from_str(options_json)?;
+
                 Ok(MappingFunction::NewBlock(
-                    NamespacedIdentifier::parse_value(self.options, opts)?
+                    NamespacedIdentifier::parse_string(identifier, opts)?
                 ))
             }
-            MappingFunctionType::NewNbt          => parse_new_nbt(self.options, opts),
-            MappingFunctionType::NewProperties   => parse_new_properties(self.options, opts),
-            MappingFunctionType::MapBlockName    => parse_map_block_name(self.options, opts),
-            MappingFunctionType::MapNbt          => parse_map_nbt(self.options, opts),
-            MappingFunctionType::MapProperties   => parse_map_properties(self.options, opts),
-            MappingFunctionType::CarryNbt        => parse_carry_nbt(self.options, opts),
-            MappingFunctionType::CarryProperties => parse_carry_properties(self.options, opts),
+            MappingFunctionType::NewNbt          => parse_new_nbt(options_json, opts),
+            MappingFunctionType::NewProperties   => parse_new_properties(options_json, opts),
+            MappingFunctionType::MapBlockName    => parse_map_block_name(options_json, opts),
+            MappingFunctionType::MapNbt          => parse_map_nbt(options_json, opts),
+            MappingFunctionType::MapProperties   => parse_map_properties(options_json, opts),
+            MappingFunctionType::CarryNbt        => parse_carry_nbt(options_json, opts),
+            MappingFunctionType::CarryProperties => parse_carry_properties(options_json, opts),
             MappingFunctionType::Code => {
-                CodeFunction::parse(self.options).map(MappingFunction::Code)
+                CodeFunction::parse(options_json).map(MappingFunction::Code)
             }
-            MappingFunctionType::Multiblock      => parse_multiblock(self.options, opts),
+            MappingFunctionType::Multiblock      => parse_multiblock(options_json, opts),
             MappingFunctionType::WalkInputNbt    => {
-                parse_walk_nbt(self.options, self.path, opts)
+                parse_walk_nbt(options_json, self.path.map(RawValue::get), opts)
             }
         }
     }
 }
 
 fn parse_new_nbt(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
     #[derive(Serialize, Deserialize)]
     struct NewNbtOptionJson {
         outer_name: Option<String>,
         outer_type: Option<String>,
-        path:       Option<Vec<(Value, String)>>,
-        key:        Value,
+        path:       Option<Vec<(IndexJson, String)>>,
+        key:        IndexJson,
         value:      String,
     }
 
-    let json_vec: Vec<NewNbtOptionJson> = serde_json::from_value(options_value)?;
+    let json_vec: Vec<NewNbtOptionJson> = serde_json::from_str(options_json)?;
 
     // Try to avoid needing to downsize when we call .into_boxed_slice() later
     let mut new_nbt_options = Vec::new();
@@ -300,9 +291,9 @@ fn parse_new_nbt(
         };
 
         let path = if let Some(path) = json.path {
-            let path_steps = path.into_iter().map(|(value, next_container_type)| {
+            let path_steps = path.into_iter().map(|(index, next_container_type)| {
                 Ok((
-                    Index::try_from(value)?,
+                    index.into(),
                     container_type(&next_container_type)?,
                 ))
             }).collect::<Result<_, MappingParseError>>()?;
@@ -312,7 +303,7 @@ fn parse_new_nbt(
             None
         };
 
-        let key = Index::try_from(json.key)?;
+        let key = json.key.into();
         let value = VerifiedSnbt::new(json.value, opts.snbt_options)
             .map_err(MappingParseError::InvalidSnbt)?;
 
@@ -329,17 +320,14 @@ fn parse_new_nbt(
 }
 
 fn parse_new_properties(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
     // There might be some clever way to avoid the extra allocations
     // from remapping everything, but whatever.
-    let new_properties = MappingParseError::expect_map(options_value)?;
+    let new_properties: HashMap<String, &RawValue> = serde_json::from_str(options_json)?;
 
     let new_properties = new_properties.into_iter().map(|(property_name, value)| {
-        let property_value = match value {
-            Value::String(string) => Ok(string),
-            other => Err(MappingParseError::wrong_value(other, "an SNBT string")),
-        }?;
+        let property_value: String = serde_json::from_str(value.get())?;
 
         let property_value = block_property_from_str(
             &property_value, &property_name, opts,
@@ -352,14 +340,14 @@ fn parse_new_properties(
 }
 
 fn parse_map_block_name(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let blockname_map: HashMap<String, Vec<FunctionJson>> = serde_json::from_value(options_value)?;
+    let blockname_map: HashMap<String, Vec<FunctionJson>> = serde_json::from_str(options_json)?;
 
     let blockname_map = blockname_map.into_iter().map(|(key, function_vec)| {
         Ok((
-            NamespacedIdentifier::parse_value(Value::String(key), opts)?,
+            NamespacedIdentifier::parse_string(key, opts)?,
             FunctionJson::parse_multiple(function_vec, opts)?,
         ))
     }).collect::<Result<_,MappingParseError>>()?;
@@ -368,16 +356,18 @@ fn parse_map_block_name(
 }
 
 fn parse_map_nbt(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
     #[derive(Serialize, Deserialize)]
-    struct MapNbtJson {
-        cases: Option<BTreeMap<String, Vec<FunctionJson>>>,
-        default: Option<Vec<FunctionJson>>,
+    struct MapNbtJson<'a> {
+        #[serde(borrow)]
+        cases: Option<BTreeMap<String, Vec<FunctionJson<'a>>>>,
+        #[serde(borrow)]
+        default: Option<Vec<FunctionJson<'a>>>,
     }
 
-    let json: MapNbtJson = serde_json::from_value(options_value)?;
+    let json: MapNbtJson = serde_json::from_str(options_json)?;
 
     let mut nbt_map = if let Some(cases) = json.cases {
         cases.into_iter().map(|(key, function_vec)| {
@@ -400,10 +390,10 @@ fn parse_map_nbt(
 }
 
 fn parse_map_properties(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let json: HashMap<PropertyName, HashMap<String, Vec<FunctionJson>>> = serde_json::from_value(options_value)?;
+    let json: HashMap<PropertyName, HashMap<String, Vec<FunctionJson>>> = serde_json::from_str(options_json)?;
 
     // Most normal nested iteration
     let property_map = json.into_iter().map(|(property_name, value_map)| {
@@ -421,19 +411,19 @@ fn parse_map_properties(
 }
 
 fn parse_carry_nbt(
-    options_value: Value, _opts: MappingParseOptions,
+    options_json: &str, _opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
     #[derive(Serialize, Deserialize)]
     struct CarryNbtJson {
         outer_name: Option<String>,
         outer_type: Option<String>,
-        path:       Option<Vec<(Value, String)>>,
-        key:        Option<Value>,
+        path:       Option<Vec<(IndexJson, String)>>,
+        key:        Option<IndexJson>,
         r#type:     Option<String>,
     }
 
-    let json: CarryNbtJson = serde_json::from_value(options_value)?;
+    let json: CarryNbtJson = serde_json::from_str(options_json)?;
 
     let outer_name = match json.outer_name {
         Some(string) => string.into_boxed_str(),
@@ -446,13 +436,13 @@ fn parse_carry_nbt(
     };
 
     // If not None, apply the conversion function (which may return an Err), and propagate any Err
-    let key = json.key.map(Index::try_from).transpose()?;
+    let key = json.key.map(Index::from);
     let value_type = json.r#type.map(|s| nbt_type(&s)).transpose()?;
 
     let path = if let Some(path) = json.path {
-        let path_steps = path.into_iter().map(|(value, next_container_type)| {
+        let path_steps = path.into_iter().map(|(index, next_container_type)| {
             Ok((
-                Index::try_from(value)?,
+                index.into(),
                 container_type(&next_container_type)?,
             ))
         }).collect::<Result<_, MappingParseError>>()?;
@@ -472,10 +462,10 @@ fn parse_carry_nbt(
 }
 
 fn parse_carry_properties(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let carry_properties_json: HashMap<String, Vec<Snbt>> = serde_json::from_value(options_value)?;
+    let carry_properties_json: HashMap<String, Vec<Snbt>> = serde_json::from_str(options_json)?;
 
     let carry_properties = carry_properties_json.into_iter().map(|(key, snbt_vec)| {
         let nbt_vec = snbt_vec.into_iter().map(|snbt| {
@@ -492,16 +482,17 @@ fn parse_carry_properties(
 }
 
 fn parse_multiblock(
-    options_value: Value, opts: MappingParseOptions,
+    options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
     #[derive(Serialize, Deserialize)]
-    struct MultiblockEntry {
+    struct MultiblockEntry<'a> {
         coords: Vec<i32>,
-        functions: Vec<FunctionJson>,
+        #[serde(borrow)]
+        functions: Vec<FunctionJson<'a>>,
     }
 
-    let json_vec: Vec<MultiblockEntry> = serde_json::from_value(options_value)?;
+    let json_vec: Vec<MultiblockEntry> = serde_json::from_str(options_json)?;
 
     let multiblock_entries = json_vec.into_iter().map(|json| {
         if json.coords.len() != 3 {
@@ -522,16 +513,16 @@ fn parse_multiblock(
 }
 
 fn parse_walk_nbt(
-    options_value: Value, path: Option<Value>, opts: MappingParseOptions,
+    options_json: &str, path_json: Option<&str>, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let path: Box<[(Index, NbtContainerType)]> = if let Some(path_val) = path {
+    let path: Box<[(Index, NbtContainerType)]> = if let Some(path_json) = path_json {
 
-        let path: Vec<(Value, String)> = serde_json::from_value(path_val)?;
+        let path: Vec<(IndexJson, String)> = serde_json::from_str(path_json)?;
 
-        let path_steps = path.into_iter().map(|(value, next_container_type)| {
+        let path_steps = path.into_iter().map(|(index, next_container_type)| {
             Ok((
-                Index::try_from(value)?,
+                index.into(),
                 container_type(&next_container_type)?,
             ))
         }).collect::<Result<_, MappingParseError>>()?;
@@ -544,18 +535,23 @@ fn parse_walk_nbt(
     // Yay defining private structs and functions inside a function
 
     #[derive(Serialize, Deserialize)]
-    struct WalkInputOptionsJson {
-        functions: Option<Vec<FunctionJson>>,
+    struct WalkInputOptionsJson<'a> {
+        #[serde(borrow)]
+        functions: Option<Vec<FunctionJson<'a>>>,
 
         r#type: Option<String>,
-        self_default: Option<Vec<FunctionJson>>,
+        #[serde(borrow)]
+        self_default: Option<Vec<FunctionJson<'a>>>,
 
-        keys: Option<HashMap<String, WalkInputOptionsJson>>,
-        index: Option<HashMap<String, WalkInputOptionsJson>>,
-        nested_default: Option<Vec<FunctionJson>>,
+        #[serde(borrow)]
+        keys: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
+        #[serde(borrow)]
+        index: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
+        #[serde(borrow)]
+        nested_default: Option<Vec<FunctionJson<'a>>>,
     }
 
-    let json: WalkInputOptionsJson = serde_json::from_value(options_value)?;
+    let json: WalkInputOptionsJson = serde_json::from_str(options_json)?;
 
     fn parse_walk_input_options(
         json: WalkInputOptionsJson, opts: MappingParseOptions,

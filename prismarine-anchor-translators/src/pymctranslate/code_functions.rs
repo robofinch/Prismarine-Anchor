@@ -1,7 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-use serde_json::Value;
-
 use super::MappingParseError;
 
 
@@ -131,7 +129,7 @@ impl CodeFunction {
 }
 
 impl CodeFunction {
-    pub fn parse(value: Value) -> Result<Self, MappingParseError> {
+    pub fn parse(json: &str) -> Result<Self, MappingParseError> {
 
         #[derive(Serialize, Deserialize)]
         struct CodeFunctionJson {
@@ -140,7 +138,7 @@ impl CodeFunction {
             output:   Vec<String>,
         }
 
-        let code_function: CodeFunctionJson = serde_json::from_value(value)?;
+        let code_function: CodeFunctionJson = serde_json::from_str(json)?;
 
         let correct_input  = code_function.function.input_type().to_vec();
         let correct_output = code_function.function.output_type().to_vec();

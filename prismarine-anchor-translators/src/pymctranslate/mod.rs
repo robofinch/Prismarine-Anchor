@@ -5,12 +5,15 @@
 
 mod specifications;
 mod mappings;
+// Files which occur once for a version
+mod headers;
 mod code_functions;
 
 
 use std::mem;
 
-use serde_json::{Error as JsonError, Map, Number, Value};
+// TODO: actually implement Deserialize, or else at least use RawValue
+use serde_json::Error as JsonError;
 use thiserror::Error;
 
 use prismarine_anchor_nbt::snbt;
@@ -23,6 +26,7 @@ use prismarine_anchor_translation::datatypes::BlockProperty;
 // make unused warnings go away for now
 pub use self::mappings::MappingFile;
 pub use self::specifications::SpecificationFile;
+pub use self::headers::{VersionMetadata, BiomeMap, NumericalBlockMap, WaterloggingInfo};
 
 
 /// Useful for annotating types more precisely.
@@ -99,13 +103,6 @@ pub enum MappingParseError {
     InvalidContainerType(String),
     #[error("expected the name of an NBT type, like \"int\" or \"byte_array\", but received \"{0}\"")]
     InvalidNbtType(String),
-    #[error("expected {expected}, but received {value_description}")]
-    WrongValue {
-        value_description: &'static str,
-        expected: &'static str,
-    },
-    #[error("expected {1}, but received {0}")]
-    InvalidNumber(Number, &'static str),
     #[error("expected a string parsable as an integer index (usize), but received \"{0}\"")]
     InvalidIndex(String),
     #[error("expected multiblock coords to have 3 integer components, but receieved {0}")]
@@ -113,20 +110,6 @@ pub enum MappingParseError {
 }
 
 impl MappingParseError {
-    pub fn wrong_value(value: Value, expected: &'static str) -> Self {
-        Self::WrongValue {
-            value_description: value_description(&value),
-            expected,
-        }
-    }
-
-    pub fn expect_map(value: Value) -> Result<Map<String, Value>, Self> {
-        match value {
-            Value::Object(map) => Ok(map),
-            other => Err(MappingParseError::wrong_value(other, "an object (i.e. a map/dict)")),
-        }
-    }
-
     pub fn invalid_property(tag: NbtTag) -> Self {
         Self::InvalidProperty(tag_description(&tag.tag_type()))
     }
@@ -143,32 +126,28 @@ pub struct NamespacedIdentifier {
 }
 
 impl NamespacedIdentifier {
-    pub fn parse_value(
-        value: Value, opts: MappingParseOptions,
+    pub fn parse_string(
+        mut identifier: String, opts: MappingParseOptions,
     ) -> Result<Self, MappingParseError> {
 
-        let mut namespace = match value {
-            Value::String(string) => string,
-            other => return Err(MappingParseError::wrong_value(other, "a string"))
-        };
-
-        let path = match namespace.find(':') {
+        let path = match identifier.find(':') {
             // "+ 1" because the UTF-8 byte length of ':' is 1
-            Some(colon_pos) => namespace.split_off(colon_pos + 1),
+            Some(colon_pos) => identifier.split_off(colon_pos + 1),
             None => if opts.assume_empty_namespace {
-                mem::replace(&mut namespace, String::new())
+                mem::replace(&mut identifier, String::new())
 
             } else {
-                let mut quoted = String::with_capacity(namespace.len() + 2);
+                let mut quoted = String::with_capacity(identifier.len() + 2);
                 quoted.push_str("\"");
-                quoted.push_str(&namespace);
+                quoted.push_str(&identifier);
                 quoted.push_str("\"");
                 return Err(MappingParseError::InvalidIdentifier(quoted));
             }
         };
         // Either the namespace is empty or has a colon at the end. This pops the colon,
         // or leaves namespace unchanged.
-        namespace.pop();
+        identifier.pop();
+        let namespace = identifier;
 
         // Validate the namespace and path
         if opts.java_character_constraints {
@@ -222,17 +201,6 @@ pub fn block_property_from_str(
         })?;
 
     Ok(tag.try_into().map_err(MappingParseError::invalid_property)?)
-}
-
-pub fn value_description(value: &Value) -> &'static str {
-    match value {
-        Value::Null      => "a null value",
-        Value::Bool(_)   => "a boolean value",
-        Value::Number(_) => "a numeric value",
-        Value::String(_) => "a string",
-        Value::Array(_)  => "an array",
-        Value::Object(_) => "an object",
-    }
 }
 
 pub fn tag_description(tag: &NbtType) -> &'static str {

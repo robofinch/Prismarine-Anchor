@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Read};
+use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
@@ -36,13 +36,11 @@ impl SpecificationFile {
     }
 
     /// Deserialize a Specification JSON file into a more workable Rust version.
-    // Separated out so that the Read generic cannot make finish_specification_file monomorphize
-    // into multiple copies
     #[inline]
-    pub fn from_json<R: Read>(
-        reader: &mut R, opts: MappingParseOptions,
+    pub fn from_json(
+        json: &str, opts: MappingParseOptions,
     ) -> Result<SpecificationFile, MappingParseError> {
-        parse_specification_file(serde_json::from_reader(reader)?, opts)
+        parse_specification_file(serde_json::from_str(json)?, opts)
     }
 }
 
