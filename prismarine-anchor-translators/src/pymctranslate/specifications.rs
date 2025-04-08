@@ -47,8 +47,8 @@ impl SpecificationFile {
 /// A not-yet-validated specification file
 #[derive(Serialize, Deserialize)]
 struct SpecificationJson {
-    properties: HashMap<PropertyName, Vec<String>>,
-    defaults: HashMap<PropertyName, String>,
+    properties: Option<HashMap<PropertyName, Vec<String>>>,
+    defaults: Option<HashMap<PropertyName, String>>,
     nbt_identifier: Option<Vec<String>>,
     snbt: Option<Snbt>,
 }
@@ -57,8 +57,11 @@ fn parse_specification_file(
     json: SpecificationJson, opts: MappingParseOptions,
 ) -> Result<SpecificationFile, MappingParseError> {
 
-    let mut properties: HashMap<PropertyNameBoxed, (Vec<BlockProperty>, usize)> = json
-        .properties.into_iter().map(|(property, values)| {
+    let properties = json.properties.unwrap_or_default();
+    let defaults = json.defaults.unwrap_or_default();
+
+    let mut properties: HashMap<PropertyNameBoxed, (Vec<BlockProperty>, usize)> = properties
+        .into_iter().map(|(property, values)| {
 
             let snbt_values = values.into_iter().map(|value| {
                 Ok(block_property_from_str(&value, &property, opts)?)
@@ -67,8 +70,8 @@ fn parse_specification_file(
             Ok((property.into_boxed_str(), (snbt_values, 0)))
         }).collect::<Result<_,MappingParseError>>()?;
 
-    let mut defaults: HashMap<PropertyName, BlockProperty> = json
-        .defaults.into_iter().map(|(property, value)| {
+    let mut defaults: HashMap<PropertyName, BlockProperty> = defaults
+        .into_iter().map(|(property, value)| {
             let property_value = block_property_from_str(&value, &property, opts)?;
             Ok((property, property_value))
         }).collect::<Result<_, MappingParseError>>()?;
