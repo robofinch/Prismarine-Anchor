@@ -10,9 +10,6 @@ mod headers;
 mod code_functions;
 
 
-use std::mem;
-
-// TODO: actually implement Deserialize, or else at least use RawValue
 use serde_json::Error as JsonError;
 use thiserror::Error;
 
@@ -21,7 +18,9 @@ use prismarine_anchor_nbt::{
     snbt::SnbtError, settings::SnbtParseOptions,
     NbtTag, NbtContainerType, NbtType,
 };
-use prismarine_anchor_translation::datatypes::BlockProperty;
+use prismarine_anchor_translation::datatypes::{
+    BlockProperty, IdentifierParseError, IdentifierParseOptions, NamespacedIdentifier,
+};
 
 // make unused warnings go away for now
 pub use self::mappings::MappingFile;
@@ -53,10 +52,7 @@ pub struct PyMcMappings {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MappingParseOptions {
-    pub assume_empty_namespace: bool,
-    /// If true, use Java Edition's stricter restrictions for the characters
-    /// which may appear in a [`NamespacedIdentifier`].
-    pub java_character_constraints: bool,
+    pub identifier_options: IdentifierParseOptions,
     pub snbt_options: SnbtParseOptions,
 }
 
@@ -65,6 +61,8 @@ pub struct MappingParseOptions {
 pub enum MappingParseError {
     #[error(transparent)]
     Json(#[from] JsonError),
+    #[error(transparent)]
+    Identifier(#[from] IdentifierParseError),
     #[error("specification is missing the default for property '{0}'")]
     MissingDefault(PropertyName),
     #[error("specification had a default for '{0}', which is not a property")]
@@ -93,12 +91,6 @@ pub enum MappingParseError {
     IncorrectInput(&'static str),
     #[error("a code function, '{0}', had unexpected outputs specified")]
     IncorrectOutput(&'static str),
-    #[error("expected a string identifier in the form \"namespace:path\", but receieved {0}")]
-    InvalidIdentifier(String),
-    #[error("invalid character '{1}' in the namespace of \"{0}\"")]
-    InvalidNamespaceCharacter(String, char),
-    #[error("invalid character '{1}' in the path of \"{0}\"")]
-    InvalidPathCharacter(String, char),
     #[error("expected the name of an NBT container type, like \"compound\" or \"int_array\", but received \"{0}\"")]
     InvalidContainerType(String),
     #[error("expected the name of an NBT type, like \"int\" or \"byte_array\", but received \"{0}\"")]
@@ -118,77 +110,6 @@ impl MappingParseError {
 // ================================================================
 //  Utilities used in various parts of this module
 // ================================================================
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NamespacedIdentifier {
-    pub namespace: Box<str>,
-    pub path: Box<str>,
-}
-
-impl NamespacedIdentifier {
-    pub fn parse_string(
-        mut identifier: String, opts: MappingParseOptions,
-    ) -> Result<Self, MappingParseError> {
-
-        let path = match identifier.find(':') {
-            // "+ 1" because the UTF-8 byte length of ':' is 1
-            Some(colon_pos) => identifier.split_off(colon_pos + 1),
-            None => if opts.assume_empty_namespace {
-                mem::replace(&mut identifier, String::new())
-
-            } else {
-                let mut quoted = String::with_capacity(identifier.len() + 2);
-                quoted.push_str("\"");
-                quoted.push_str(&identifier);
-                quoted.push_str("\"");
-                return Err(MappingParseError::InvalidIdentifier(quoted));
-            }
-        };
-        // Either the namespace is empty or has a colon at the end. This pops the colon,
-        // or leaves namespace unchanged.
-        identifier.pop();
-        let namespace = identifier;
-
-        // Validate the namespace and path
-        if opts.java_character_constraints {
-            // If we can find a character which is not allowed, return an error.
-            if let Some(ch) = namespace.chars().find(|&ch| {
-                let allowed = ch.is_ascii_digit()
-                    || ch.is_ascii_lowercase()
-                    || ['_', '-', '.'].contains(&ch);
-                !allowed
-            }) {
-                return Err(MappingParseError::InvalidNamespaceCharacter(path, ch));
-            }
-
-            if let Some(ch) = path.chars().find(|&ch| {
-                let allowed = ch.is_ascii_digit()
-                    || ch.is_ascii_lowercase()
-                    || ['_', '-', '.', '/'].contains(&ch);
-                !allowed
-            }) {
-                return Err(MappingParseError::InvalidPathCharacter(path, ch));
-            }
-
-        } else {
-            // The character constraints used by Bedrock are a lot looser
-            if namespace.find(':').is_some() {
-                return Err(MappingParseError::InvalidNamespaceCharacter(path, ':'))
-            }
-            if namespace.find('/').is_some() {
-                return Err(MappingParseError::InvalidNamespaceCharacter(path, '/'))
-            }
-            if path.find(':').is_some() {
-                return Err(MappingParseError::InvalidPathCharacter(path, ':'))
-            }
-        }
-
-        Ok(Self {
-            namespace: namespace.into_boxed_str(),
-            path: path.into_boxed_str(),
-        })
-    }
-}
 
 pub fn block_property_from_str(
     property: &str, property_name: &str, opts: MappingParseOptions,

@@ -1,9 +1,10 @@
 use std::{fmt, mem};
-use std::borrow::Cow;
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt::{Display, Formatter},
 };
+
+use thiserror::Error;
 
 use prismarine_anchor_nbt::{NbtCompound, NbtTag};
 
@@ -87,22 +88,19 @@ impl TryFrom<NbtTag> for BlockProperty {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Block {
-    pub namespace: Cow<'static, str>,
-    pub name: Cow<'static, str>,
+    pub identifier: NamespacedIdentifier,
     pub properties: BlockProperties,
     pub extra_layers: Vec<Block>,
 }
 
 impl Block {
     pub fn new(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
+        identifier: NamespacedIdentifier,
         properties: Option<BlockProperties>,
         extra_layers: Option<Vec<Block>>,
     ) -> Self {
         Self {
-            namespace,
-            name,
+            identifier,
             properties: properties.unwrap_or_else(|| BlockProperties::new()),
             // Vec::new() is cheap
             extra_layers: extra_layers.unwrap_or(Vec::new()),
@@ -111,8 +109,10 @@ impl Block {
 
     pub fn new_air() -> Self {
         Self {
-            namespace: Cow::Borrowed(UNIVERSAL_NAMESPACE),
-            name: Cow::Borrowed("air"),
+            identifier: NamespacedIdentifier {
+                namespace: UNIVERSAL_NAMESPACE.into(),
+                path: "air".into(),
+            },
             properties: BlockProperties::new(),
             extra_layers: Vec::new(),
         }
@@ -146,38 +146,33 @@ impl Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockEntity {
-    pub namespace: Cow<'static, str>,
-    pub name: Cow<'static, str>,
+    pub identifier: NamespacedIdentifier,
     pub position: BlockPosition,
     pub nbt: NbtCompound,
-    pub nbt_root_name: Cow<'static, str>,
+    pub nbt_root_name: Box<str>,
 }
 
 impl BlockEntity {
     pub fn new(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
+        identifier: NamespacedIdentifier,
         position: BlockPosition,
     ) -> Self {
         Self {
-            namespace,
-            name,
+            identifier,
             position,
             nbt: NbtCompound::new(),
-            nbt_root_name: Cow::Borrowed(""),
+            nbt_root_name: "".into(),
         }
     }
 
     pub fn new_with_nbt(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
+        identifier: NamespacedIdentifier,
         position: BlockPosition,
         nbt: NbtCompound,
-        nbt_root_name: Cow<'static, str>,
+        nbt_root_name: Box<str>,
     ) -> Self {
         Self {
-            namespace,
-            name,
+            identifier,
             position,
             nbt,
             nbt_root_name,
@@ -187,24 +182,21 @@ impl BlockEntity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
-    pub namespace: Cow<'static, str>,
-    pub name: Cow<'static, str>,
+    pub identifier: NamespacedIdentifier,
     pub position: FloatingWorldPos,
     pub nbt: NbtCompound,
-    pub nbt_root_name: Cow<'static, str>,
+    pub nbt_root_name: Box<str>,
 }
 
 impl Entity {
     pub fn new(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
+        identifier: NamespacedIdentifier,
         position: FloatingWorldPos,
         nbt: NbtCompound,
-        nbt_root_name: Cow<'static, str>,
+        nbt_root_name: Box<str>,
     ) -> Self {
         Self {
-            namespace,
-            name,
+            identifier,
             position,
             nbt,
             nbt_root_name,
@@ -218,48 +210,116 @@ pub enum BlockOrEntity {
     Entity(Entity),
 }
 
-// I think I like the strategy of Item having an Option<Block> instead. might change this, then.
-#[derive(Debug, Clone, PartialEq)]
-pub struct BlockItem {
-    pub namespace: Cow<'static, str>,
-    pub name: Cow<'static, str>,
-    pub properties: BlockProperties,
-    pub nbt: NbtCompound,
-}
-
-impl BlockItem {
-    pub fn new(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
-        properties: BlockProperties,
-        nbt: NbtCompound,
-    ) -> Self {
-        Self {
-            namespace,
-            name,
-            properties,
-            nbt,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
-    pub namespace: Cow<'static, str>,
-    pub name: Cow<'static, str>,
+    pub identifier: NamespacedIdentifier,
     pub nbt: NbtCompound,
 }
 
 impl Item {
-    pub fn new(
-        namespace: Cow<'static, str>,
-        name: Cow<'static, str>,
-        nbt: NbtCompound,
-    ) -> Self {
+    pub fn new(identifier: NamespacedIdentifier, nbt: NbtCompound) -> Self {
+        Self { identifier, nbt }
+    }
+}
+
+/// Namespaced identifiers are also known as resource locations.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NamespacedIdentifier {
+    pub namespace: Box<str>,
+    pub path: Box<str>,
+}
+
+impl NamespacedIdentifier {
+    pub fn parse_string(
+        mut identifier: String, opts: IdentifierParseOptions,
+    ) -> Result<Self, IdentifierParseError> {
+
+        let path = match identifier.find(':') {
+            // "+ 1" because the UTF-8 byte length of ':' is 1
+            Some(colon_pos) => identifier.split_off(colon_pos + 1),
+            None => if opts.assume_empty_namespace {
+                mem::replace(&mut identifier, String::new())
+
+            } else {
+                let mut quoted = String::with_capacity(identifier.len() + 2);
+                quoted.push_str("\"");
+                quoted.push_str(&identifier);
+                quoted.push_str("\"");
+                return Err(IdentifierParseError::InvalidIdentifier(quoted));
+            }
+        };
+        // Either the namespace is empty or has a colon at the end. This pops the colon,
+        // or leaves namespace unchanged.
+        identifier.pop();
+        let namespace = identifier;
+
+        // Validate the namespace and path
+        if opts.java_character_constraints {
+            // If we can find a character which is not allowed, return an error.
+            if let Some(ch) = namespace.chars().find(|&ch| {
+                let allowed = ch.is_ascii_digit()
+                    || ch.is_ascii_lowercase()
+                    || ['_', '-', '.'].contains(&ch);
+                !allowed
+            }) {
+                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, ch));
+            }
+
+            if let Some(ch) = path.chars().find(|&ch| {
+                let allowed = ch.is_ascii_digit()
+                    || ch.is_ascii_lowercase()
+                    || ['_', '-', '.', '/'].contains(&ch);
+                !allowed
+            }) {
+                return Err(IdentifierParseError::InvalidPathCharacter(path, ch));
+            }
+
+        } else {
+            // The character constraints used by Bedrock are a lot looser
+            if namespace.find(':').is_some() {
+                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, ':'))
+            }
+            if namespace.find('/').is_some() {
+                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, '/'))
+            }
+            if path.find(':').is_some() {
+                return Err(IdentifierParseError::InvalidPathCharacter(path, ':'))
+            }
+        }
+
+        Ok(Self {
+            namespace: namespace.into_boxed_str(),
+            path: path.into_boxed_str(),
+        })
+    }
+}
+
+/// Parse options for [`NamespacedIdentifier`]s, also known as Resource Locations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IdentifierParseOptions {
+    /// If true, if the `namespace:` part of `namespace:path` is missing, assume
+    /// that the namespace is the empty string.
+    pub assume_empty_namespace: bool,
+    /// If true, use Java Edition's stricter restrictions for the characters
+    /// which may appear in a [`NamespacedIdentifier`].
+    pub java_character_constraints: bool,
+}
+
+impl Default for IdentifierParseOptions {
+    fn default() -> Self {
         Self {
-            namespace,
-            name,
-            nbt,
+            assume_empty_namespace:     false,
+            java_character_constraints: false,
         }
     }
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum IdentifierParseError {
+    #[error("expected a string identifier in the form \"namespace:path\", but receieved {0}")]
+    InvalidIdentifier(String),
+    #[error("invalid character '{1}' in the namespace of \"{0}\"")]
+    InvalidNamespaceCharacter(String, char),
+    #[error("invalid character '{1}' in the path of \"{0}\"")]
+    InvalidPathCharacter(String, char),
 }

@@ -153,10 +153,12 @@ impl BiomeMap {
     pub fn from_json(json: &str, opts: MappingParseOptions) -> Result<Self, MappingParseError> {
         let json: BiomeMapJson = serde_json::from_str(json)?;
 
+        let id_opts = opts.identifier_options;
+
         let biome_to_number: HashMap<NamespacedIdentifier, Option<u16>> = json.int_map.into_iter()
             .map(|(key, value)| {
                 Ok((
-                    NamespacedIdentifier::parse_string(key, opts)?,
+                    NamespacedIdentifier::parse_string(key, id_opts)?,
                     value,
                 ))
             })
@@ -175,15 +177,15 @@ impl BiomeMap {
 
         let to_universal = json.to_universal.into_iter().map(|(key, value)| {
             Ok((
-                NamespacedIdentifier::parse_string(key, opts)?,
-                NamespacedIdentifier::parse_string(value, opts)?,
+                NamespacedIdentifier::parse_string(key, id_opts)?,
+                NamespacedIdentifier::parse_string(value, id_opts)?,
             ))
         }).collect::<Result<_, MappingParseError>>()?;
 
         let from_universal = json.from_universal.into_iter().map(|(key, value)| {
             Ok((
-                NamespacedIdentifier::parse_string(key, opts)?,
-                NamespacedIdentifier::parse_string(value, opts)?,
+                NamespacedIdentifier::parse_string(key, id_opts)?,
+                NamespacedIdentifier::parse_string(value, id_opts)?,
             ))
         }).collect::<Result<_, MappingParseError>>()?;
 
@@ -203,7 +205,7 @@ impl NumericalBlockMap {
 
         let to_number: HashMap<NamespacedIdentifier, u16> = to_number_map.into_iter()
             .map(|(identifier, num)| {
-                Ok((NamespacedIdentifier::parse_string(identifier, opts)?, num))
+                Ok((NamespacedIdentifier::parse_string(identifier, opts.identifier_options)?, num))
             })
             .collect::<Result<_, MappingParseError>>()?;
 
@@ -240,11 +242,15 @@ impl WaterloggingInfo {
         let always_waterlogged: Vec<String> = serde_json::from_str(always_waterlogged_json)?;
 
         let waterloggable = waterloggable.into_iter()
-            .map(|s| NamespacedIdentifier::parse_string(s, opts))
+            .map(|s| Ok(
+                NamespacedIdentifier::parse_string(s, opts.identifier_options)?
+            ))
             .collect::<Result<_, MappingParseError>>()?;
 
         let always_waterlogged = always_waterlogged.into_iter()
-            .map(|s| NamespacedIdentifier::parse_string(s, opts))
+            .map(|s| Ok(
+                NamespacedIdentifier::parse_string(s, opts.identifier_options)?
+            ))
             .collect::<Result<_, MappingParseError>>()?;
 
         Ok(Self { waterloggable, always_waterlogged })

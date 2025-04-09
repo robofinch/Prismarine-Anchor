@@ -238,7 +238,7 @@ impl<'a> FunctionJson<'a> {
                 let identifier: String = serde_json::from_str(options_json)?;
 
                 Ok(MappingFunction::NewBlock(
-                    NamespacedIdentifier::parse_string(identifier, opts)?
+                    NamespacedIdentifier::parse_string(identifier, opts.identifier_options)?
                 ))
             }
             MappingFunctionType::NewNbt          => parse_new_nbt(options_json, opts),
@@ -347,7 +347,7 @@ fn parse_map_block_name(
 
     let blockname_map = blockname_map.into_iter().map(|(key, function_vec)| {
         Ok((
-            NamespacedIdentifier::parse_string(key, opts)?,
+            NamespacedIdentifier::parse_string(key, opts.identifier_options)?,
             FunctionJson::parse_multiple(function_vec, opts)?,
         ))
     }).collect::<Result<_,MappingParseError>>()?;
