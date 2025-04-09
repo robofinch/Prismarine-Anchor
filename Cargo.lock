@@ -301,23 +301,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "prismarine-anchor-derive"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "prismarine-anchor-editor"
 version = "0.1.0"
 dependencies = [
  "flate2",
  "getrandom",
  "prismarine-anchor-nbt",
+ "prismarine-anchor-world",
  "rusty-leveldb",
+]
+
+[[package]]
+name = "prismarine-anchor-macros"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

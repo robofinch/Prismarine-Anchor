@@ -7,6 +7,8 @@ use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, DeriveInput, Type
 use self::generate::generate_impl;
 
 
+// TODO: compound! macro, and more convenient deserialization with error handling
+
 #[proc_macro_derive(CustomTranslator, attributes(translator_types))]
 pub fn custom_translator(tokens: TokenStream) -> TokenStream {
     let input: DeriveInput = parse_macro_input!(tokens as DeriveInput);

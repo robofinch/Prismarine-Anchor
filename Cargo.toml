@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "prismarine-anchor-derive",
     "prismarine-anchor-editor",
+    "prismarine-anchor-macros",
     "prismarine-anchor-nbt",
     "prismarine-anchor-translation",
     "prismarine-anchor-translators",
@@ -47,8 +47,8 @@ panic = "abort"
 opt-level = 2
 
 [workspace.dependencies]
-prismarine-anchor-derive        = { version = "0.1.0", path = "./prismarine-anchor-derive"      }
 prismarine-anchor-editor        = { version = "0.1.0", path = "./prismarine-anchor-editor"      }
+prismarine-anchor-macros        = { version = "0.1.0", path = "./prismarine-anchor-macros"      }
 prismarine-anchor-nbt           = { version = "0.1.0", path = "./prismarine-anchor-nbt", features = ["comparable"] }
 prismarine-anchor-translation   = { version = "0.1.0", path = "./prismarine-anchor-translation" }
 prismarine-anchor-translators   = { version = "0.1.0", path = "./prismarine-anchor-translators" }

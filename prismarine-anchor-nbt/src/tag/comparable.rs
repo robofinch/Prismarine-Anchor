@@ -160,6 +160,7 @@ impl ComparableNbtTag {
         }
     }
 
+    #[cfg(feature = "float_cmp")]
     fn map_floats(
         &self, map_float: impl Fn(f32) -> f32, map_double: impl Fn(f64) -> f64,
     ) -> (Self, bool) {

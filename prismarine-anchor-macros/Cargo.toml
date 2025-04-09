@@ -1,5 +1,5 @@
 [package]
-name = "prismarine-anchor-derive"
+name = "prismarine-anchor-macros"
 authors = ["Finley Huggins"]
 version.workspace = true
 edition.workspace = true
