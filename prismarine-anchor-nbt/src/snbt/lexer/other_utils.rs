@@ -68,7 +68,7 @@ fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
     for i in 1..4 {
         sum = (sum << 4) +  upper[i]?;
     }
-    for i in 4..8 {
+    for i in 0..4 {
         sum = (sum << 4) +  lower[i]?;
     }
 
