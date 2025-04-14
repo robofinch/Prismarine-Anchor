@@ -15,7 +15,7 @@ use flate2::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::io::NbtIoError;
-use crate::settings::{IoOptions, NBTCompression};
+use crate::settings::{IoOptions, NbtCompression};
 
 
 pub use self::array::Array;
@@ -63,13 +63,13 @@ pub fn serialize_into<W: Write, T: Serialize>(
     root_name: Option<&str>,
 ) -> Result<(), NbtIoError> {
     let (mode, compression) = match opts.compression {
-        NBTCompression::Uncompressed => {
+        NbtCompression::Uncompressed => {
             return value.serialize(Serializer::new(writer, opts, root_name));
         }
-        NBTCompression::ZlibCompressed => (2, Compression::default()),
-        NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzipCompressed => (1, Compression::default()),
-        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
+        NbtCompression::ZlibCompressed => (2, Compression::default()),
+        NbtCompression::ZlibCompressedWith(compression) => (2, compression.into()),
+        NbtCompression::GzipCompressed => (1, Compression::default()),
+        NbtCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {
@@ -99,13 +99,13 @@ pub fn serialize_into_unchecked<W: Write, T: Serialize>(
     root_name: Option<&str>,
 ) -> Result<(), NbtIoError> {
     let (mode, compression) = match opts.compression {
-        NBTCompression::Uncompressed => {
+        NbtCompression::Uncompressed => {
             return value.serialize(UncheckedSerializer::new(writer, opts, root_name));
         }
-        NBTCompression::ZlibCompressed => (2, Compression::default()),
-        NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzipCompressed => (1, Compression::default()),
-        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
+        NbtCompression::ZlibCompressed => (2, Compression::default()),
+        NbtCompression::ZlibCompressedWith(compression) => (2, compression.into()),
+        NbtCompression::GzipCompressed => (1, Compression::default()),
+        NbtCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {
@@ -156,10 +156,10 @@ pub fn deserialize_from<R: Read, T: DeserializeOwned>(
     opts: IoOptions,
 ) -> Result<(T, String), NbtIoError> {
     match opts.compression {
-        NBTCompression::Uncompressed => deserialize_from_raw(reader, opts),
-        NBTCompression::ZlibCompressed | NBTCompression::ZlibCompressedWith(_) =>
+        NbtCompression::Uncompressed => deserialize_from_raw(reader, opts),
+        NbtCompression::ZlibCompressed | NbtCompression::ZlibCompressedWith(_) =>
             deserialize_from_raw(&mut ZlibDecoder::new(reader), opts),
-            NBTCompression::GzipCompressed | NBTCompression::GzipCompressedWith(_) =>
+            NbtCompression::GzipCompressed | NbtCompression::GzipCompressedWith(_) =>
             deserialize_from_raw(&mut GzDecoder::new(reader), opts),
     }
 }

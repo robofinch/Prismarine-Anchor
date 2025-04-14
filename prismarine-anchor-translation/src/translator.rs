@@ -126,6 +126,7 @@ impl PartialOrd for VersionName {
 }
 
 impl From<String> for VersionName {
+    #[inline]
     fn from(version: String) -> Self {
         Self::parse_numeric(&version).unwrap_or(Self::String(version))
     }

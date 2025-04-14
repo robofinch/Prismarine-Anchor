@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::raw;
 use crate::{
-    settings::{DepthLimit, IoOptions, NBTCompression},
+    settings::{DepthLimit, IoOptions, NbtCompression},
     tag::{NbtCompound, NbtList, NbtTag},
 };
 
@@ -51,10 +51,10 @@ pub fn read_nbt<R: Read>(
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     match opts.compression {
-        NBTCompression::Uncompressed => read_nbt_uncompressed(reader, opts),
-        NBTCompression::ZlibCompressed | NBTCompression::ZlibCompressedWith(_) =>
+        NbtCompression::Uncompressed => read_nbt_uncompressed(reader, opts),
+        NbtCompression::ZlibCompressed | NbtCompression::ZlibCompressedWith(_) =>
             read_nbt_uncompressed(&mut ZlibDecoder::new(reader), opts),
-        NBTCompression::GzipCompressed | NBTCompression::GzipCompressedWith(_) =>
+        NbtCompression::GzipCompressed | NbtCompression::GzipCompressedWith(_) =>
             read_nbt_uncompressed(&mut GzDecoder::new(reader), opts),
     }
 }
@@ -202,13 +202,13 @@ pub fn write_nbt<W: Write>(
 ) -> Result<(), NbtIoError> {
 
     let (mode, compression) = match opts.compression {
-        NBTCompression::Uncompressed => {
+        NbtCompression::Uncompressed => {
             return write_nbt_uncompressed(writer, opts, root_name, root);
         }
-        NBTCompression::ZlibCompressed => (2, Compression::default()),
-        NBTCompression::ZlibCompressedWith(compression) => (2, compression.into()),
-        NBTCompression::GzipCompressed => (1, Compression::default()),
-        NBTCompression::GzipCompressedWith(compression) => (1, compression.into()),
+        NbtCompression::ZlibCompressed => (2, Compression::default()),
+        NbtCompression::ZlibCompressedWith(compression) => (2, compression.into()),
+        NbtCompression::GzipCompressed => (1, Compression::default()),
+        NbtCompression::GzipCompressedWith(compression) => (1, compression.into()),
     };
 
     if mode == 1 {

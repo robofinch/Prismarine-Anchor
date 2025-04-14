@@ -80,7 +80,7 @@ pub struct IoOptions {
     ///
     /// Default: Gzip compression with the default compression level
     /// ([`NBTCompression::GzCompressed`]).
-    pub compression: NBTCompression,
+    pub compression: NbtCompression,
     /// The byte encoding used by strings. Note that the NBT tags in this crate always
     /// use Rust's encoding, UTF-8.
     ///
@@ -97,7 +97,7 @@ impl IoOptions {
     pub fn java() -> Self {
         Self {
             endianness:         Endianness::BigEndian,
-            compression:        NBTCompression::GzipCompressed,
+            compression:        NbtCompression::GzipCompressed,
             string_encoding:    StringEncoding::Cesu8,
             depth_limit:        DepthLimit::default(),
         }
@@ -107,7 +107,7 @@ impl IoOptions {
     pub fn java_uncompressed() -> Self {
         Self {
             endianness:         Endianness::BigEndian,
-            compression:        NBTCompression::Uncompressed,
+            compression:        NbtCompression::Uncompressed,
             string_encoding:    StringEncoding::Cesu8,
             depth_limit:        DepthLimit::default(),
         }
@@ -117,7 +117,7 @@ impl IoOptions {
     pub fn bedrock() -> Self {
         Self {
             endianness:         Endianness::LittleEndian,
-            compression:        NBTCompression::GzipCompressed,
+            compression:        NbtCompression::GzipCompressed,
             string_encoding:    StringEncoding::Utf8,
             depth_limit:        DepthLimit::default(),
         }
@@ -127,7 +127,7 @@ impl IoOptions {
     pub fn bedrock_uncompressed() -> Self {
         Self {
             endianness:         Endianness::LittleEndian,
-            compression:        NBTCompression::Uncompressed,
+            compression:        NbtCompression::Uncompressed,
             string_encoding:    StringEncoding::Utf8,
             depth_limit:        DepthLimit::default(),
         }
@@ -154,7 +154,7 @@ pub enum Endianness {
 // for NBT as far as I'm aware, but does matter for Bedrock's LevelDB.
 /// Describes the compression options for NBT data: uncompressed, Zlib-compressed and Gzip-compressed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NBTCompression {
+pub enum NbtCompression {
     /// Uncompressed NBT data.
     Uncompressed,
     /// Zlib-compressed NBT data. When writing, the default compression level will be used.

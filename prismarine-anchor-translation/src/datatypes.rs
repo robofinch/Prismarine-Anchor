@@ -24,12 +24,6 @@ pub struct BlockPosition {
     pub z: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ChunkPosition {
-    pub x: i32,
-    pub z: i32,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FloatingWorldPos {
     pub x: f64,
@@ -60,6 +54,7 @@ impl Display for BlockProperty {
 }
 
 impl From<BlockProperty> for NbtTag {
+    #[inline]
     fn from(value: BlockProperty) -> Self {
         match value {
             BlockProperty::Byte(n)   => Self::Byte(n),
@@ -74,6 +69,7 @@ impl From<BlockProperty> for NbtTag {
 impl TryFrom<NbtTag> for BlockProperty {
     type Error = NbtTag;
 
+    #[inline]
     fn try_from(tag: NbtTag) -> Result<Self, Self::Error> {
         match tag {
             NbtTag::Byte(n)   => Ok(Self::Byte(n)),
@@ -94,6 +90,7 @@ pub struct Block {
 }
 
 impl Block {
+    #[inline]
     pub fn new(
         identifier: NamespacedIdentifier,
         properties: Option<BlockProperties>,
@@ -107,6 +104,7 @@ impl Block {
         }
     }
 
+    #[inline]
     pub fn new_air() -> Self {
         Self {
             identifier: NamespacedIdentifier {
@@ -153,6 +151,7 @@ pub struct BlockEntity {
 }
 
 impl BlockEntity {
+    #[inline]
     pub fn new(
         identifier: NamespacedIdentifier,
         position: BlockPosition,
@@ -165,6 +164,7 @@ impl BlockEntity {
         }
     }
 
+    #[inline]
     pub fn new_with_nbt(
         identifier: NamespacedIdentifier,
         position: BlockPosition,
@@ -189,6 +189,7 @@ pub struct Entity {
 }
 
 impl Entity {
+    #[inline]
     pub fn new(
         identifier: NamespacedIdentifier,
         position: FloatingWorldPos,
@@ -217,6 +218,7 @@ pub struct Item {
 }
 
 impl Item {
+    #[inline]
     pub fn new(identifier: NamespacedIdentifier, nbt: NbtCompound) -> Self {
         Self { identifier, nbt }
     }
@@ -236,9 +238,14 @@ impl NamespacedIdentifier {
 
         let path = match identifier.find(':') {
             // "+ 1" because the UTF-8 byte length of ':' is 1
-            Some(colon_pos) => identifier.split_off(colon_pos + 1),
-            None => if opts.assume_empty_namespace {
-                mem::replace(&mut identifier, String::new())
+            Some(colon_pos) => {
+                let path = identifier.split_off(colon_pos + 1);
+                // Pop the colon
+                identifier.pop();
+                path
+            }
+            None => if let Some(namespace) = opts.default_namespace {
+                mem::replace(&mut identifier, namespace.to_owned())
 
             } else {
                 let mut quoted = String::with_capacity(identifier.len() + 2);
@@ -248,9 +255,7 @@ impl NamespacedIdentifier {
                 return Err(IdentifierParseError::InvalidIdentifier(quoted));
             }
         };
-        // Either the namespace is empty or has a colon at the end. This pops the colon,
-        // or leaves namespace unchanged.
-        identifier.pop();
+
         let namespace = identifier;
 
         // Validate the namespace and path
@@ -294,22 +299,31 @@ impl NamespacedIdentifier {
     }
 }
 
+impl Display for NamespacedIdentifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.namespace, self.path)
+    }
+}
+
 /// Parse options for [`NamespacedIdentifier`]s, also known as Resource Locations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IdentifierParseOptions {
-    /// If true, if the `namespace:` part of `namespace:path` is missing, assume
-    /// that the namespace is the empty string.
-    pub assume_empty_namespace: bool,
+    /// If `Some`, if the `namespace:` part of `namespace:path` is missing, assume
+    /// that the namespace is this string. If this is `None` and a namespace is missing,
+    /// an error is returned from appropriate functions.
+    pub default_namespace: Option<&'static str>,
     /// If true, use Java Edition's stricter restrictions for the characters
     /// which may appear in a [`NamespacedIdentifier`].
     pub java_character_constraints: bool,
 }
 
 impl Default for IdentifierParseOptions {
+    /// Defaults to the strictest settings.
+    #[inline]
     fn default() -> Self {
         Self {
-            assume_empty_namespace:     false,
-            java_character_constraints: false,
+            default_namespace: None,
+            java_character_constraints: true,
         }
     }
 }
