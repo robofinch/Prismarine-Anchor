@@ -1,8 +1,6 @@
 //! Specialized lexing functions for parsing tokens that require
 //! manipulating strings and characters.
 
-use std::array;
-
 use crate::{settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion}, snbt::SnbtError};
 use super::{Lexer, Token, TokenData};
 
@@ -61,18 +59,20 @@ fn chars_to_u32(chars: [char; 8]) -> Option<u32> {
     Some(sum)
 }
 
-// Based on an answer from the Rust users forum
-fn concat_arrays<T, const A: usize, const B: usize, const C: usize>(
-    a: [T; A],
-    b: [T; B],
-) -> [T; C] {
+fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
+    let upper = chars.0.map(|c| c.to_digit(16));
+    let lower = chars.1.map(|c| c.to_digit(16));
 
-    const {
-        assert!(A + B == C, "incorrect output array length in call to `concat_arrays`");
+    let mut sum = upper[0]?;
+
+    for i in 1..4 {
+        sum = (sum << 4) +  upper[i]?;
+    }
+    for i in 4..8 {
+        sum = (sum << 4) +  lower[i]?;
     }
 
-    let mut iter = a.into_iter().chain(b);
-    array::from_fn(|_| iter.next().unwrap())
+    Some(sum)
 }
 
 
@@ -259,8 +259,8 @@ impl Lexer<'_> {
 
                 [
                     chars_to_u32(first),
-                    chars_to_u32(concat_arrays(second, third)),
-                    chars_to_u32(concat_arrays(fourth, fifth_start)),
+                    pair_to_u32((second, third)),
+                    pair_to_u32((fourth, fifth_start)),
                     chars_to_u32(fifth_end),
                 ]
             },
