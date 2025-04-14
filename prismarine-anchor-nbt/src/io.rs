@@ -10,7 +10,7 @@ use flate2::{
 };
 use thiserror::Error;
 
-use crate::raw::{self, read_i32};
+use crate::raw;
 use crate::{
     settings::{DepthLimit, IoOptions, NBTCompression},
     tag::{NbtCompound, NbtList, NbtTag},
@@ -24,9 +24,23 @@ use crate::{
 /// of the NBT file, excluding the header.
 pub fn read_bedrock_header<R: Read>(
     reader: &mut R,
-    opts: IoOptions
+    opts: IoOptions,
 ) -> Result<(i32, i32), NbtIoError> {
-    Ok((read_i32(reader, opts)?, read_i32(reader, opts)?))
+    Ok((raw::read_i32(reader, opts)?, raw::read_i32(reader, opts)?))
+}
+
+/// Write the Bedrock Edition NBT header. The first number is the version of `level.dat` format
+/// if writing that file, and should otherwise always be `8`. The second number is the length
+/// of the NBT file, excluding the header.
+pub fn write_bedrock_header<W: Write>(
+    writer: &mut W,
+    opts: IoOptions,
+    first_num: i32,
+    nbt_len: usize,
+) -> Result<(), NbtIoError> {
+    raw::write_i32(writer, opts, first_num)?;
+    raw::write_usize_as_i32(writer, opts, nbt_len)?;
+    Ok(())
 }
 
 /// Reads the given encoding of NBT data from the given reader, returning the resulting NBT

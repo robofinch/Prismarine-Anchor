@@ -103,11 +103,31 @@ impl IoOptions {
         }
     }
 
+    /// Default Java encoding for NBT bytes, but with no compression
+    pub fn java_uncompressed() -> Self {
+        Self {
+            endianness:         Endianness::BigEndian,
+            compression:        NBTCompression::Uncompressed,
+            string_encoding:    StringEncoding::Cesu8,
+            depth_limit:        DepthLimit::default(),
+        }
+    }
+
     /// Default Bedrock encoding for NBT bytes
     pub fn bedrock() -> Self {
         Self {
             endianness:         Endianness::LittleEndian,
             compression:        NBTCompression::GzipCompressed,
+            string_encoding:    StringEncoding::Utf8,
+            depth_limit:        DepthLimit::default(),
+        }
+    }
+
+    /// Default Bedrock encoding for NBT bytes, but with no compression
+    pub fn bedrock_uncompressed() -> Self {
+        Self {
+            endianness:         Endianness::LittleEndian,
+            compression:        NBTCompression::Uncompressed,
             string_encoding:    StringEncoding::Utf8,
             depth_limit:        DepthLimit::default(),
         }
