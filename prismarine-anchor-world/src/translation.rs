@@ -49,6 +49,8 @@ impl Translators {
         }
         #[cfg(all(not(feature = "py_mc_translate"), not(feature = "minecraft_data")))]
         {
+            let _ = source;
+            let _ = target;
             Err(TranslatorLoadError::NotSupported)
         }
     }

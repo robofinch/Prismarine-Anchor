@@ -1,8 +1,9 @@
 // Reading world files
-mod zip_env;
-mod bedrock;
+pub mod zip_env;
+pub mod bedrock;
 // mod java;
 
+pub mod shared_types;
 pub mod translation;
 
 

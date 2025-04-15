@@ -12,11 +12,13 @@ prismarine-anchor-translation   .workspace = true
 prismarine-anchor-translators   .workspace = true
 
 anyhow          .workspace = true
+indexmap        .workspace = true
 flate2          .workspace = true
 rusty-leveldb   .workspace = true
 serde           .workspace = true
 serde_json      .workspace = true
 thiserror       .workspace = true
+xxhash-rust     .workspace = true
 web-time        .workspace = true
 zip             .workspace = true
 

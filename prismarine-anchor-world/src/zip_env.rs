@@ -20,8 +20,7 @@ use web_time::{SystemTime, UNIX_EPOCH};
 use zip::{result::ZipError, write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 
-/// MemEnv is an in-memory environment that can be used for testing or ephemeral databases. The
-/// performance will be better than what a disk environment delivers.
+/// `ZipEnv` supports writing or reading an in-memory virtual file system to or from a ZIP archive.
 pub struct ZipEnv(MemFS);
 
 impl Default for ZipEnv {
@@ -438,4 +437,3 @@ impl MemFS {
         }
     }
 }
-
