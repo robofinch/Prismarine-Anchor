@@ -43,6 +43,16 @@ pub fn read_u8<R: Read>(reader: &mut R, _opts: IoOptions) -> IoResult<u8> {
 }
 
 #[inline]
+pub fn read_u16<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<u16> {
+    match opts.endianness {
+        Endianness::BigEndian
+            => reader.read_u16::<BigEndian>(),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => reader.read_u16::<LittleEndian>()
+    }
+}
+
+#[inline]
 pub fn read_i8<R: Read>(reader: &mut R, _opts: IoOptions) -> IoResult<i8> {
     reader.read_i8()
 }
@@ -126,10 +136,11 @@ pub fn read_i32_as_usize<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<
 pub fn read_string_len<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian
-            => usize::try_from(read_i16(reader, opts)?),
+            => Ok(usize::from(read_u16(reader, opts)?)),
         Endianness::NetworkLittleEndian
-            => usize::try_from(reader.read_i32_varint()?),
-    }.map_err(|_| NbtIoError::ExcessiveLength)
+            => usize::try_from(reader.read_u32_varint()?)
+                .map_err(|_| NbtIoError::ExcessiveLength),
+    }
 }
 
 pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String> {
@@ -162,6 +173,16 @@ pub fn write_bool<W: Write>(writer: &mut W, opts: IoOptions, value: bool) -> IoR
 #[inline]
 pub fn write_u8<W: Write>(writer: &mut W, _opts: IoOptions, value: u8) -> IoResult<()> {
     writer.write_u8(value)
+}
+
+#[inline]
+pub fn write_u16<W: Write>(writer: &mut W, opts: IoOptions, value: u16) -> IoResult<()> {
+    match opts.endianness {
+        Endianness::BigEndian
+            => writer.write_u16::<BigEndian>(value),
+        Endianness::LittleEndian | Endianness::NetworkLittleEndian
+            => writer.write_u16::<LittleEndian>(value),
+    }
 }
 
 #[inline]
@@ -229,12 +250,12 @@ pub fn write_string_len<W: Write>(writer: &mut W, opts: IoOptions, len: usize) -
     // Error if the length can't be written
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian => {
-            let len = i16::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
-            write_i16(writer, opts, len)
+            let len = u16::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
+            write_u16(writer, opts, len)
         }
         Endianness::NetworkLittleEndian => {
-            let len = i32::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
-            writer.write_i32_varint(len)
+            let len = u32::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
+            writer.write_u32_varint(len)
         }
     }.map_err(NbtIoError::StdIo)
 }
