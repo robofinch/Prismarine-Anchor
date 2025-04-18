@@ -878,9 +878,9 @@ impl NbtList {
         self.0.is_empty()
     }
 
-    /// Returns the value of the tag at the given index, or an error if the index is out of bounds or the
-    /// the tag type does not match the type specified. This method should be used for obtaining primitives
-    /// and shared references to lists and compounds.
+    /// Returns the value of the tag at the given index, or an error if the index is out of bounds
+    /// or the the tag type does not match the type specified. This method should be used for
+    /// obtaining primitives and shared references to lists and compounds.
     #[inline]
     pub fn get<'a, T>(&'a self, index: usize) -> Result<T, NbtReprError>
     where
@@ -895,9 +895,9 @@ impl NbtList {
         .map_err(NbtReprError::from_any)
     }
 
-    /// Returns a mutable reference to the tag at the given index, or an error if the index is out of bounds or
-    /// tag type does not match the type specified. This method should be used for obtaining mutable references
-    /// to elements.
+    /// Returns a mutable reference to the tag at the given index, or an error if the index is out
+    /// of bounds or tag type does not match the type specified. This method should be used for
+    /// obtaining mutable references to elements.
     #[inline]
     pub fn get_mut<'a, T>(&'a mut self, index: usize) -> Result<T, NbtReprError>
     where
@@ -911,6 +911,39 @@ impl NbtList {
                 .ok_or_else(|| NbtStructureError::invalid_index(index, len))?,
         )
         .map_err(NbtReprError::from_any)
+    }
+
+    /// Returns a reference to the tag at the given index without any casting,
+    /// or `None` if the index is out of bounds.
+    pub fn get_tag(&self, index: usize) -> Option<&NbtTag> {
+        self.0.get(index)
+    }
+
+    /// Returns a mutable reference to the tag at the given index without any casting,
+    /// or `None` if the index is out of bounds.
+    pub fn get_tag_mut(&mut self, index: usize) -> Option<&mut NbtTag> {
+        self.0.get_mut(index)
+    }
+
+    /// While preserving the order of the `NbtList`, removes and returns the tag at the given index
+    /// without any casting, or returns `None` if the index is out of bounds.
+    pub fn remove_tag(&mut self, index: usize) -> Option<NbtTag> {
+        if index < self.0.len() {
+            Some(self.0.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Removes and returns the tag at the given index without any casting,
+    /// or returns `None` if the index is out of bounds. Does not preserve the order
+    /// of the `NbtList`.
+    pub fn swap_remove_tag(&mut self, index: usize) -> Option<NbtTag> {
+        if index < self.0.len() {
+            Some(self.0.swap_remove(index))
+        } else {
+            None
+        }
     }
 
     /// Pushes the given value to the back of the list after wrapping it in an `NbtTag`.
@@ -1226,9 +1259,9 @@ impl NbtCompound {
         self.0.is_empty()
     }
 
-    /// Returns the value of the tag with the given name, or an error if no tag exists with the given name
-    /// or specified type. This method should be used to obtain primitives as well as shared references to
-    /// lists and compounds.
+    /// Returns the value of the tag with the given name, or an error if no tag exists with the
+    /// given name or specified type. This method should be used to obtain primitives as well as
+    /// shared references to lists and compounds.
     #[inline]
     pub fn get<'a, 'b, K, T>(&'a self, name: &'b K) -> Result<T, NbtReprError>
     where
@@ -1246,8 +1279,9 @@ impl NbtCompound {
         .map_err(NbtReprError::from_any)
     }
 
-    /// Returns the value of the tag with the given name, or an error if no tag exists with the given name
-    /// or specified type. This method should be used to obtain mutable references to lists and compounds.
+    /// Returns the value of the tag with the given name, or an error if no tag exists with the
+    /// given name or specified type. This method should be used to obtain mutable references to
+    /// lists and compounds.
     #[inline]
     pub fn get_mut<'a, 'b, K, T>(&'a mut self, name: &'b K) -> Result<T, NbtReprError>
     where
@@ -1275,7 +1309,58 @@ impl NbtCompound {
         self.0.contains_key(key)
     }
 
-    /// Adds the given value to this compound with the given name after wrapping that value in an `NbtTag`.
+    /// Returns a reference to the tag with the given name without any casting,
+    /// or `None` if no tag exists with the given name.
+    pub fn get_tag<K>(&self, key: &K) -> Option<&NbtTag>
+    where
+        String: Borrow<K>,
+        K: Hash + Ord + Eq + ?Sized,
+    {
+        self.0.get(key)
+    }
+
+    /// Returns a mutable reference to the tag with the given name without any casting,
+    /// or `None` if no tag exists with the given name.
+    pub fn get_tag_mut<K>(&mut self, key: &K) -> Option<&mut NbtTag>
+    where
+        String: Borrow<K>,
+        K: Hash + Ord + Eq + ?Sized,
+    {
+        self.0.get_mut(key)
+    }
+
+    #[cfg(feature = "preserve_order")]
+    /// Removes and returns the tag with the given name without any casting,
+    /// or `None` if no tag exists with the given name. If using the `preserve_order`
+    /// feature, this method preserves the insertion order.
+    pub fn remove_tag<K>(&mut self, key: &K) -> Option<NbtTag>
+    where
+        String: Borrow<K>,
+        K: Hash + Ord + Eq + ?Sized,
+    {
+        self.0.shift_remove(key)
+    }
+
+    /// Removes and returns the tag with the given name without any casting,
+    /// or `None` if no tag exists with the given name. This method does not preserve the order
+    /// of the map (if tracked with the `preserve_order` feature).
+    pub fn swap_remove_tag<K>(&mut self, key: &K) -> Option<NbtTag>
+    where
+        String: Borrow<K>,
+        K: Hash + Ord + Eq + ?Sized,
+    {
+        #[cfg(feature = "preserve_order")]
+        {
+            self.0.swap_remove(key)
+        }
+        #[cfg(not(feature = "preserve_order"))]
+        {
+            self.0.remove(key)
+        }
+    }
+
+    /// Adds the given value to this compound with the given name
+    /// after wrapping that value in an `NbtTag`.
     #[inline]
     pub fn insert<K: Into<String>, T: Into<NbtTag>>(&mut self, name: K, value: T) {
         self.0.insert(name.into(), value.into());
