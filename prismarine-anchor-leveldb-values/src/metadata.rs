@@ -201,10 +201,10 @@ impl From<NbtCompound> for MetaData {
                 return None;
             }
 
-            let Some(&NbtTag::Short(min)) = range.get_tag("min") else {
+            let Some(&NbtTag::Short(max)) = range.get_tag("max") else {
                 return None;
             };
-            let Some(&NbtTag::Short(max)) = range.get_tag("max") else {
+            let Some(&NbtTag::Short(min)) = range.get_tag("min") else {
                 return None;
             };
 
@@ -362,12 +362,13 @@ impl From<MetaData> for NbtCompound {
             };
         }
 
+        // Note: it is vital that "max" is inserted before "min", to be alphabetical.
         macro_rules! add_range {
             ($val:expr, $meta:ident) => {
                 if let Some(range) = $val {
                     let mut range_compound = NbtCompound::new();
-                    range_compound.insert("min".to_owned(), range.start);
                     range_compound.insert("max".to_owned(), range.end);
+                    range_compound.insert("min".to_owned(), range.start);
                     compound.insert(
                         <&str>::from(MetaDataType::$meta).to_owned(),
                         NbtTag::Compound(range_compound),
