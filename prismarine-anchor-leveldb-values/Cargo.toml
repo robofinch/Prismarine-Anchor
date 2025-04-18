@@ -1,0 +1,63 @@
+[package]
+name = "prismarine-anchor-leveldb-values"
+authors = ["Finley Huggins"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "" # Will probably be MIT OR Apache-2.0.
+
+[dependencies]
+prismarine-anchor-nbt   = { workspace = true, optional = true }
+
+indexmap        = { workspace = true, optional = true }
+serde           = { workspace = true, optional = true }
+thiserror       = { workspace = true, optional = true }
+xxhash-rust     = { workspace = true, optional = true }
+zerocopy        = { workspace = true, features = ["derive"], optional = true }
+
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# We don't directly use this, but our deps do, and it needs to have the js feature enabled.
+# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
+getrandom = { workspace = true, features = ["js"] }
+
+[features]
+concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
+version                     = []
+legacy_version              = []
+actor_digest_version        = []
+data_3d                     = []
+data_2d                     = []
+legacy_data_2d              = []
+subchunk_blocks             = []
+legacy_terrain              = []
+legacy_extra_block_data     = []
+border_blocks               = []
+hardcoded_spawners          = []
+aabb_volumes                = []
+checksums                   = []
+metadata                    = []
+finalized_state             = []
+biome_state                 = []
+conversion_data             = []
+caves_and_cliffs_blending   = []
+blending_biome_height       = []
+blending_data               = []
+actor_digest                = []
+actor                       = []
+autonomous_entities         = []
+player                      = []
+village                     = []
+map                         = []
+portals                     = []
+structure_template          = []
+ticking_area                = []
+scoreboard                  = []
+wandering_trader_scheduler  = []
+biome_data                  = []
+mob_events                  = []
+overworld                   = []
+nether                      = []
+the_end                     = []
+position_tracking           = []
+flat_world_layers           = []
