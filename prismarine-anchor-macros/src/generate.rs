@@ -182,13 +182,10 @@ impl<'a> ToTokens for SourceTranslator<'a> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let TranslatorTypes { error, block, entity, item } = self.types;
 
+        let translator = Shorthand::Translator;
+
         tokens.extend(quote! {
-            ::prismarine_anchor_translation::translator::Translator::<
-                #error,
-                #block,
-                #entity,
-                #item,
-            >
+            #translator::<#error, #block, #entity, #item>
         })
     }
 }
