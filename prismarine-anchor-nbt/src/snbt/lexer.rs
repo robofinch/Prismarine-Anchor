@@ -636,18 +636,15 @@ impl AmbiguousWord {
 
         match self {
             Self::True | Self::False => {
-                if opts.true_false == ParseTrueFalse::AsString
-                    || (opts.true_false == ParseTrueFalse::AsDetected && expecting_string) {
-                        Ok(TokenData {
-                            token: Token::String {
-                                value: self.string_val(),
-                                quoted: false
-                            },
-                            index,
-                            char_width,
-                        })
-                } else {
-                    Ok(TokenData::new(self.numeric_val(), index, char_width))
+                match (opts.true_false, expecting_string) {
+                    (ParseTrueFalse::AsString, _) | (ParseTrueFalse::AsDetected, true) => {
+                        let token = Token::String {
+                            value: self.string_val(),
+                            quoted: false
+                        };
+                        Ok(TokenData::new(token, index, char_width))
+                    }
+                    _ => Ok(TokenData::new(self.numeric_val(), index, char_width)),
                 }
             }
             _ => match (opts.non_finite, expecting_string) {
@@ -680,7 +677,7 @@ impl AmbiguousWord {
                             index,
                             char_width,
                         })
-                    } else if opts.version == SnbtVersion::UpdatedJava {
+                    } else if let SnbtVersion::UpdatedJava = opts.version {
                         Err(SnbtError::invalid_number(
                             input, index, char_width, NumericParseError::NonfiniteFloat
                         ))

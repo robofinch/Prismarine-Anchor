@@ -1,6 +1,7 @@
 use flate2::Compression;
+#[cfg(feature = "derive_serde")]
+use serde::{Serialize, Deserialize};
 
-// todo: derive serde for these when the serde feature is enabled
 
 // ================================
 //      Limits
@@ -12,7 +13,9 @@ use flate2::Compression;
 /// but note that this crate uses recursive functions to read and write NBT data;
 /// if the limit is too high and unreasonably nested data is received,
 /// a crash could occur from the nested function calls exceeding the maximum stack size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct DepthLimit(pub(crate) u32);
 
 impl Default for DepthLimit {
@@ -67,7 +70,9 @@ impl DepthLimit {
 // until benchmarks are set up.
 
 /// Encoding options for reading/writing NBT data from/to bytes (e.g. from/to a file).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct IoOptions {
     /// [Endianness] of some NBT data, primarily numeric data. Moreover, in the `NetworkLitleEndian`
     /// variant, `i32` and `i64` values are written or read with a variable-length varint encoding.
@@ -137,7 +142,9 @@ impl IoOptions {
 /// [Endianness] of NBT bytes.
 ///
 /// [Endianness]: https://en.wikipedia.org/wiki/Endianness
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum Endianness {
     /// Used by Java
     BigEndian,
@@ -152,8 +159,11 @@ pub enum Endianness {
 
 // Note that there's also an option to include/exclude the Zlib header, which should not matter
 // for NBT as far as I'm aware, but does matter for Bedrock's LevelDB.
-/// Describes the compression options for NBT data: uncompressed, Zlib-compressed and Gzip-compressed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Describes the compression options for NBT data:
+/// uncompressed, Zlib-compressed and Gzip-compressed.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum NbtCompression {
     /// Uncompressed NBT data.
     Uncompressed,
@@ -167,7 +177,9 @@ pub enum NbtCompression {
     GzipCompressedWith(CompressionLevel),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct CompressionLevel(u8);
 
 impl From<Compression> for CompressionLevel {
@@ -185,12 +197,14 @@ impl From<CompressionLevel> for Compression {
 }
 
 /// String encodings used by Minecraft. Java is CESU-8, Bedrock is probably always UTF-8.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum StringEncoding {
     /// Used by Bedrock
     Utf8,
     /// Used by Java
-    Cesu8
+    Cesu8,
 }
 
 
@@ -210,7 +224,9 @@ pub enum StringEncoding {
 /// Finer control is possible through fields of [`SnbtParseOptions`] and [`SnbtWriteOptions`],
 /// and in particular, outputting character escape sequences only valid in `UpdatedJava` SNBT,
 /// such as `\n` or `\t`, can be enabled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum SnbtVersion {
     /// For Java 1.21.5 and later. Adds additional parsing features, and is mostly
     /// backwards-compatible, but the restrictions on numeric values and unquoted strings
@@ -261,7 +277,9 @@ pub enum SnbtVersion {
 
 /// Options for parsing SNBT data into NBT data. See the [`SnbtVersion`] enum and its variants
 /// for information about the two versions of SNBT.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct SnbtParseOptions {
     /// Version of the SNBT format used. Has many effects on how SNBT is parsed. Note that
     /// the [`UpdatedJava`] version normally halts with an error if an infinite float or double
@@ -343,7 +361,9 @@ impl SnbtParseOptions {
 /// This enum indicates whether they should always be parsed as bytes, always parsed
 /// as unquoted strings, or parsed as bytes unless they are an `NbtCompound` key or
 /// an element of an `NbtList` of String tags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum ParseTrueFalse {
     AsByte,
     AsDetected,
@@ -363,7 +383,9 @@ pub enum ParseTrueFalse {
 /// into NBT; combined, the settings can, for instance, parse `Infinityd` as `f64::MAX`.
 ///
 /// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum ParseNonFinite {
     AsDetected,
     AsFloat,
@@ -372,7 +394,9 @@ pub enum ParseNonFinite {
 }
 
 /// How to handle an invalid or disabled escape sequence in a quoted string when parsing SNBT data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum HandleInvalidEscape {
     /// Copy the escape sequence verbatim into the final string
     CopyVerbatim,
@@ -384,7 +408,9 @@ pub enum HandleInvalidEscape {
 
 /// Options for writing NBT data to SNBT. See the [`SnbtVersion`] enum and its variants
 /// for information about the two versions of SNBT.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct SnbtWriteOptions {
     /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT.
     // TODO: add warning and error logging throughout the crate, such as
@@ -460,7 +486,9 @@ impl SnbtWriteOptions {
 /// the `MAX` constant of `f32` or `f64`, negative infinity as the `MIN` constant, and NaN as `0.`.
 ///
 /// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum WriteNonFinite {
     /// Display positive infinity as though it were the `MAX` constant of `f32` or `f64`,
     /// negative infinity as the `MIN` constant, and NaN as `0.`.
@@ -479,7 +507,9 @@ pub enum WriteNonFinite {
 ///
 /// If the `named_escapes` feature is not enabled, the option for enabling
 /// unicode escapes will be ignored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct EnabledEscapeSequences(u16);
 
 impl EnabledEscapeSequences {
@@ -563,7 +593,9 @@ impl EnabledEscapeSequences {
 }
 
 /// The various escape sequences allowed in SNBT
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EscapeSequence {
     /// `\b`, backspace

@@ -18,7 +18,7 @@ pub use self::lexer::{allowed_unquoted, NumericParseError, starts_unquoted_numbe
 pub(crate) use self::lexer::is_ambiguous;
 
 
-// Should add module-wide documentation about the specification and implementation.
+// TODO: should add module-wide documentation about the specification and implementation.
 
 
 
@@ -500,7 +500,7 @@ fn parse_compound_tag<'a>(
                         // First loop iteration or no comma
                         Some(0) | None => return Ok((compound, tokens.index())),
                         // Later iteration with a trailing comma
-                        Some(index) => if tokens.snbt_version() == SnbtVersion::Original {
+                        Some(index) => if let SnbtVersion::Original = tokens.snbt_version() {
                             return Err(SnbtError::trailing_comma(tokens.raw(), index));
                         }
                     }

@@ -98,12 +98,14 @@ impl Lexer<'_> {
         &mut self, start: usize, char_width: usize, token_string: &str
     ) -> Option<Result<TokenData, SnbtError>> {
 
-        if self.snbt_version() == SnbtVersion::UpdatedJava && token_string.ends_with(FUNC_SUFFIX) {
-            if token_string.starts_with(BOOL_FUNC) {
-                return Some(self.parse_bool_func(start, char_width, &token_string));
+        if let SnbtVersion::UpdatedJava = self.snbt_version() {
+            if token_string.ends_with(FUNC_SUFFIX) {
+                if token_string.starts_with(BOOL_FUNC) {
+                    return Some(self.parse_bool_func(start, char_width, &token_string));
 
-            } else if token_string.starts_with(UUID_FUNC) {
-                return Some(self.parse_uuid_func(start, char_width, &token_string));
+                } else if token_string.starts_with(UUID_FUNC) {
+                    return Some(self.parse_uuid_func(start, char_width, &token_string));
+                }
             }
         }
 
@@ -417,20 +419,26 @@ impl Lexer<'_> {
         let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeTwo);
         let handle_invalid = self.opts.handle_invalid_escape;
 
-        if !enabled && handle_invalid != HandleInvalidEscape::Error
-        {
-            let mut parsed_width = 0;
-            if self.next_ch().is_some() {
-                parsed_width += 1;
-            }
-            if self.next_ch().is_some() {
-                parsed_width += 1;
-            }
+        if !enabled {
+            match handle_invalid {
+                // Below code will throw an error
+                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Ignore => {
+                    self.next_ch();
+                    self.next_ch();
+                    return Ok(None);
+                }
+                HandleInvalidEscape::CopyVerbatim => {
+                    let mut parsed_width = 0;
+                    if self.next_ch().is_some() {
+                        parsed_width += 1;
+                    }
+                    if self.next_ch().is_some() {
+                        parsed_width += 1;
+                    }
 
-            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
-                return Ok(None);
-            } else {
-                return Ok(Some((None, parsed_width)))
+                    return Ok(Some((None, parsed_width)));
+                }
             }
         }
 
@@ -480,18 +488,25 @@ impl Lexer<'_> {
         let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeFour);
         let handle_invalid = self.opts.handle_invalid_escape;
 
-        if !enabled && handle_invalid != HandleInvalidEscape::Error {
-            let mut parsed_width = 0;
-            for _ in 0..4 {
-                if self.next_ch().is_some() {
-                    parsed_width += 1;
+        if !enabled {
+            match handle_invalid {
+                // Below code will throw an error
+                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Ignore => {
+                    for _ in 0..4 {
+                        self.next_ch();
+                    }
+                    return Ok(None);
                 }
-            }
-
-            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
-                return Ok(None);
-            } else {
-                return Ok(Some((None, parsed_width)))
+                HandleInvalidEscape::CopyVerbatim => {
+                    let mut parsed_width = 0;
+                    for _ in 0..4 {
+                        if self.next_ch().is_some() {
+                            parsed_width += 1;
+                        }
+                    }
+                    return Ok(Some((None, parsed_width)));
+                }
             }
         }
 
@@ -539,18 +554,25 @@ impl Lexer<'_> {
         let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeEight);
         let handle_invalid = self.opts.handle_invalid_escape;
 
-        if !enabled && handle_invalid != HandleInvalidEscape::Error {
-            let mut parsed_width = 0;
-            for _ in 0..8 {
-                if self.next_ch().is_some() {
-                    parsed_width += 1;
+        if !enabled {
+            match handle_invalid {
+                // Below code will throw an error
+                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Ignore => {
+                    for _ in 0..8 {
+                        self.next_ch();
+                    }
+                    return Ok(None);
                 }
-            }
-
-            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
-                return Ok(None);
-            } else {
-                return Ok(Some((None, parsed_width)))
+                HandleInvalidEscape::CopyVerbatim => {
+                    let mut parsed_width = 0;
+                    for _ in 0..8 {
+                        if self.next_ch().is_some() {
+                            parsed_width += 1;
+                        }
+                    }
+                    return Ok(Some((None, parsed_width)));
+                }
             }
         }
 
@@ -601,24 +623,37 @@ impl Lexer<'_> {
         let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeNamed);
         let handle_invalid = self.opts.handle_invalid_escape;
 
-        if !enabled && handle_invalid != HandleInvalidEscape::Error {
-            let mut parsed_width = 0;
-            if let Some(ch) = self.next_ch() {
-                parsed_width += 1;
-                if ch == '{' {
-                    while let Some(ch) = self.next_ch() {
-                        parsed_width += 1;
-                        if ch == '}' {
-                            break;
+        if !enabled {
+            match handle_invalid {
+                // Below code will throw an error
+                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Ignore => {
+                    if let Some(ch) = self.next_ch() {
+                        if ch == '{' {
+                            while let Some(ch) = self.next_ch() {
+                                if ch == '}' {
+                                    break;
+                                }
+                            }
                         }
                     }
+                    return Ok(None);
                 }
-            }
-
-            if handle_invalid == HandleInvalidEscape::CopyVerbatim {
-                return Ok(None);
-            } else {
-                return Ok(Some((None, parsed_width)))
+                HandleInvalidEscape::CopyVerbatim => {
+                    let mut parsed_width = 0;
+                    if let Some(ch) = self.next_ch() {
+                        parsed_width += 1;
+                        if ch == '{' {
+                            while let Some(ch) = self.next_ch() {
+                                parsed_width += 1;
+                                if ch == '}' {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    return Ok(Some((None, parsed_width)));
+                }
             }
         }
 

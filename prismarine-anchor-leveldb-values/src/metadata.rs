@@ -8,7 +8,7 @@ use xxhash_rust::xxh64;
 
 use prismarine_anchor_nbt::{NbtCompound, NbtTag};
 use prismarine_anchor_nbt::{
-    io::{read_nbt, write_nbt, NbtIoError},
+    io::{read_compound, write_compound, NbtIoError},
     settings::{Endianness, IoOptions},
 };
 
@@ -69,7 +69,7 @@ impl LevelChunkMetaDataDictionary {
             let hash = u64::from_le_bytes(hash);
 
             // MetaData stored as an NBT is the value
-            let (nbt, _) = read_nbt(
+            let (nbt, _) = read_compound(
                 &mut reader,
                 IoOptions::bedrock_uncompressed(),
             )?;
@@ -131,10 +131,11 @@ impl LevelChunkMetaDataDictionary {
         writer.write_all(&len.to_le_bytes()).expect("Cursor IO doesn't fail");
 
         for (hash, nbt) in self.0.iter().take(len_usize) {
+            let nbt = nbt.clone().into();
             writer.write_all(&hash.to_le_bytes()).expect("Cursor IO doesn't fail");
 
             // Could only fail on invalid NBT.
-            write_nbt(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt.clone().into())?;
+            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
         }
 
         Ok(writer.into_inner())
@@ -147,10 +148,11 @@ impl LevelChunkMetaDataDictionary {
         writer.write_all(&len.to_le_bytes()).expect("Cursor IO doesn't fail");
 
         for (hash, nbt) in self.0.into_iter().take(len_usize) {
+            let nbt = nbt.into();
             writer.write_all(&hash.to_le_bytes()).expect("Cursor IO doesn't fail");
 
             // Could only fail on invalid NBT.
-            write_nbt(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt.into())?;
+            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
         }
 
         Ok(writer.into_inner())
@@ -185,7 +187,7 @@ impl MetaData {
         };
 
         let mut writer = Cursor::new(Vec::new());
-        write_nbt(&mut writer, network_little_endian, None,&nbt)?;
+        write_compound(&mut writer, network_little_endian, None, &nbt)?;
 
         Ok(xxh64::xxh64(&writer.into_inner(), 0))
     }

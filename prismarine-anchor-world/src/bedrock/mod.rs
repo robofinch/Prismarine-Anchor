@@ -18,7 +18,7 @@ use prismarine_anchor_leveldb_entries::{
 };
 use prismarine_anchor_nbt::io as nbt_io;
 use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{write_nbt, NbtIoError};
+use prismarine_anchor_nbt::io::{write_compound, NbtIoError};
 
 use self::leveldb::{new_leveldb, DBCompressor};
 
@@ -240,7 +240,7 @@ impl LevelDatFile {
                 IoOptions::bedrock_uncompressed(),
             ).map_err(add_nbt_context)?;
 
-        let (compound, _) = nbt_io::read_nbt(
+        let (compound, _) = nbt_io::read_compound(
                 &mut file,
                 IoOptions::bedrock_uncompressed(),
             ).map_err(add_nbt_context)?;
@@ -278,7 +278,7 @@ impl LevelDatFile {
 
         let mut nbt_buffer = Cursor::new(Vec::new());
 
-        write_nbt(&mut nbt_buffer, IoOptions::bedrock_uncompressed(), None, &self.nbt)
+        write_compound(&mut nbt_buffer, IoOptions::bedrock_uncompressed(), None, &self.nbt)
             .map_err(add_nbt_context)?;
 
         let nbt_buffer = nbt_buffer.into_inner();

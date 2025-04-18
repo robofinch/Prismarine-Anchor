@@ -214,7 +214,7 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, NumericParseE
         // since the only edge case is probably hex or binary (e.g., `1_2` would be an issue in
         // radix 2, but not decimal), but floats can't have 'x' or 'b' in them.
         // It's easier to not think too hard, and let it try to parse as a float.
-        // TODO: after thorough testing is set up, check if returning an error here is valid.
+        // TODO: after thorough testing is set up, check if returning an error here would be valid.
         ReadDigitsResult::InvalidUnderscore => return None,
     }
 

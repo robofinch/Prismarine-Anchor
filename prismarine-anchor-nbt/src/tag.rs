@@ -102,6 +102,7 @@ pub enum NbtType {
 impl NbtTag {
     /// Returns the single character denoting this tag's type, or `None` if this tag has no type
     /// specifier.
+    #[inline]
     pub fn type_specifier(&self) -> Option<&'static str> {
         match self {
             Self::Byte(_)      => Some("B"),
@@ -117,6 +118,7 @@ impl NbtTag {
     }
 
     /// Returns this tag's type.
+    #[inline]
     pub fn tag_type(&self) -> NbtType {
         match self {
             Self::Byte(_)      => NbtType::Byte,
@@ -134,7 +136,14 @@ impl NbtTag {
         }
     }
 
+    /// Returns this tag's numeric ID.
+    #[inline]
+    pub fn numeric_tag_id(&self) -> u8 {
+        raw::id_for_tag(Some(self))
+    }
+
     /// Returns which type of container this tag is, or `None` if it is not a container.
+    #[inline]
     pub fn container_type(&self) -> Option<NbtContainerType> {
         match self {
             Self::Compound(_)  => Some(NbtContainerType::Compound),
@@ -146,6 +155,7 @@ impl NbtTag {
         }
     }
 
+    #[inline]
     pub(crate) fn tag_name(&self) -> &'static str {
         match self {
             NbtTag::Byte(_) => "Byte",

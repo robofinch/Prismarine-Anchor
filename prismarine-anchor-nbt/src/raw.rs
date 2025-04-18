@@ -334,7 +334,7 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
 #[inline]
 pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i32>> {
 
-    if opts.endianness == Endianness::NetworkLittleEndian {
+    if let Endianness::NetworkLittleEndian = opts.endianness {
         // The number of bytes to read per i32 is variable; we can't do any better than reading
         // the values one-at-a-time
         (0..len).map(|_| reader.read_i32_varint()).collect()
@@ -367,7 +367,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
 #[inline]
 pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i64>> {
 
-    if opts.endianness == Endianness::NetworkLittleEndian {
+    if let Endianness::NetworkLittleEndian = opts.endianness {
         // The number of bytes to read per i64 is variable; we can't do any better than reading
         // the values one-at-a-time
         (0..len).map(|_| reader.read_i64_varint()).collect()

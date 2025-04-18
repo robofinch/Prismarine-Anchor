@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use prismarine_anchor_leveldb_values::metadata::MetaDataWriteError;
 use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{read_nbt, write_nbt, NbtIoError};
+use prismarine_anchor_nbt::io::{read_compound, write_compound, NbtIoError};
 
 pub use self::{entry::BedrockLevelDBEntry, key::BedrockLevelDBKey};
 
@@ -145,7 +145,7 @@ fn read_nbt_list(nbt_list_bytes: &[u8]) -> Option<Vec<NbtCompound>> {
 
     while !all_read(reader.position(), input_len) {
 
-        let nbt_result = read_nbt(
+        let nbt_result = read_compound(
             &mut reader,
             IoOptions::bedrock_uncompressed(),
         );
@@ -168,7 +168,7 @@ fn nbt_list_to_bytes(compounds: &[NbtCompound]) -> Result<Vec<u8>, NbtIoError> {
     let mut writer = Cursor::new(Vec::new());
 
     for compound in compounds {
-        write_nbt(&mut writer, IoOptions::bedrock_uncompressed(), None, compound)?;
+        write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, compound)?;
     }
 
     Ok(writer.into_inner())

@@ -36,8 +36,9 @@ unicode_names2  = { workspace = true, optional = true }
 getrandom = { workspace = true, features = ["js"] }
 
 [features]
-default = [ "allow_list_root", "named_escapes" ]
-# Need to actually use document_features for the below comments to be visible in the generated docs
+default = [ "named_escapes" ]
+# TODO: Need to actually use document_features for the
+# below comments to be visible in the generated docs
 
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "dep:indexmap" ]
@@ -56,8 +57,12 @@ allow_list_root     = []
 ## is what Minecraft uses, 512.
 configurable_depth  = []
 
-## Enables serde support
+## Enables serde support for NBT tags, lists, and compounds.
 serde               = [ "dep:serde" ]
+## Derives `Serialize` and `Deserialize` for various plain-old-data structs.
+derive_serde        = [ "serde/serde_derive"]
+## Derives `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash` for various plain-old-data structs.
+derive_standard     = []
 
 #! ### Nonstandard Features
 #! The following features add additional parsing and writing functions for NBT bytes
@@ -67,7 +72,7 @@ serde               = [ "dep:serde" ]
 #! because they are simple to implement, and plausibly useful, not because they are important.
 
 ## Adds functions that read and write NbtTags of any variant to or from bytes (e.g. a file).
-allow_any_root      = [ "allow_list_root" ]
+allow_any_root      = []
 ## Adds functions that read and write NbtTags of any variant to or from NBT bytes
 ## (e.g. an NBT file) which do not give the root node a name.
 allow_unnamed_root  = [ "allow_any_root" ]

@@ -50,7 +50,7 @@ pub struct PyMcMappings {
 //  Options and Error
 // ================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct MappingParseOptions {
     pub identifier_options: IdentifierParseOptions,
     pub snbt_options: SnbtParseOptions,
