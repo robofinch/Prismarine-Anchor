@@ -51,7 +51,7 @@ aabb_volumes                = []
 checksums                   = []
 metadata                    = [
     "dimensions",
-    "dep:indexmap", "dep:prismarine-anchor-nbt", "dep:thiserror"
+    "dep:indexmap", "prismarine-anchor-nbt/preserve_order", "dep:thiserror"
 ]
 finalized_state             = []
 biome_state                 = []
