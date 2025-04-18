@@ -50,8 +50,8 @@ hardcoded_spawners          = []
 aabb_volumes                = []
 checksums                   = []
 metadata                    = [
-    "dimensions",
-    "dep:indexmap", "prismarine-anchor-nbt/preserve_order", "dep:thiserror"
+    "dimensions", "prismarine-anchor-nbt/preserve_order",
+    "dep:indexmap", "dep:xxhash-rust", "dep:thiserror"
 ]
 finalized_state             = []
 biome_state                 = []

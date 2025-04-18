@@ -1301,30 +1301,33 @@ impl NbtCompound {
 
     /// Returns whether or not this compound has a tag with the given name.
     #[inline]
-    pub fn contains_key<K>(&self, key: &K) -> bool
+    pub fn contains_key<'b, K>(&self, key: &'b K) -> bool
     where
         String: Borrow<K>,
         K: Hash + Ord + Eq + ?Sized,
+        &'b K: Into<String>,
     {
         self.0.contains_key(key)
     }
 
     /// Returns a reference to the tag with the given name without any casting,
     /// or `None` if no tag exists with the given name.
-    pub fn get_tag<K>(&self, key: &K) -> Option<&NbtTag>
+    pub fn get_tag<'b, K>(&self, key: &'b K) -> Option<&NbtTag>
     where
         String: Borrow<K>,
         K: Hash + Ord + Eq + ?Sized,
+        &'b K: Into<String>,
     {
         self.0.get(key)
     }
 
     /// Returns a mutable reference to the tag with the given name without any casting,
     /// or `None` if no tag exists with the given name.
-    pub fn get_tag_mut<K>(&mut self, key: &K) -> Option<&mut NbtTag>
+    pub fn get_tag_mut<'b, K>(&mut self, key: &'b K) -> Option<&mut NbtTag>
     where
         String: Borrow<K>,
         K: Hash + Ord + Eq + ?Sized,
+        &'b K: Into<String>,
     {
         self.0.get_mut(key)
     }
@@ -1333,10 +1336,11 @@ impl NbtCompound {
     /// Removes and returns the tag with the given name without any casting,
     /// or `None` if no tag exists with the given name. If using the `preserve_order`
     /// feature, this method preserves the insertion order.
-    pub fn remove_tag<K>(&mut self, key: &K) -> Option<NbtTag>
+    pub fn remove_tag<'b, K>(&mut self, key: &'b K) -> Option<NbtTag>
     where
         String: Borrow<K>,
         K: Hash + Ord + Eq + ?Sized,
+        &'b K: Into<String>,
     {
         self.0.shift_remove(key)
     }
@@ -1344,10 +1348,11 @@ impl NbtCompound {
     /// Removes and returns the tag with the given name without any casting,
     /// or `None` if no tag exists with the given name. This method does not preserve the order
     /// of the map (if tracked with the `preserve_order` feature).
-    pub fn swap_remove_tag<K>(&mut self, key: &K) -> Option<NbtTag>
+    pub fn swap_remove_tag<'b, K>(&mut self, key: &'b K) -> Option<NbtTag>
     where
         String: Borrow<K>,
         K: Hash + Ord + Eq + ?Sized,
+        &'b K: Into<String>,
     {
         #[cfg(feature = "preserve_order")]
         {
