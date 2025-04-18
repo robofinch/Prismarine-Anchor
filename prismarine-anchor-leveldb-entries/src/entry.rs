@@ -1,4 +1,5 @@
 use prismarine_anchor_leveldb_values::{
+    actor_digest_version::ActorDigestVersion,
     chunk_position::DimensionedChunkPos,
     metadata::LevelChunkMetaDataDictionary,
 };
@@ -8,7 +9,6 @@ use crate::{
     read_nbt_list, nbt_list_to_bytes, key::BedrockLevelDBKey,
     EntryParseResult, EntryToBytesOptions, ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
-
 
 /// The entries in a world's LevelDB database used by Minecraft Bedrock,
 /// parsed out of binary, but not necessary into the most useful completely-parsed format.
@@ -26,8 +26,7 @@ pub enum BedrockLevelDBEntry {
 
     Version(DimensionedChunkPos, u8),
     LegacyVersion(DimensionedChunkPos, u8),
-    /// Always zero. Presumably here for future compatibility.
-    ActorDigestVersion(DimensionedChunkPos, u8),
+    ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
 
     // Data3D(DimensionedChunkPos),
     // Data2D(DimensionedChunkPos),
@@ -65,7 +64,7 @@ pub enum BedrockLevelDBEntry {
     //  Data not specific to a chunk
     // ================================
 
-    // Actor(u64),
+    // Actor(ActorID),
 
     LevelChunkMetaDataDictionary(LevelChunkMetaDataDictionary),
 
@@ -106,7 +105,7 @@ pub enum BedrockLevelDBEntry {
     // villages
     // VillageManager <- I think I saw some library include this
     // dimension0
-    // dimension1 <- not sure if it exists, but dimension0 does.
+    // dimension1
     // dimension2 <- not sure if it exists, but dimension0 does.
     // idcounts
 
@@ -180,17 +179,23 @@ impl BedrockLevelDBEntry {
         match key {
             BedrockLevelDBKey::Version(chunk_pos) => {
                 if value.len() == 1 {
+                    println!("Chunk version: {}", value[0]);
                     return ValueParseResult::Parsed(Self::Version(chunk_pos, value[0]));
                 }
             }
             BedrockLevelDBKey::LegacyVersion(chunk_pos) => {
                 if value.len() == 1 {
+                    println!("Legacy chunk version: {}", value[0]);
                     return ValueParseResult::Parsed(Self::LegacyVersion(chunk_pos, value[0]));
                 }
             }
             BedrockLevelDBKey::ActorDigestVersion(chunk_pos) => {
                 if value.len() == 1 {
-                    return ValueParseResult::Parsed(Self::ActorDigestVersion(chunk_pos, value[0]));
+                    if let Ok(digest_version) = ActorDigestVersion::try_from(value[0]) {
+                        return ValueParseResult::Parsed(
+                            Self::ActorDigestVersion(chunk_pos, digest_version),
+                        );
+                    }
                 }
             }
             BedrockLevelDBKey::BlockEntities(chunk_pos) => {
@@ -219,12 +224,13 @@ impl BedrockLevelDBEntry {
                         Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes))
                     );
                 }
-                // TODO: use the error value to log debug information
             }
             BedrockLevelDBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
                     return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
                 }
+                // TODO: use the error value to log debug information
+                // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
             }
             BedrockLevelDBKey::RawKey(key) => {
                 return ValueParseResult::Parsed(Self::RawEntry {
@@ -288,7 +294,7 @@ impl BedrockLevelDBEntry {
         Ok(match self {
             Self::Version(.., version)                => vec![*version],
             Self::LegacyVersion(.., version)          => vec![*version],
-            Self::ActorDigestVersion(.., version)     => vec![*version],
+            Self::ActorDigestVersion(.., version)     => vec![u8::from(*version)],
             Self::BlockEntities(.., compounds)        => nbt_list_to_bytes(compounds)?,
             Self::LegacyEntities(.., compounds)       => nbt_list_to_bytes(compounds)?,
             Self::PendingTicks(.., compounds)         => nbt_list_to_bytes(compounds)?,

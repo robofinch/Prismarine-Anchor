@@ -1,6 +1,10 @@
 use std::str;
 
-use prismarine_anchor_leveldb_values::{chunk_position::DimensionedChunkPos, uuid::UUID};
+use prismarine_anchor_leveldb_values::{
+    actor::ActorID,
+    chunk_position::DimensionedChunkPos,
+    uuid::UUID,
+};
 use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
 use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
 
@@ -101,7 +105,7 @@ pub enum BedrockLevelDBKey {
     //  Data not specific to a chunk
     // ================================
 
-    Actor(u32, u32),
+    Actor(ActorID),
     /// Stores the NBT metadata of all chunks. Maps the xxHash64 hash of NBT data
     /// to that NBT data, so that each chunk need only store 8 bytes instead of the entire
     /// NBT; most chunks have the same metadata.
@@ -193,10 +197,10 @@ impl BedrockLevelDBKey {
                 return Some(Self::ActorDigest(dimensioned_pos));
             }
         } else if raw_key.len() == 19 && raw_key.starts_with(b"actorprefix") {
-            // The unwraps turn slices of length 4 into arrays of length 4, which succeeds.
-            let upper_bytes = u32::from_be_bytes(raw_key[11..15].try_into().unwrap());
-            let lower_bytes = u32::from_be_bytes(raw_key[15..19].try_into().unwrap());
-            return Some(Self::Actor(upper_bytes, lower_bytes));
+            // The unwrap turns a slice of length 8 into an array of length 8, which succeeds.
+            let actorid_bytes: [u8; 8] = raw_key[11..19].try_into().unwrap();
+
+            return Some(Self::Actor(ActorID::parse(actorid_bytes)));
         }
 
         // Next, most data is chunk data.
@@ -438,11 +442,10 @@ impl BedrockLevelDBKey {
                 dimensioned_pos.extend_serialized(bytes, opts.write_overworld_id);
                 return
             }
-            &Self::Actor(upper_bytes, lower_bytes) => {
+            &Self::Actor(actor_id) => {
                 bytes.reserve(19);
                 bytes.extend(b"actorprefix");
-                bytes.extend(upper_bytes.to_be_bytes());
-                bytes.extend(lower_bytes.to_be_bytes());
+                bytes.extend(actor_id.to_bytes());
                 return
             }
             &Self::LevelChunkMetaDataDictionary => {
