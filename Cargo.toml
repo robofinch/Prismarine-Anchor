@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "prismarine-anchor-editor",
+    "prismarine-anchor-leveldb-entries",
     "prismarine-anchor-leveldb-values",
     "prismarine-anchor-macros",
     "prismarine-anchor-nbt",
@@ -11,9 +12,7 @@ members = [
 ]
 
 [workspace.package]
-# No license provided to anyone for now; all rights reserved. See README for more.
-# Note that some crates in this workspace don't use license.workspace = true
-license = ""
+license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -48,13 +47,14 @@ panic = "abort"
 opt-level = 2
 
 [workspace.dependencies]
-prismarine-anchor-editor         = { version = "0.1.0", path = "./prismarine-anchor-editor"        }
-prismarine-anchor-leveldb-values = { version = "0.1.0", path = "./prismarine-anchor-leveldb-values"}
-prismarine-anchor-macros         = { version = "0.1.0", path = "./prismarine-anchor-macros"        }
-prismarine-anchor-nbt            = { version = "0.1.0", path = "./prismarine-anchor-nbt"           }
-prismarine-anchor-translation    = { version = "0.1.0", path = "./prismarine-anchor-translation"   }
-prismarine-anchor-translators    = { version = "0.1.0", path = "./prismarine-anchor-translators"   }
-prismarine-anchor-world          = { version = "0.1.0", path = "./prismarine-anchor-world"         }
+prismarine-anchor-editor          = { version = "0.1.0", path = "./prismarine-anchor-editor"          }
+prismarine-anchor-leveldb-entries = { version = "0.1.0", path = "./prismarine-anchor-leveldb-entries" }
+prismarine-anchor-leveldb-values  = { version = "0.1.0", path = "./prismarine-anchor-leveldb-values"  }
+prismarine-anchor-macros          = { version = "0.1.0", path = "./prismarine-anchor-macros"          }
+prismarine-anchor-nbt             = { version = "0.1.0", path = "./prismarine-anchor-nbt"             }
+prismarine-anchor-translation     = { version = "0.1.0", path = "./prismarine-anchor-translation"     }
+prismarine-anchor-translators     = { version = "0.1.0", path = "./prismarine-anchor-translators"     }
+prismarine-anchor-world           = { version = "0.1.0", path = "./prismarine-anchor-world"           }
 
 
 anyhow              = "1"

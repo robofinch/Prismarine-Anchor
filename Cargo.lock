@@ -355,10 +355,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-leveldb-entries"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "prismarine-anchor-nbt",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "prismarine-anchor-leveldb-values"
 version = "0.1.0"
 dependencies = [
- "getrandom",
  "indexmap",
  "prismarine-anchor-nbt",
  "serde",

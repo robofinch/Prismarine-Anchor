@@ -1,0 +1,14 @@
+[package]
+name = "prismarine-anchor-leveldb-entries"
+authors = ["Finley Huggins"]
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+prismarine-anchor-nbt   = { workspace = true, optional = true }
+
+indexmap        = { workspace = true, optional = true }
+serde           = { workspace = true, optional = true }
+thiserror       = { workspace = true, optional = true }
