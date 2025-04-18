@@ -12,9 +12,8 @@ pub mod settings;
 pub mod serde;
 
 
-pub use repr::*;
-pub use tag::*;
-
+pub use self::repr::*;
+pub use self::tag::*;
 
 // The macros might be worth looking into later.
 // pub use quartz_nbt_macros::compound;

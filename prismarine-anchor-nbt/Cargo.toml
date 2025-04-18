@@ -29,19 +29,24 @@ indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
 unicode_names2  = { workspace = true, optional = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# We don't directly use this, but our deps do, and it needs to have the js feature enabled.
+# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
+getrandom = { workspace = true, features = ["js"] }
+
 [features]
 default = [ "allow_list_root", "named_escapes" ]
 # Need to actually use document_features for the below comments to be visible in the generated docs
 
 ## If enabled, Compound tags will preserve the order of their elements.
-preserve_order      = [ "indexmap" ]
+preserve_order      = [ "dep:indexmap" ]
 ## Provides an NBT tag wrapper implementing `Eq`, `Ord`, and `Hash`.
 comparable          = []
 ## Provides approximate float comparisons for `ComparableNbtTag`.
-float_cmp           = [ "comparable", "float-cmp" ]
+float_cmp           = [ "comparable", "dep:float-cmp" ]
 
 ## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
-named_escapes       = [ "unicode_names2" ]
+named_escapes       = [ "dep:unicode_names2" ]
 ## Adds NBT IO parsing and writing functions that allow a List to be the root node.
 ## Such a root node is sometimes used by Minecraft Bedrock Edition.
 allow_list_root     = []
@@ -49,6 +54,9 @@ allow_list_root     = []
 ## be configured via additional functions for parsing and writing. Note that the default limit
 ## is what Minecraft uses, 512.
 configurable_depth  = []
+
+## Enables serde support
+serde               = [ "dep:serde" ]
 
 #! ### Nonstandard Features
 #! The following features add additional parsing and writing functions for NBT bytes
