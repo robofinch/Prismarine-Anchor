@@ -1,5 +1,4 @@
 mod leveldb;
-mod db_entries;
 
 
 use std::{io, fmt, mem};
@@ -13,13 +12,15 @@ use std::{
 use rusty_leveldb::{env::Env, DB as LevelDB, Status};
 use thiserror::Error;
 
+use prismarine_anchor_leveldb_entries::{
+    BedrockLevelDBEntry, BedrockLevelDBKey,
+    EntryToBytesOptions, KeyToBytesOptions, ValueToBytesError,
+};
 use prismarine_anchor_nbt::io as nbt_io;
 use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
 use prismarine_anchor_nbt::io::{write_nbt, NbtIoError};
 
 use self::leveldb::{new_leveldb, DBCompressor};
-
-pub use self::db_entries::{BedrockLevelDBEntry, BedrockLevelDBKey, DimensionedChunkPos};
 
 
 // other possible things to do in the future:
@@ -33,7 +34,7 @@ pub use self::db_entries::{BedrockLevelDBEntry, BedrockLevelDBKey, DimensionedCh
 
 /// Data associated with one Bedrock world's folder (or .mcworld file)
 pub struct BedrockWorldFiles {
-    level_dat: LevelDat,
+    level_dat: LevelDatFile,
     level_name: String,
     db: LevelDB,
     env: Rc<Box<dyn Env>>,
@@ -94,7 +95,7 @@ impl BedrockWorldFiles {
         let mut actual_root_path = root_path;
         actual_root_path.push(nested_root_path);
 
-        let level_dat = LevelDat::parse_from_env(env_ref, actual_root_path.clone())?;
+        let level_dat = LevelDatFile::parse_from_env(env_ref, actual_root_path.clone())?;
 
         let mut level_name = String::new();
         let _ = open_from_path(env_ref, "levelname.txt", actual_root_path.clone())
@@ -119,12 +120,12 @@ impl BedrockWorldFiles {
     }
 
     /// Read the in-memory `level.dat` information.
-    pub fn level_dat(&self) -> &LevelDat {
+    pub fn level_dat(&self) -> &LevelDatFile {
         &self.level_dat
     }
 
     /// Read or write the in-memory `level.dat` information.
-    pub fn level_dat_mut(&mut self) -> &mut LevelDat {
+    pub fn level_dat_mut(&mut self) -> &mut LevelDatFile {
         &mut self.level_dat
     }
 
@@ -168,7 +169,31 @@ impl BedrockWorldFiles {
         &mut self.db
     }
 
-    // TODO: add method to read key from level_db
+    /// Read the entry in the LevelDB with the provided key and serialization options,
+    /// and parse it into a `BedrockLevelDBEntry` if present.
+    pub fn get(
+        &mut self, key: BedrockLevelDBKey, opts: KeyToBytesOptions,
+    ) -> Option<BedrockLevelDBEntry> {
+
+        self.db.get(&key.to_bytes(opts))
+            .map(|value| BedrockLevelDBEntry::parse_value_vec(key, value))
+    }
+
+    /// Write the provided entry into the LevelDB using the provided serialization options.
+    pub fn put(
+        &mut self, entry: BedrockLevelDBEntry, opts: EntryToBytesOptions,
+    ) -> Result<(), BedrockWorldFileError> {
+
+        let (key, value) = entry.into_bytes(opts)
+            .map_err(|(_, err)| err)?;
+
+        self.db.put(&key, &value).map_err(|err| {
+            BedrockWorldFileError::StatusCode(
+                Cow::Borrowed("writing an entry to the LevelDB"),
+                err,
+            )
+        })
+    }
 
     /// Read the world's icon from this world's `Env`.
     pub fn world_icon(&self) -> Result<Box<dyn Read>, BedrockWorldFileError> {
@@ -187,12 +212,12 @@ impl Debug for BedrockWorldFiles {
 }
 
 /// Partially parsed `level.dat` file
-pub struct LevelDat {
+pub struct LevelDatFile {
     pub version: i32,
     pub nbt: NbtCompound,
 }
 
-impl LevelDat {
+impl LevelDatFile {
     /// Read the `level.dat` file for a world whose folder is located at `root_path`
     /// inside the provided `Env`.
     pub fn parse_from_env(
@@ -285,6 +310,8 @@ pub enum BedrockWorldFileError {
     StatusCode(Cow<'static, str>, Status),
     #[error("error while {0}: {1}")]
     NbtError(Cow<'static, str>, NbtIoError),
+    #[error("error while writing a LevelDB entry: {0}")]
+    LevelDBValue(#[from] ValueToBytesError),
     #[error("error while {0}: {1}")]
     Io(Cow<'static, str>, io::Error),
 }

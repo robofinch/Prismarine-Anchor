@@ -7,8 +7,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-prismarine-anchor-nbt   = { workspace = true, optional = true }
+prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
+prismarine-anchor-nbt               .workspace = true
+prismarine-anchor-translation       .workspace = true
 
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
-thiserror       = { workspace = true, optional = true }
+thiserror       .workspace = true

@@ -1,79 +1,11 @@
 use std::str;
-use std::io::{Cursor, Read, Write};
 
-use indexmap::IndexMap;
-use thiserror::Error;
-
-use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{read_nbt, write_nbt, NbtIoError};
+use prismarine_anchor_leveldb_values::{chunk_position::DimensionedChunkPos, uuid::UUID};
+use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
 use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
 
-use crate::shared_types::{ChunkPosition, NamedDimension, NumericDimension, VanillaDimension, UUID};
+use super::KeyToBytesOptions;
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DimensionedChunkPos(ChunkPosition, NumericDimension);
-
-impl DimensionedChunkPos {
-    /// Attempt to parse the bytes as a `ChunkPosition` followed by an optional `NumericDimension`.
-    /// The dimension defaults to the Overworld if not present.
-    ///
-    /// Warning: the `NumericDimension` might not be a vanilla dimension, which could indicate
-    /// that a successful parse is unintended.
-    pub fn new_raw(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() == 8 {
-            Some(Self(
-                ChunkPosition {
-                    x: i32::from_le_bytes(bytes[0..4].try_into().unwrap()),
-                    y: i32::from_le_bytes(bytes[4..8].try_into().unwrap()),
-                },
-                NumericDimension::OVERWORLD,
-            ))
-
-        } else if bytes.len() == 12 {
-
-            let dimension_id = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
-
-            Some(Self(
-                ChunkPosition {
-                    x: i32::from_le_bytes(bytes[0..4].try_into().unwrap()),
-                    y: i32::from_le_bytes(bytes[4..8].try_into().unwrap()),
-                },
-                NumericDimension::from_bedrock_numeric(dimension_id),
-            ))
-
-        } else {
-            None
-        }
-    }
-
-    /// Extend the provided bytes with the byte format of a `DimensionedChunkPos`, namely
-    /// a `ChunkPosition` followed by a `NumericDimension`. If the dimension
-    /// is the Overworld, its dimension ID doesn't need to be serialized, but if
-    /// `write_overworld_id` is true, then it will be.
-    pub fn extend_serialized(self, bytes: &mut Vec<u8>, write_overworld_id: bool) {
-        bytes.reserve(12);
-        bytes.extend(self.0.x.to_le_bytes());
-        bytes.extend(self.0.y.to_le_bytes());
-        if write_overworld_id || self.1.to_bedrock_numeric() != 0 {
-            bytes.extend(self.1.to_bedrock_numeric().to_le_bytes());
-        }
-    }
-
-    pub fn to_bytes(self, write_overworld_id: bool) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes, write_overworld_id);
-        bytes
-    }
-}
-
-impl TryFrom<&[u8]> for DimensionedChunkPos {
-    type Error = ();
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Self::new_raw(value).ok_or(())
-    }
-}
 
 /// The keys in a world's LevelDB database used by Minecraft Bedrock.
 /// Based on information from [minecraft.wiki]
@@ -114,8 +46,8 @@ pub enum BedrockLevelDBKey {
 
     /// NBT data of block entities.
     BlockEntities(DimensionedChunkPos),
-    /// NBT data of entities.
-    Entities(DimensionedChunkPos),
+    /// NBT data of entities. The newer format relies on `Actor` keys.
+    LegacyEntities(DimensionedChunkPos),
     /// NBT data of pending ticks.
     PendingTicks(DimensionedChunkPos),
     /// NBT data of random ticks
@@ -169,8 +101,7 @@ pub enum BedrockLevelDBKey {
     //  Data not specific to a chunk
     // ================================
 
-    // TODO: figure out if this key format is correct
-    Actor(u64),
+    Actor(u32, u32),
     /// Stores the NBT metadata of all chunks. Maps the xxHash64 hash of NBT data
     /// to that NBT data, so that each chunk need only store 8 bytes instead of the entire
     /// NBT; most chunks have the same metadata.
@@ -262,9 +193,10 @@ impl BedrockLevelDBKey {
                 return Some(Self::ActorDigest(dimensioned_pos));
             }
         } else if raw_key.len() == 19 && raw_key.starts_with(b"actorprefix") {
-            // The unwrap is turning a slice of length 8 into an array of length 8
-            let actor_id = u64::from_be_bytes(raw_key[11..19].try_into().unwrap());
-            return Some(Self::Actor(actor_id));
+            // The unwraps turn slices of length 4 into arrays of length 4, which succeeds.
+            let upper_bytes = u32::from_be_bytes(raw_key[11..15].try_into().unwrap());
+            let lower_bytes = u32::from_be_bytes(raw_key[15..19].try_into().unwrap());
+            return Some(Self::Actor(upper_bytes, lower_bytes));
         }
 
         // Next, most data is chunk data.
@@ -291,7 +223,7 @@ impl BedrockLevelDBKey {
                         // 47 is subchunk block data, handled below
                         48  => Self::LegacyTerrain          (dimensioned_pos),
                         49  => Self::BlockEntities          (dimensioned_pos),
-                        50  => Self::Entities               (dimensioned_pos),
+                        50  => Self::LegacyEntities         (dimensioned_pos),
                         51  => Self::PendingTicks           (dimensioned_pos),
                         52  => Self::LegacyExtraBlockData   (dimensioned_pos),
                         53  => Self::BiomeState             (dimensioned_pos),
@@ -433,27 +365,16 @@ impl BedrockLevelDBKey {
         None
     }
 
-    /// Extend the provided `Vec` with the raw key bytes of a `BedrockLevelDBKey`.
-    ///
-    /// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
-    /// numeric IDs written when a `NumericDimension` is serialized.
-    /// Likewise, if `write_overworld_name` is false, then only non-Overworld dimensions
-    /// will have their names written when a `NamedDimension` is serialized.
-    ///
-    /// The best choice is `write_overworld_id = false` for all current versions
-    /// (up to at least 1.21.51), `write_overworld_name = true` for any version at or above
-    /// 1.20.40, and `write_overworld_name = false` for any version below 1.20.40.
-    pub fn extend_serialized(
-        &self, bytes: &mut Vec<u8>,
-        write_overworld_id: bool, write_overworld_name: bool,
-    ) {
+    /// Extend the provided `Vec` with the raw key bytes of a `BedrockLevelDBKey`,
+    /// using the provided serialization settings.
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>, opts: KeyToBytesOptions) {
 
         fn extend_village(
             bytes: &mut Vec<u8>,
             dimension: &NamedDimension,
             uuid: &UUID,
-            variant: &'static [u8],
             write_overworld_name: bool,
+            variant: &'static [u8],
         ) {
             if write_overworld_name || dimension != &NamedDimension::OVERWORLD {
 
@@ -484,7 +405,7 @@ impl BedrockLevelDBKey {
             // 47 is handled below
             &Self::LegacyTerrain          (d_pos) => (d_pos, 48),
             &Self::BlockEntities          (d_pos) => (d_pos, 49),
-            &Self::Entities               (d_pos) => (d_pos, 50),
+            &Self::LegacyEntities         (d_pos) => (d_pos, 50),
             &Self::PendingTicks           (d_pos) => (d_pos, 51),
             &Self::LegacyExtraBlockData   (d_pos) => (d_pos, 52),
             &Self::BiomeState             (d_pos) => (d_pos, 53),
@@ -506,7 +427,7 @@ impl BedrockLevelDBKey {
             // Time for a "little" side trip
             &Self::SubchunkBlocks(d_pos, subchunk) => {
                 bytes.reserve(14);
-                d_pos.extend_serialized(bytes, write_overworld_id);
+                d_pos.extend_serialized(bytes, opts.write_overworld_id);
                 bytes.push(47);
                 bytes.push(subchunk as u8);
                 return
@@ -514,13 +435,14 @@ impl BedrockLevelDBKey {
             &Self::ActorDigest(dimensioned_pos) => {
                 bytes.reserve(16);
                 bytes.extend(b"digp");
-                dimensioned_pos.extend_serialized(bytes, write_overworld_id);
+                dimensioned_pos.extend_serialized(bytes, opts.write_overworld_id);
                 return
             }
-            &Self::Actor(actor_id) => {
+            &Self::Actor(upper_bytes, lower_bytes) => {
                 bytes.reserve(19);
                 bytes.extend(b"actorprefix");
-                bytes.extend(actor_id.to_be_bytes());
+                bytes.extend(upper_bytes.to_be_bytes());
+                bytes.extend(lower_bytes.to_be_bytes());
                 return
             }
             &Self::LevelChunkMetaDataDictionary => {
@@ -556,19 +478,19 @@ impl BedrockLevelDBKey {
                 return
             }
             Self::VillageDwellers(dimension, uuid) => {
-                extend_village(bytes, dimension, uuid, b"DWELLERS", write_overworld_name);
+                extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"DWELLERS");
                 return
             }
             Self::VillageInfo(dimension, uuid) => {
-                extend_village(bytes, dimension, uuid, b"INFO", write_overworld_name);
+                extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"INFO");
                 return
             }
             Self::VillagePOI(dimension, uuid) => {
-                extend_village(bytes, dimension, uuid, b"POI", write_overworld_name);
+                extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"POI");
                 return
             }
             Self::VillagePlayers(dimension, uuid) => {
-                extend_village(bytes, dimension, uuid, b"PLAYERS", write_overworld_name);
+                extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"PLAYERS");
                 return
             }
             &Self::Map(map_id) => {
@@ -648,23 +570,14 @@ impl BedrockLevelDBKey {
 
         // Look back at the top of the function for context
         bytes.reserve(13);
-        dimensioned_pos.extend_serialized(bytes, write_overworld_id);
+        dimensioned_pos.extend_serialized(bytes, opts.write_overworld_id);
         bytes.push(key_tag);
     }
 
-    /// Get the raw key bytes of a `BedrockLevelDBKey`.
-    ///
-    /// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
-    /// numeric IDs written when a `NumericDimension` is serialized.
-    /// Likewise, if `write_overworld_name` is false, then only non-Overworld dimensions
-    /// will have their names written when a `NamedDimension` is serialized.
-    ///
-    /// The best choice is `write_overworld_id = false` for all current versions
-    /// (up to at least 1.21.51), `write_overworld_name = true` for any version at or above
-    /// 1.20.40, and `write_overworld_name = false` for any version below 1.20.40.
-    pub fn into_bytes(self, write_overworld_id: bool, write_overworld_name: bool) -> Vec<u8> {
+    /// Get the raw key bytes of a `BedrockLevelDBKey` with the provided serialization options.
+    pub fn to_bytes(&self, opts: KeyToBytesOptions) -> Vec<u8> {
         let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes, write_overworld_id, write_overworld_name);
+        self.extend_serialized(&mut bytes, opts);
         bytes
     }
 }
@@ -679,432 +592,4 @@ impl From<Vec<u8>> for BedrockLevelDBKey {
     fn from(raw_key: Vec<u8>) -> Self {
         Self::parse_key_vec(raw_key)
     }
-}
-
-/// The entries in a world's LevelDB database used by Minecraft Bedrock.
-/// Based on information from [minecraft.wiki], [LeviLamina],
-/// and data from iterating through an actual world's keys and values.
-///
-/// [minecraft.wiki]: https://minecraft.wiki/w/Bedrock_Edition_level_format#Chunk_key_format
-/// [LeviLamina]: https://github.com/LiteLDev/LeviLamina
-#[derive(Debug, Clone)]
-pub enum BedrockLevelDBEntry {
-    // ================================
-    //  Chunk-specific data
-    // ================================
-
-    Version(DimensionedChunkPos, u8),
-    LegacyVersion(DimensionedChunkPos, u8),
-    /// Always zero. Presumably here for future compatibility.
-    ActorDigestVersion(DimensionedChunkPos, u8),
-
-    // Data3D(DimensionedChunkPos),
-    // Data2D(DimensionedChunkPos),
-    // LegacyData2D(DimensionedChunkPos),
-
-    // SubchunkBlocks(DimensionedChunkPos, i8),
-    // LegacyTerrain(DimensionedChunkPos),
-    // LegacyExtraBlockData(DimensionedChunkPos),
-
-    // BlockEntities(DimensionedChunkPos),
-    // Entities(DimensionedChunkPos),
-    // PendingTicks(DimensionedChunkPos),
-    // RandomTicks(DimensionedChunkPos),
-
-    // BorderBlocks(DimensionedChunkPos),
-    // HardcodedSpawners(DimensionedChunkPos),
-    // AabbVolumes(DimensionedChunkPos),
-
-    // Checksums(DimensionedChunkPos),
-    MetaDataHash(DimensionedChunkPos, u64),
-
-    // GenerationSeed(DimensionedChunkPos),
-    // FinalizedState(DimensionedChunkPos),
-    // BiomeState(DimensionedChunkPos),
-
-    // ConversionData(DimensionedChunkPos),
-
-    // CavesAndCliffsBlending(DimensionedChunkPos),
-    // BlendingBiomeHeight(DimensionedChunkPos),
-    // BlendingData(DimensionedChunkPos),
-
-    // ActorDigest(DimensionedChunkPos),
-
-    // ================================
-    //  Data not specific to a chunk
-    // ================================
-
-    // Actor(u64),
-
-    LevelChunkMetaDataDictionary(IndexMap<u64, NbtCompound>),
-
-    // AutonomousEntities,
-
-    // LocalPlayer,
-    // Player(UUID),
-    // LegacyPlayer(i64),
-    // PlayerServer(UUID),
-
-    // VillageDwellers(NamedDimension, UUID),
-    // VillageInfo(NamedDimension, UUID),
-    // VillagePOI(NamedDimension, UUID),
-    // VillagePlayers(NamedDimension, UUID),
-
-    // Map(i64),
-    // Portals,
-
-    // StructureTemplate(NamespacedIdentifier),
-    // TickingArea(UUID),
-    // Scoreboard,
-    // WanderingTraderScheduler,
-
-    // BiomeData,
-    // MobEvents,
-
-    // Overworld,
-    // Nether,
-    // TheEnd,
-
-    // PositionTrackingDB(u32),
-    // PositionTrackingLastId,
-
-    // FlatWorldLayers,
-
-    // TODO: other encountered keys from very old versions:
-    // mVillages
-    // villages
-    // VillageManager <- I think I saw some library include this
-    // dimension0
-    // dimension1 <- not sure if it exists, but dimension0 does.
-    // dimension2 <- not sure if it exists, but dimension0 does.
-    // idcounts
-
-    RawEntry {
-        key: Vec<u8>,
-        value: Vec<u8>,
-    },
-    RawValue {
-        key: BedrockLevelDBKey,
-        value: Vec<u8>,
-    },
-}
-
-impl BedrockLevelDBEntry {
-    pub fn parse_entry(key: &[u8], value: &[u8]) -> Self {
-        match Self::parse_recognized_entry(key, value) {
-            EntryParseResult::Parsed(entry) => entry,
-            EntryParseResult::UnrecognizedKey => Self::RawEntry {
-                key:   key.to_owned(),
-                value: value.to_owned(),
-            },
-            EntryParseResult::UnrecognizedValue(parsed_key) => Self::RawValue {
-                key:   parsed_key,
-                value: value.to_owned(),
-            }
-        }
-    }
-
-    pub fn parse_entry_vec(key: Vec<u8>, value: Vec<u8>) -> Self {
-        match Self::parse_recognized_entry(&key, &value) {
-            EntryParseResult::Parsed(entry) => entry,
-            EntryParseResult::UnrecognizedKey => Self::RawEntry {
-                key,
-                value,
-            },
-            EntryParseResult::UnrecognizedValue(parsed_key) => Self::RawValue {
-                key: parsed_key,
-                value,
-            }
-        }
-    }
-
-    pub fn parse_recognized_entry(key: &[u8], value: &[u8]) -> EntryParseResult {
-        let Some(key) = BedrockLevelDBKey::parse_recognized_key(key) else {
-            return EntryParseResult::UnrecognizedKey;
-        };
-        Self::parse_recognized_value(key, value).into()
-    }
-
-    pub fn parse_value(key: BedrockLevelDBKey, value: &[u8]) -> Self {
-        match Self::parse_recognized_value(key, value) {
-            ValueParseResult::Parsed(parsed) => parsed,
-            ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
-                key,
-                value: value.to_vec()
-            },
-        }
-    }
-
-    pub fn parse_value_vec(key: BedrockLevelDBKey, value: Vec<u8>) -> Self {
-        match Self::parse_recognized_value(key, &value) {
-            ValueParseResult::Parsed(parsed) => parsed,
-            ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
-                key,
-                value,
-            },
-        }
-    }
-
-    pub fn parse_recognized_value(key: BedrockLevelDBKey, value: &[u8]) -> ValueParseResult {
-        match key {
-            BedrockLevelDBKey::Version(chunk_pos) => {
-                if value.len() == 1 {
-                    return ValueParseResult::Parsed(Self::Version(chunk_pos, value[0]));
-                }
-            }
-            BedrockLevelDBKey::LegacyVersion(chunk_pos) => {
-                if value.len() == 1 {
-                    return ValueParseResult::Parsed(Self::LegacyVersion(chunk_pos, value[0]));
-                }
-            }
-            BedrockLevelDBKey::ActorDigestVersion(chunk_pos) => {
-                if value.len() == 1 {
-                    return ValueParseResult::Parsed(Self::ActorDigestVersion(chunk_pos, value[0]));
-                }
-            }
-            BedrockLevelDBKey::MetaDataHash(chunk_pos) => {
-                if let Ok(bytes) = <[u8; 8]>::try_from(value) {
-                    return ValueParseResult::Parsed(
-                        Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes))
-                    );
-                }
-            }
-            BedrockLevelDBKey::LevelChunkMetaDataDictionary => {
-                if value.len() >= 4 {
-                    let num_entries = u32::from_le_bytes(value[0..4].try_into().unwrap());
-
-                    let mut reader = Cursor::new(&value[4..]);
-                    let mut map = IndexMap::new();
-
-                    // println!("Expected num entries: {num_entries}");
-
-                    for _ in 0..num_entries {
-
-                        // println!("Reading hash...");
-                        let mut hash = [0; 8];
-                        let Ok(()) = reader.read_exact(&mut hash) else {
-                            return ValueParseResult::UnrecognizedValue(key);
-                        };
-
-                        // println!("Reading NBT...");
-
-                        let nbt_result = read_nbt(
-                            &mut reader,
-                            IoOptions::bedrock_uncompressed(),
-                        );
-                        let nbt = match nbt_result {
-                            Ok((nbt, _)) => nbt,
-                            Err(_) => {
-                                // println!("Error: {err}");
-                                return ValueParseResult::UnrecognizedValue(key)
-                            }
-                        };
-
-                        // println!("Checking for duplicate...");
-                        // Reject if there's a duplicate hash
-                        let None = map.insert(u64::from_le_bytes(hash), nbt) else {
-                            return ValueParseResult::UnrecognizedValue(key);
-                        };
-
-                    }
-
-                    // println!("Checking for excess...");
-                    // Reject if there was excess data
-                    let read_len = reader.position();
-                    let total_len = reader.into_inner().len();
-                    // println!("Read len: {read_len}, total len: {total_len}");
-
-                    if let Ok(total_len) = u64::try_from(total_len) {
-                        if read_len != total_len {
-                            return ValueParseResult::UnrecognizedValue(key);
-                        }
-                    } else if let Ok(read_len) = usize::try_from(read_len) {
-                        if read_len != total_len {
-                            return ValueParseResult::UnrecognizedValue(key);
-                        }
-                    } else {
-                        // This should be impossible.
-                        // How can usize be both bigger and smaller than u64?
-                        return ValueParseResult::UnrecognizedValue(key);
-                    }
-
-                    return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(map));
-                }
-            }
-
-            BedrockLevelDBKey::RawKey(key) => {
-                return ValueParseResult::Parsed(Self::RawEntry {
-                    key,
-                    value: value.to_vec(),
-                });
-            }
-            // TODO: explicitly handle every case. This is just to make it compile.
-            _ => return ValueParseResult::Parsed(BedrockLevelDBEntry::RawEntry {
-                key: vec![],
-                value: vec![],
-            })
-        }
-
-        ValueParseResult::UnrecognizedValue(key)
-    }
-
-    pub fn to_key(&self) -> BedrockLevelDBKey {
-        match self {
-            Self::Version(chunk_pos, ..)        => BedrockLevelDBKey::Version(*chunk_pos),
-            Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(*chunk_pos),
-            Self::ActorDigestVersion(chunk_pos, ..)
-                => BedrockLevelDBKey::ActorDigestVersion(*chunk_pos),
-            Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(*chunk_pos),
-            Self::LevelChunkMetaDataDictionary(_)
-                => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
-            Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key.clone()),
-            Self::RawValue { key, .. }          => key.clone(),
-        }
-    }
-
-    pub fn into_key(self) -> BedrockLevelDBKey {
-        match self {
-            Self::Version(chunk_pos, ..)        => BedrockLevelDBKey::Version(chunk_pos),
-            Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(chunk_pos),
-            Self::ActorDigestVersion(chunk_pos, ..)
-                => BedrockLevelDBKey::ActorDigestVersion(chunk_pos),
-            Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(chunk_pos),
-            Self::LevelChunkMetaDataDictionary(_)
-                => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
-            Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key),
-            Self::RawValue { key, .. }          => key,
-        }
-    }
-
-    /// If `error_on_excessive_length` is true and this is a LevelChunkMetaDataDictionary
-    /// entry whose number of values is too large to fit in a u32, then an error is returned.
-    pub fn to_value_bytes(
-        &self,
-        error_on_excessive_length: bool,
-    ) -> Result<Vec<u8>, ValueToBytesError> {
-
-        Ok(match self {
-            Self::Version(.., version)            => vec![*version],
-            Self::LegacyVersion(.., version)      => vec![*version],
-            Self::ActorDigestVersion(.., version) => vec![*version],
-            Self::MetaDataHash(.., hash)          => hash.to_le_bytes().to_vec(),
-            Self::LevelChunkMetaDataDictionary(map) => {
-
-                let (len, len_usize) = if size_of::<usize>() >= size_of::<u32>() {
-
-                    let len = match u32::try_from(map.len()) {
-                        Ok(len) => len,
-                        Err(_) => {
-                            if error_on_excessive_length {
-                                return Err(ValueToBytesError::DictionaryLength)
-                            } else {
-                                u32::MAX
-                            }
-                        }
-                    };
-
-                    // This cast from u32 to usize won't overflow
-                    (len, len as usize)
-                } else {
-                    // This cast from usize to u32 won't overflow
-                    (map.len() as u32, map.len())
-                };
-
-                let mut writer = Cursor::new(Vec::new());
-                writer.write_all(&len.to_le_bytes()).expect("Cursor IO doesn't fail");
-
-                for (hash, nbt) in map.iter().take(len_usize) {
-                    writer.write_all(&hash.to_le_bytes()).expect("Cursor IO doesn't fail");
-
-                    // Could only fail on invalid NBT.
-                    write_nbt(&mut writer, IoOptions::bedrock_uncompressed(), None, nbt)
-                        .map_err(ValueToBytesError::NbtIoError)?;
-                }
-
-                writer.into_inner()
-            }
-            Self::RawEntry { value, .. }          => value.clone(),
-            Self::RawValue { value, .. }          => value.clone(),
-        })
-    }
-
-    pub fn to_bytes(
-        &self,
-        write_overworld_id: bool,
-        write_overworld_name: bool,
-        error_on_excessive_length: bool,
-    ) -> (Vec<u8>, Result<Vec<u8>, ValueToBytesError>) {
-
-        (
-            self.to_key().into_bytes(write_overworld_id, write_overworld_name),
-            self.to_value_bytes(error_on_excessive_length),
-        )
-    }
-
-    pub fn into_bytes(
-        self,
-        write_overworld_id: bool,
-        write_overworld_name: bool,
-        error_on_excessive_length: bool,
-    ) -> (Vec<u8>, Result<Vec<u8>, ValueToBytesError>) {
-
-        match self {
-            Self::RawEntry { key, value } => (key, Ok(value)),
-            Self::RawValue { key, value } => {
-                let key_bytes = key.into_bytes(write_overworld_id, write_overworld_name);
-                (key_bytes, Ok(value))
-            }
-            // TODO: maybe some other entries could also be more memory efficient, too.
-            _ => {
-                let value_bytes = self.to_value_bytes(error_on_excessive_length);
-                let key_bytes = self
-                    .into_key()
-                    .into_bytes(write_overworld_id, write_overworld_name);
-
-                (key_bytes, value_bytes)
-            }
-        }
-    }
-}
-
-impl From<(&[u8], &[u8])> for BedrockLevelDBEntry {
-    fn from(raw_entry: (&[u8], &[u8])) -> Self {
-        Self::parse_entry(raw_entry.0, raw_entry.1)
-    }
-}
-
-impl From<(Vec<u8>, Vec<u8>)> for BedrockLevelDBEntry {
-    fn from(raw_entry: (Vec<u8>, Vec<u8>)) -> Self {
-        Self::parse_entry_vec(raw_entry.0, raw_entry.1)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum EntryParseResult {
-    Parsed(BedrockLevelDBEntry),
-    UnrecognizedKey,
-    UnrecognizedValue(BedrockLevelDBKey),
-}
-
-impl From<ValueParseResult> for EntryParseResult {
-    fn from(value: ValueParseResult) -> Self {
-        match value {
-            ValueParseResult::Parsed(parsed)         => Self::Parsed(parsed),
-            ValueParseResult::UnrecognizedValue(key) => Self::UnrecognizedValue(key),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ValueParseResult {
-    Parsed(BedrockLevelDBEntry),
-    UnrecognizedValue(BedrockLevelDBKey),
-}
-
-#[derive(Error, Debug)]
-pub enum ValueToBytesError {
-    #[error("error while writing NBT: {0}")]
-    NbtIoError(#[from] NbtIoError),
-    #[error("there were too many metadata entries in a LevelChunkMetaDataDictionary")]
-    DictionaryLength,
 }

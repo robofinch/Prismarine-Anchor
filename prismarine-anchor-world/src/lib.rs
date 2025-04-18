@@ -3,7 +3,6 @@ pub mod zip_env;
 pub mod bedrock;
 // mod java;
 
-pub mod shared_types;
 pub mod translation;
 
 

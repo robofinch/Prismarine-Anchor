@@ -7,7 +7,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
+prismarine-anchor-leveldb-entries   .workspace = true
+prismarine-anchor-leveldb-values    = { workspace = true, features = ["chunk_position", "dimensions"] }
 prismarine-anchor-nbt               .workspace = true
 prismarine-anchor-translation       .workspace = true
 prismarine-anchor-translators       .workspace = true
