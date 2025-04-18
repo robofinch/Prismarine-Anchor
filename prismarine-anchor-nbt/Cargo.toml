@@ -1,10 +1,10 @@
 [package]
 name = "prismarine-anchor-nbt"
 authors = ["Finley Huggins"]
+license.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "" # Will probably be MIT OR Apache-2.0.
 
 # Note that licenses of dependencies include:
 # Unicode-3.0       - no copies of their Data Files or Software are included here,
@@ -12,6 +12,7 @@ license = "" # Will probably be MIT OR Apache-2.0.
 #                     No action needed.
 # Apache-2.0        - the only dependency requiring Apache-2.0 (without 'OR [something]')
 #                     has no NOTICE file
+#                     (plus we only use them through Cargo, not their source code)
 # MIT               - requires copyright notice for all substantial portions of code;
 #                     here, the license file for quartz_nbt needed to be included
 # Zlib              - no req's if you don't modify their code

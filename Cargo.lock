@@ -423,6 +423,7 @@ dependencies = [
  "flate2",
  "getrandom",
  "indexmap",
+ "prismarine-anchor-leveldb-values",
  "prismarine-anchor-nbt",
  "prismarine-anchor-translation",
  "prismarine-anchor-translators",

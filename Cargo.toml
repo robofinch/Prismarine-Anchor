@@ -48,13 +48,13 @@ panic = "abort"
 opt-level = 2
 
 [workspace.dependencies]
-prismarine-anchor-editor          = { version = "0.1.0", path = "./prismarine-anchor-editor"      }
-prismarine-anchor-leveldb-values  = { version = "0.1.0", path = "./prismarine-anchor-editor"      }
-prismarine-anchor-macros          = { version = "0.1.0", path = "./prismarine-anchor-macros"      }
-prismarine-anchor-nbt             = { version = "0.1.0", path = "./prismarine-anchor-nbt"         }
-prismarine-anchor-translation     = { version = "0.1.0", path = "./prismarine-anchor-translation" }
-prismarine-anchor-translators     = { version = "0.1.0", path = "./prismarine-anchor-translators" }
-prismarine-anchor-world           = { version = "0.1.0", path = "./prismarine-anchor-world"       }
+prismarine-anchor-editor         = { version = "0.1.0", path = "./prismarine-anchor-editor"        }
+prismarine-anchor-leveldb-values = { version = "0.1.0", path = "./prismarine-anchor-leveldb-values"}
+prismarine-anchor-macros         = { version = "0.1.0", path = "./prismarine-anchor-macros"        }
+prismarine-anchor-nbt            = { version = "0.1.0", path = "./prismarine-anchor-nbt"           }
+prismarine-anchor-translation    = { version = "0.1.0", path = "./prismarine-anchor-translation"   }
+prismarine-anchor-translators    = { version = "0.1.0", path = "./prismarine-anchor-translators"   }
+prismarine-anchor-world          = { version = "0.1.0", path = "./prismarine-anchor-world"         }
 
 
 anyhow              = "1"

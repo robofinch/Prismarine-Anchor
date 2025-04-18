@@ -1,15 +1,16 @@
 [package]
 name = "prismarine-anchor-world"
 authors = ["Finley Huggins"]
+license.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "" # Will probably be MIT OR Apache-2.0.
 
 [dependencies]
-prismarine-anchor-nbt           .workspace = true
-prismarine-anchor-translation   .workspace = true
-prismarine-anchor-translators   .workspace = true
+prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
+prismarine-anchor-nbt               .workspace = true
+prismarine-anchor-translation       .workspace = true
+prismarine-anchor-translators       .workspace = true
 
 anyhow          .workspace = true
 indexmap        .workspace = true
@@ -20,10 +21,12 @@ serde_json      .workspace = true
 thiserror       .workspace = true
 xxhash-rust     .workspace = true
 web-time        .workspace = true
+zerocopy         = { workspace = true, features = ["derive"] }
 zip             .workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # We don't directly use this, but our deps do, and it needs to have the js feature enabled.
+# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
 getrandom = { workspace = true, features = ["js"] }
 
 [features]

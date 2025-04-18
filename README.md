@@ -5,14 +5,12 @@ and code isn't copied from Amulet.)
 
 ### Licensing
 
-All rights reserved for now, while stuff can undergo major changes. Will probably be open-source.
-
 Notable dependencies and inspirations include Amulet Editor, which is not open-source,
 the awesome `quartz_nbt` (copying-and-pasting that is how the nbt crate here began),
 and `rusty-leveldb` (their MCPE example and MemEnv struct were helpful, as well as their
 main functionality as a LevelDB crate). Project Lodestone is a growing source for this project;
 hopefully, some of the work here will also help Lodestone (whether as a dependency or
-copying-and-pasting and adding a required notice, depending on this project's license).
+copying-and-pasting and adding a notice).
 
 Much of the information for developing the NBT parser came from minecraft.wiki and wiki.bedrock.dev.
 

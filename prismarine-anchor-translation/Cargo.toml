@@ -1,10 +1,10 @@
 [package]
 name = "prismarine-anchor-translation"
 authors = ["Finley Huggins"]
+license.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "" # Will probably be MIT OR Apache-2.0.
 
 [dependencies]
 prismarine-anchor-nbt  .workspace = true
