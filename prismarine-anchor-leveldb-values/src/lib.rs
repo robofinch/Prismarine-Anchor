@@ -1,3 +1,10 @@
+#[cfg(feature = "dimensions")]
+pub mod dimensions;
+#[cfg(feature = "chunk_position")]
+pub mod chunk_position;
+#[cfg(feature = "uuid")]
+pub mod uuid;
+
 #[cfg(feature = "concatenated_nbt_compounds")]
 pub mod concatenated_nbt_compounds; // For multiple sorts of values
 
