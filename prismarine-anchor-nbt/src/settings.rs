@@ -91,50 +91,70 @@ pub struct IoOptions {
     ///
     /// Default: CESU-8 for Java, UTF-8 for Bedrock
     pub string_encoding: StringEncoding,
+    /// Whether invalid strings should be read as `ByteString`s instead of causing errors to be
+    /// thrown.
+    ///
+    /// Default: false.
+    pub allow_invalid_strings: bool,
     /// The maximum depth that NBT compounds and tags can be recursively nested.
     ///
     /// Default: 512, the limit used by Minecraft.
-    pub depth_limit: DepthLimit
+    pub depth_limit: DepthLimit,
 }
 
 impl IoOptions {
     /// Default Java encoding for NBT bytes
+    #[inline]
     pub fn java() -> Self {
         Self {
-            endianness:         Endianness::BigEndian,
-            compression:        NbtCompression::GzipCompressed,
-            string_encoding:    StringEncoding::Cesu8,
-            depth_limit:        DepthLimit::default(),
+            endianness:             Endianness::BigEndian,
+            compression:            NbtCompression::GzipCompressed,
+            string_encoding:        StringEncoding::Cesu8,
+            allow_invalid_strings:  false,
+            depth_limit:            DepthLimit::default(),
         }
     }
 
     /// Default Java encoding for NBT bytes, but with no compression
+    #[inline]
     pub fn java_uncompressed() -> Self {
         Self {
-            endianness:         Endianness::BigEndian,
-            compression:        NbtCompression::Uncompressed,
-            string_encoding:    StringEncoding::Cesu8,
-            depth_limit:        DepthLimit::default(),
+            compression: NbtCompression::Uncompressed,
+            ..Self::java()
         }
     }
 
     /// Default Bedrock encoding for NBT bytes
+    #[inline]
     pub fn bedrock() -> Self {
         Self {
-            endianness:         Endianness::LittleEndian,
-            compression:        NbtCompression::GzipCompressed,
-            string_encoding:    StringEncoding::Utf8,
-            depth_limit:        DepthLimit::default(),
+            endianness:             Endianness::LittleEndian,
+            compression:            NbtCompression::GzipCompressed,
+            string_encoding:        StringEncoding::Utf8,
+            allow_invalid_strings:  false,
+            depth_limit:            DepthLimit::default(),
         }
     }
 
     /// Default Bedrock encoding for NBT bytes, but with no compression
+    #[inline]
     pub fn bedrock_uncompressed() -> Self {
         Self {
-            endianness:         Endianness::LittleEndian,
-            compression:        NbtCompression::Uncompressed,
-            string_encoding:    StringEncoding::Utf8,
-            depth_limit:        DepthLimit::default(),
+            compression: NbtCompression::Uncompressed,
+            ..Self::bedrock()
+        }
+    }
+
+    /// Bedrock encoding for NBT bytes with `NetworkEndian` endianness
+    /// and no compression.
+    #[inline]
+    pub fn bedrock_network_uncompressed() -> Self {
+        Self {
+            endianness:             Endianness::NetworkLittleEndian,
+            compression:            NbtCompression::Uncompressed,
+            string_encoding:        StringEncoding::Utf8,
+            allow_invalid_strings:  false,
+            depth_limit:            DepthLimit::default(),
         }
     }
 }

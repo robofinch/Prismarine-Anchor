@@ -16,18 +16,19 @@ type NbtResult<T> = Result<T, NbtIoError>;
 pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
     match tag {
         None => 0x0, // TAG_End
-        Some(NbtTag::Byte(..))      => 0x1,
-        Some(NbtTag::Short(..))     => 0x2,
-        Some(NbtTag::Int(..))       => 0x3,
-        Some(NbtTag::Long(..))      => 0x4,
-        Some(NbtTag::Float(..))     => 0x5,
-        Some(NbtTag::Double(..))    => 0x6,
-        Some(NbtTag::ByteArray(..)) => 0x7,
-        Some(NbtTag::String(..))    => 0x8,
-        Some(NbtTag::List(..))      => 0x9,
-        Some(NbtTag::Compound(..))  => 0xA,
-        Some(NbtTag::IntArray(..))  => 0xB,
-        Some(NbtTag::LongArray(..)) => 0xC,
+        Some(NbtTag::Byte(..))       => 0x1,
+        Some(NbtTag::Short(..))      => 0x2,
+        Some(NbtTag::Int(..))        => 0x3,
+        Some(NbtTag::Long(..))       => 0x4,
+        Some(NbtTag::Float(..))      => 0x5,
+        Some(NbtTag::Double(..))     => 0x6,
+        Some(NbtTag::ByteArray(..))  => 0x7,
+        Some(NbtTag::String(..))     => 0x8,
+        Some(NbtTag::ByteString(..)) => 0x8,
+        Some(NbtTag::List(..))       => 0x9,
+        Some(NbtTag::Compound(..))   => 0xA,
+        Some(NbtTag::IntArray(..))   => 0xB,
+        Some(NbtTag::LongArray(..))  => 0xC,
     }
 }
 
@@ -151,6 +152,18 @@ pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String
     Ok(string_from_bytes(bytes.as_slice(), opts)?.into_owned())
 }
 
+pub fn read_string_or_bytes(reader: &mut impl Read, opts: IoOptions) -> NbtResult<NbtTag> {
+    let len = read_string_len(reader, opts)?;
+    let mut bytes = vec![0; len];
+    reader.read_exact(&mut bytes)?;
+
+    Ok(if let Ok(string) = string_from_bytes(bytes.as_slice(), opts) {
+        NbtTag::String(string.into_owned())
+    } else {
+        NbtTag::ByteString(bytes)
+    })
+}
+
 #[cfg(feature = "serde")]
 pub fn read_string_into<'a, R: Read>(
     reader: &mut R,
@@ -265,6 +278,20 @@ pub fn write_string<W: Write>(writer: &mut W, opts: IoOptions, string: &str) -> 
     let string = bytes_from_string(string, opts);
     write_string_len(writer, opts, string.len())?;
     writer.write_all(&string).map_err(NbtIoError::StdIo)
+}
+
+#[inline]
+pub fn write_byte_string(
+    writer: &mut impl Write,
+    opts: IoOptions,
+    string: &[u8],
+) -> NbtResult<()> {
+    if opts.allow_invalid_strings {
+        write_string_len(writer, opts, string.len())?;
+        writer.write_all(string).map_err(NbtIoError::StdIo)
+    } else {
+        Err(NbtIoError::InvalidUtf8String)
+    }
 }
 
 #[inline]

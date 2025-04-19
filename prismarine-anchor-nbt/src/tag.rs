@@ -64,6 +64,10 @@ pub enum NbtTag {
     ByteArray(Vec<i8>),
     /// A UTF-8 string.
     String(String),
+    /// A "string" tag that may be invalid UTF-8. This **does not** have strong support
+    /// in this library; it exists solely to handle strange edge cases. It is not properly
+    /// handled in SNBT; the methods in the `io` module support it.
+    ByteString(Vec<u8>),
     /// An NBT tag list.
     List(NbtList),
     /// An NBT tag compound.
@@ -121,18 +125,19 @@ impl NbtTag {
     #[inline]
     pub fn tag_type(&self) -> NbtType {
         match self {
-            Self::Byte(_)      => NbtType::Byte,
-            Self::Short(_)     => NbtType::Short,
-            Self::Int(_)       => NbtType::Int,
-            Self::Long(_)      => NbtType::Long,
-            Self::Float(_)     => NbtType::Float,
-            Self::Double(_)    => NbtType::Double,
-            Self::ByteArray(_) => NbtType::ByteArray,
-            Self::String(_)    => NbtType::String,
-            Self::List(_)      => NbtType::List,
-            Self::Compound(_)  => NbtType::Compound,
-            Self::IntArray(_)  => NbtType::IntArray,
-            Self::LongArray(_) => NbtType::LongArray,
+            Self::Byte(_)       => NbtType::Byte,
+            Self::Short(_)      => NbtType::Short,
+            Self::Int(_)        => NbtType::Int,
+            Self::Long(_)       => NbtType::Long,
+            Self::Float(_)      => NbtType::Float,
+            Self::Double(_)     => NbtType::Double,
+            Self::ByteArray(_)  => NbtType::ByteArray,
+            Self::String(_)     => NbtType::String,
+            Self::ByteString(_) => NbtType::String,
+            Self::List(_)       => NbtType::List,
+            Self::Compound(_)   => NbtType::Compound,
+            Self::IntArray(_)   => NbtType::IntArray,
+            Self::LongArray(_)  => NbtType::LongArray,
         }
     }
 
@@ -158,18 +163,19 @@ impl NbtTag {
     #[inline]
     pub(crate) fn tag_name(&self) -> &'static str {
         match self {
-            NbtTag::Byte(_) => "Byte",
-            NbtTag::Short(_) => "Short",
-            NbtTag::Int(_) => "Int",
-            NbtTag::Long(_) => "Long",
-            NbtTag::Float(_) => "Float",
-            NbtTag::Double(_) => "Double",
-            NbtTag::String(_) => "String",
-            NbtTag::ByteArray(_) => "ByteArray",
-            NbtTag::IntArray(_) => "IntArray",
-            NbtTag::LongArray(_) => "LongArray",
-            NbtTag::Compound(_) => "Compound",
-            NbtTag::List(_) => "List",
+            NbtTag::Byte(_)       => "Byte",
+            NbtTag::Short(_)      => "Short",
+            NbtTag::Int(_)        => "Int",
+            NbtTag::Long(_)       => "Long",
+            NbtTag::Float(_)      => "Float",
+            NbtTag::Double(_)     => "Double",
+            NbtTag::String(_)     => "String",
+            NbtTag::ByteString(_) => "String",
+            NbtTag::ByteArray(_)  => "ByteArray",
+            NbtTag::IntArray(_)   => "IntArray",
+            NbtTag::LongArray(_)  => "LongArray",
+            NbtTag::Compound(_)   => "Compound",
+            NbtTag::List(_)       => "List",
         }
     }
 
@@ -486,6 +492,16 @@ impl NbtTag {
             }
             NbtTag::ByteArray(value) => write_list(&**value, indent, ts.unwrap(), f),
             NbtTag::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
+            NbtTag::ByteString(value) => {
+                if let Ok(string) = String::from_utf8(value.clone()) {
+                    write!(f, "{}", Self::string_to_snbt(&string, opts))
+                } else {
+                    // If you're writing an invalid string to SNBT... well, the output
+                    // has to be a valid string. This isn't valid SNBT, but it should be
+                    // useful for debugging, I think.
+                    write_list(&*value, indent, "ByteString", f)
+                }
+            }
             NbtTag::List(value) => if current_depth >= opts.depth_limit.0 {
                 // Converting to a string should be infallible; we can't simply error out.
                 // Instead, unfortunately, we must just print something that

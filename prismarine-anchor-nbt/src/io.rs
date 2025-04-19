@@ -171,7 +171,13 @@ fn read_tag_body_const<const TAG_ID: u8>(
 
             NbtTag::ByteArray(raw::cast_byte_buf_to_signed(array))
         }
-        0x8 => NbtTag::String(raw::read_string(reader, opts)?),
+        0x8 => {
+            if opts.allow_invalid_strings {
+                raw::read_string_or_bytes(reader, opts)?
+            } else {
+                NbtTag::String(raw::read_string(reader, opts)?)
+            }
+        }
         0x9 => {
             let tag_id = raw::read_u8(reader, opts)?;
             let len = raw::read_i32_as_usize(reader, opts)?;
@@ -442,6 +448,7 @@ fn write_tag_body<W: Write>(
             writer.write_all(raw::cast_bytes_to_unsigned(value.as_slice()))?;
         }
         NbtTag::String(value) => raw::write_string(writer, opts, value)?,
+        NbtTag::ByteString(value) => raw::write_byte_string(writer, opts, value)?,
         NbtTag::List(value) =>
             if value.is_empty() {
                 writer.write_all(&[raw::id_for_tag(None), 0, 0, 0, 0])?;
@@ -579,11 +586,17 @@ pub enum NbtIoError {
     /// An invalid enum variant was encountered.
     #[error("Encountered invalid enum variant while deserializing")]
     InvalidEnumVariant,
-    /// An invalid CESU-8 string was encountered.
-    #[error("Encountered invalid CESU-8 string")]
+    /// An invalid CESU-8 string was encountered. Consider enabling `allow_invalid_strings`
+    /// if this isn't a mistake.
+    #[error(
+        "Encountered invalid CESU-8 string; enable allow_invalid_strings if this is not a mistake"
+    )]
     InvalidCesu8String,
-    /// An invalid UTF-8 string was encountered.
-    #[error("Encountered invalid UTF-8 string")]
+    /// An invalid UTF-8 string was encountered. Consider enabling `allow_invalid_strings`
+    /// if this isn't a mistake.
+    #[error(
+        "Encountered invalid UTF-8 string; enable allow_invalid_strings if this is not a mistake"
+    )]
     InvalidUtf8String,
     /// Bytes forming an invalid Network-Endian i32 were encountered.
     #[error("Encountered bytes that formed an invalid Network-Endian i32")]
