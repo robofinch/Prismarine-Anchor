@@ -87,7 +87,7 @@ pub mod flat_world_layers;
 
 /// Compare a reader's position to the total length of data that was expected to be read,
 /// to check if everything was read.
-#[cfg(any(feature = "metadata", feature = "concatenated_nbt_compounds"))]
+#[cfg(any(feature = "data_3d", feature = "concatenated_nbt_compounds", feature = "metadata"))]
 #[inline]
 fn all_read(read_position: u64, total_len: usize) -> bool {
 

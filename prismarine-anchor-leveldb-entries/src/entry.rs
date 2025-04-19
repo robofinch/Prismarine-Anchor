@@ -2,6 +2,9 @@ use prismarine_anchor_leveldb_values::{
     actor_digest_version::ActorDigestVersion,
     chunk_position::DimensionedChunkPos,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
+    data_2d::Data2D,
+    data_3d::Data3D,
+    legacy_data_2d::LegacyData2D,
     legacy_version::LegacyChunkVersion,
     metadata::LevelChunkMetaDataDictionary,
     version::ChunkVersion,
@@ -30,9 +33,9 @@ pub enum BedrockLevelDBEntry {
     LegacyVersion(DimensionedChunkPos, LegacyChunkVersion),
     ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
 
-    // Data3D(DimensionedChunkPos),
-    // Data2D(DimensionedChunkPos),
-    // LegacyData2D(DimensionedChunkPos),
+    Data3D(DimensionedChunkPos, Data3D),
+    Data2D(DimensionedChunkPos, Data2D),
+    LegacyData2D(DimensionedChunkPos, LegacyData2D),
 
     // SubchunkBlocks(DimensionedChunkPos, i8),
     // LegacyTerrain(DimensionedChunkPos),
@@ -204,6 +207,27 @@ impl BedrockLevelDBEntry {
                     }
                 }
             }
+            BedrockLevelDBKey::Data3D(chunk_pos) => {
+                if let Some(data_3d) = Data3D::parse(value) {
+                    return ValueParseResult::Parsed(
+                        BedrockLevelDBEntry::Data3D(chunk_pos, data_3d)
+                    );
+                }
+            }
+            BedrockLevelDBKey::Data2D(chunk_pos) => {
+                if let Some(data_2d) = Data2D::parse(value) {
+                    return ValueParseResult::Parsed(
+                        BedrockLevelDBEntry::Data2D(chunk_pos, data_2d)
+                    );
+                }
+            }
+            BedrockLevelDBKey::LegacyData2D(chunk_pos) => {
+                if let Some(legacy_data_2d) = LegacyData2D::parse(value) {
+                    return ValueParseResult::Parsed(
+                        BedrockLevelDBEntry::LegacyData2D(chunk_pos, legacy_data_2d)
+                    );
+                }
+            }
             BedrockLevelDBKey::BlockEntities(chunk_pos) => {
                 // The true is definitely needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
@@ -264,6 +288,9 @@ impl BedrockLevelDBEntry {
             Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(*chunk_pos),
             Self::ActorDigestVersion(chunk_pos, ..)
                 => BedrockLevelDBKey::ActorDigestVersion(*chunk_pos),
+            Self::Data3D(chunk_pos, ..)         => BedrockLevelDBKey::Data3D(*chunk_pos),
+            Self::Data2D(chunk_pos, ..)         => BedrockLevelDBKey::Data2D(*chunk_pos),
+            Self::LegacyData2D(chunk_pos, ..)   => BedrockLevelDBKey::LegacyData2D(*chunk_pos),
             Self::BlockEntities(chunk_pos, ..)  => BedrockLevelDBKey::BlockEntities(*chunk_pos),
             Self::LegacyEntities(chunk_pos, ..) => BedrockLevelDBKey::LegacyEntities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::RandomTicks(*chunk_pos),
@@ -282,6 +309,9 @@ impl BedrockLevelDBEntry {
             Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(chunk_pos),
             Self::ActorDigestVersion(chunk_pos, ..)
                 => BedrockLevelDBKey::ActorDigestVersion(chunk_pos),
+            Self::Data3D(chunk_pos, ..)         => BedrockLevelDBKey::Data3D(chunk_pos),
+            Self::Data2D(chunk_pos, ..)         => BedrockLevelDBKey::Data2D(chunk_pos),
+            Self::LegacyData2D(chunk_pos, ..)   => BedrockLevelDBKey::LegacyData2D(chunk_pos),
             Self::BlockEntities(chunk_pos, ..)  => BedrockLevelDBKey::BlockEntities(chunk_pos),
             Self::LegacyEntities(chunk_pos, ..) => BedrockLevelDBKey::LegacyEntities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::PendingTicks(chunk_pos),
@@ -305,6 +335,9 @@ impl BedrockLevelDBEntry {
             Self::Version(.., version)                => vec![u8::from(*version)],
             Self::LegacyVersion(.., version)          => vec![u8::from(*version)],
             Self::ActorDigestVersion(.., version)     => vec![u8::from(*version)],
+            Self::Data3D(.., data)                    => data.to_bytes(),
+            Self::Data2D(.., data)                    => data.to_bytes(),
+            Self::LegacyData2D(.., data)              => data.to_bytes(),
             Self::BlockEntities(.., compounds)        => compounds.to_bytes(true)?,
             Self::LegacyEntities(.., compounds)       => compounds.to_bytes(true)?,
             Self::PendingTicks(.., compounds)         => compounds.to_bytes(true)?,

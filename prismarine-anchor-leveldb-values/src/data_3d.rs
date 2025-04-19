@@ -1,7 +1,10 @@
 use std::array;
-use std::{collections::BTreeSet, io::Read};
+use std::collections::BTreeSet;
+use std::io::{Cursor, Read};
 
 use zerocopy::transmute;
+
+use super::all_read;
 
 
 #[derive(Debug, Clone)]
@@ -9,7 +12,9 @@ pub struct Data3D {
     /// The inner array is indexed by Z values. The outer array is indexed by X values.
     /// Therefore, the correct indexing order is `heightmap[X][Z]`.
     pub heightmap: [[u16; 16]; 16],
-    pub biomes: [Data3DSubchunkBiomes; 24],
+    /// The biomes are stored in subchunks starting from the bottom of the world.
+    /// In the Overworld, it should have length 24; in the Nether, 8; and in the End, 16.
+    pub biomes: Vec<Data3DSubchunkBiomes>,
 }
 
 #[derive(Debug, Clone)]
@@ -45,7 +50,56 @@ pub enum PaletteBitsPerIndex {
 }
 
 impl Data3D {
+    pub fn parse(value: &[u8]) -> Option<Self> {
+        if value.len() <= 512 {
+            return None;
+        }
 
+        // The .try_into().unwrap() converts a slice of length 512 into an array of
+        // length 512, which does not fail.
+        let heightmap: [u8; 512] = value[0..512].try_into().unwrap();
+        let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
+        let heightmap = heightmap.map(u16::from_le_bytes);
+        let heightmap: [[u16; 16]; 16] = transmute!(heightmap);
+
+        // We know that value.len() > 512
+        let mut reader = Cursor::new(&value[512..]);
+        let mut subchunks = Vec::new();
+
+        let remaining_len = value.len() - 512;
+
+        while !all_read(reader.position(), remaining_len) {
+            subchunks.push(Data3DSubchunkBiomes::parse(&mut reader)?);
+        }
+
+        Some(Self {
+            heightmap,
+            biomes: subchunks,
+        })
+    }
+
+    #[inline]
+    pub fn flattened_heightmap(&self) -> [u16; 256] {
+        transmute!(self.heightmap)
+    }
+
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
+        let heightmap: [u16; 256] = transmute!(self.heightmap);
+        let heightmap = heightmap.map(u16::to_le_bytes);
+        let heightmap: [u8; 512] = transmute!(heightmap);
+
+        bytes.extend(heightmap);
+
+        for subchunk in &self.biomes {
+            subchunk.extend_serialized(bytes);
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes);
+        bytes
+    }
 }
 
 impl Data3DSubchunkBiomes {
@@ -243,13 +297,11 @@ impl PalettizedBiomes {
 
     /// Creates a new `PalettizedBiomes` struct which stores the biome IDs of a subchunk
     /// in a condensed way. This performs the following checks,
-    /// which include iterating over all 4096 indices:
+    /// which includes iterating over all 4096 indices:
     ///
     /// `packed_biome_indices` has length exactly `bits_per_index.num_u32s_for_4096_indices()`;
     ///
-    /// `biome_id_palette` has length greater than the maximum biome index, and at most `4096`;
-    ///
-    /// Any padding bits in each `u32` of `packed_biome_indices` are `0`.
+    /// `biome_id_palette` has length greater than the maximum biome index, and at most `4096`.
     pub fn new_packed_checked(
         bits_per_index: PaletteBitsPerIndex,
         packed_biome_indices: Vec<u32>,
@@ -269,7 +321,7 @@ impl PalettizedBiomes {
         let max_permissible_index = u32::try_from(max_permissible_index).unwrap();
 
         let indices_per_u32 = bits_per_index.indices_per_u32();
-        let padding_bits = bits_per_index.padding_bits();
+        // let padding_bits = bits_per_index.padding_bits();
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
         let index_mask = (1u32 << u8::from(bits_per_index)) - 1;
 
@@ -285,13 +337,6 @@ impl PalettizedBiomes {
 
                 dword >>= u8::from(bits_per_index);
             }
-            // The padding bits should be zero.
-            for _ in 0..padding_bits {
-                dword >>= 1;
-                if dword & 1 != 0 {
-                    return None;
-                }
-            }
         }
 
         // All the checks are done.
@@ -306,9 +351,7 @@ impl PalettizedBiomes {
     ///
     /// `packed_biome_indices` has length exactly `bits_per_index.num_u32s_for_4096_indices()`;
     ///
-    /// `biome_id_palette` has length greater than the maximum biome index, and at most `4096`;
-    ///
-    /// Any padding bits in each `u32` of `packed_biome_indices` are `0`.
+    /// `biome_id_palette` has length greater than the maximum biome index, and at most `4096`.
     pub fn new_packed_unchecked(
         bits_per_index: PaletteBitsPerIndex,
         packed_biome_indices: Vec<u32>,

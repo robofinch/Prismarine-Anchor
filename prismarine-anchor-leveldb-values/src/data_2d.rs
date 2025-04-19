@@ -14,10 +14,12 @@ pub struct Data2D {
 }
 
 impl Data2D {
+    #[inline]
     pub fn flattened_heightmap(&self) -> [u16; 256] {
         transmute!(self.heightmap)
     }
 
+    #[inline]
     pub fn flattened_biome_ids(&self) -> [u8; 256] {
         transmute!(self.biome_ids)
     }

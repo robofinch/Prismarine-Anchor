@@ -171,11 +171,14 @@ pub enum BedrockLevelDBKey {
 
     /// This key, `game_flatworldlayers`, only seems to be used in very old versions.
     FlatWorldLayers,
+    // MVillages,
+    // Dimension0,
+    // Dimension1,
 
     // TODO: other encountered keys from very old versions:
-    // mVillages
     // villages
-    // dimension0 <- presumably dimension1 and dimension2 then, as well?
+    // VillageManager
+    // dimension2 <- might not exist
     // idcounts   <- I've only heard of this, not seen this as a key.
 
     RawKey(Vec<u8>),
