@@ -84,3 +84,62 @@ pub mod the_end;
 pub mod position_tracking;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
+
+/// Compare a reader's position to the total length of data that was expected to be read,
+/// to check if everything was read.
+#[cfg(any(feature = "metadata", feature = "concatenated_nbt_compounds"))]
+#[inline]
+fn all_read(read_position: u64, total_len: usize) -> bool {
+
+    // The as casts don't overflow because we check the size.
+    if size_of::<usize>() <= size_of::<u64>() {
+        let total_len = total_len as u64;
+        read_position == total_len
+
+    } else {
+        let read_len = read_position as usize;
+        read_len == total_len
+    }
+}
+
+/// For use during development. Instead of printing binary data as entirely binary,
+/// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
+/// with binary data interspersed.
+///
+/// For example:
+/// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
+#[allow(unused)]
+fn print_debug(value: &[u8]) {
+    let mut nums = value.iter().peekable();
+
+    while let Some(_) = nums.peek() {
+        while let Some(&&num) = nums.peek() {
+            if let Some(ch) = char::from_u32(num as u32) {
+                if ch.is_ascii_alphanumeric()
+                    || ch == '.' || ch == '-' || ch == '_'
+                {
+                    nums.next();
+                    print!("{ch}");
+                } else {
+                    break;
+                }
+            } else {
+                break
+            }
+        }
+        print!("[");
+        while let Some(&&num) = nums.peek() {
+            if let Some(ch) = char::from_u32(num as u32) {
+                if ch.is_ascii_alphanumeric()
+                    || ch == '.' || ch == '-' || ch == '_'
+                {
+                    break;
+                }
+            }
+            nums.next();
+            print!("{num},");
+        }
+        print!("]");
+    }
+    println!("")
+}

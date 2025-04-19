@@ -1,12 +1,14 @@
 use prismarine_anchor_leveldb_values::{
     actor_digest_version::ActorDigestVersion,
     chunk_position::DimensionedChunkPos,
+    concatenated_nbt_compounds::ConcatenatedNbtCompounds,
+    legacy_version::LegacyChunkVersion,
     metadata::LevelChunkMetaDataDictionary,
+    version::ChunkVersion,
 };
-use prismarine_anchor_nbt::NbtCompound;
 
 use crate::{
-    read_nbt_list, nbt_list_to_bytes, key::BedrockLevelDBKey,
+    key::BedrockLevelDBKey,
     EntryParseResult, EntryToBytesOptions, ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
 
@@ -24,8 +26,8 @@ pub enum BedrockLevelDBEntry {
     //  Chunk-specific data
     // ================================
 
-    Version(DimensionedChunkPos, u8),
-    LegacyVersion(DimensionedChunkPos, u8),
+    Version(DimensionedChunkPos, ChunkVersion),
+    LegacyVersion(DimensionedChunkPos, LegacyChunkVersion),
     ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
 
     // Data3D(DimensionedChunkPos),
@@ -36,10 +38,10 @@ pub enum BedrockLevelDBEntry {
     // LegacyTerrain(DimensionedChunkPos),
     // LegacyExtraBlockData(DimensionedChunkPos),
 
-    BlockEntities(DimensionedChunkPos, Vec<NbtCompound>),
-    LegacyEntities(DimensionedChunkPos, Vec<NbtCompound>),
-    PendingTicks(DimensionedChunkPos, Vec<NbtCompound>),
-    RandomTicks(DimensionedChunkPos, Vec<NbtCompound>),
+    BlockEntities(DimensionedChunkPos,  ConcatenatedNbtCompounds),
+    LegacyEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
+    PendingTicks(DimensionedChunkPos,   ConcatenatedNbtCompounds),
+    RandomTicks(DimensionedChunkPos,    ConcatenatedNbtCompounds),
 
     // BorderBlocks(DimensionedChunkPos),
     // HardcodedSpawners(DimensionedChunkPos),
@@ -179,14 +181,18 @@ impl BedrockLevelDBEntry {
         match key {
             BedrockLevelDBKey::Version(chunk_pos) => {
                 if value.len() == 1 {
-                    println!("Chunk version: {}", value[0]);
-                    return ValueParseResult::Parsed(Self::Version(chunk_pos, value[0]));
+                    if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
+                        return ValueParseResult::Parsed(Self::Version(chunk_pos, chunk_version));
+                    }
                 }
             }
             BedrockLevelDBKey::LegacyVersion(chunk_pos) => {
                 if value.len() == 1 {
-                    println!("Legacy chunk version: {}", value[0]);
-                    return ValueParseResult::Parsed(Self::LegacyVersion(chunk_pos, value[0]));
+                    if let Some(chunk_version) = LegacyChunkVersion::parse(value[0]) {
+                        return ValueParseResult::Parsed(
+                            Self::LegacyVersion(chunk_pos, chunk_version)
+                        );
+                    }
                 }
             }
             BedrockLevelDBKey::ActorDigestVersion(chunk_pos) => {
@@ -199,22 +205,26 @@ impl BedrockLevelDBEntry {
                 }
             }
             BedrockLevelDBKey::BlockEntities(chunk_pos) => {
-                if let Some(compounds) = read_nbt_list(value) {
+                // The true is definitely needed.
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             },
             BedrockLevelDBKey::LegacyEntities(chunk_pos) => {
-                if let Some(compounds) = read_nbt_list(value) {
+                // TODO: Not sure if true is needed.
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::LegacyEntities(chunk_pos, compounds));
                 }
             },
             BedrockLevelDBKey::PendingTicks(chunk_pos) => {
-                if let Some(compounds) = read_nbt_list(value) {
+                // TODO: Not sure if true is needed.
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             },
             BedrockLevelDBKey::RandomTicks(chunk_pos) => {
-                if let Some(compounds) = read_nbt_list(value) {
+                // TODO: Not sure if true is needed.
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             },
@@ -292,13 +302,13 @@ impl BedrockLevelDBEntry {
     ) -> Result<Vec<u8>, ValueToBytesError> {
 
         Ok(match self {
-            Self::Version(.., version)                => vec![*version],
-            Self::LegacyVersion(.., version)          => vec![*version],
+            Self::Version(.., version)                => vec![u8::from(*version)],
+            Self::LegacyVersion(.., version)          => vec![u8::from(*version)],
             Self::ActorDigestVersion(.., version)     => vec![u8::from(*version)],
-            Self::BlockEntities(.., compounds)        => nbt_list_to_bytes(compounds)?,
-            Self::LegacyEntities(.., compounds)       => nbt_list_to_bytes(compounds)?,
-            Self::PendingTicks(.., compounds)         => nbt_list_to_bytes(compounds)?,
-            Self::RandomTicks(.., compounds)          => nbt_list_to_bytes(compounds)?,
+            Self::BlockEntities(.., compounds)        => compounds.to_bytes(true)?,
+            Self::LegacyEntities(.., compounds)       => compounds.to_bytes(true)?,
+            Self::PendingTicks(.., compounds)         => compounds.to_bytes(true)?,
+            Self::RandomTicks(.., compounds)          => compounds.to_bytes(true)?,
             Self::MetaDataHash(.., hash)              => hash.to_le_bytes().to_vec(),
             Self::LevelChunkMetaDataDictionary(dict)  => {
                 dict.to_bytes(opts.error_on_excessive_length)?

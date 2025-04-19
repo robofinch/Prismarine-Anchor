@@ -13,6 +13,7 @@ use prismarine_anchor_nbt::{
 };
 
 use crate::dimensions::NamedDimension;
+use super::all_read;
 
 
 #[derive(Debug, Clone)]
@@ -613,20 +614,4 @@ pub enum MetaDataWriteError {
 pub enum MetaDataHashError {
     #[error("error while writing metadata to NBT to compute its xxhash64 hash: {0}")]
     NbtError(#[from] NbtIoError)
-}
-
-/// Compare a reader's position to the total length of data that was expected to be read,
-/// to check if everything was read.
-#[inline]
-fn all_read(read_position: u64, total_len: usize) -> bool {
-
-    // The as casts don't overflow because we check the size.
-    if size_of::<usize>() <= size_of::<u64>() {
-        let total_len = total_len as u64;
-        read_position == total_len
-
-    } else {
-        let read_len = read_position as usize;
-        read_len == total_len
-    }
 }

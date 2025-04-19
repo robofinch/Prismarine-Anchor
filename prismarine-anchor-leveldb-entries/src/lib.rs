@@ -1,13 +1,12 @@
 mod key;
 mod entry;
 
-use std::io::Cursor;
 
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_values::metadata::MetaDataWriteError;
-use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{read_compound, write_compound, NbtIoError};
+use prismarine_anchor_nbt::io::NbtIoError;
+
 
 pub use self::{entry::BedrockLevelDBEntry, key::BedrockLevelDBKey};
 
@@ -119,59 +118,6 @@ impl From<MetaDataWriteError> for ValueToBytesError {
             MetaDataWriteError::NbtError(err)    => Self::NbtIoError(err),
         }
     }
-}
-
-/// Compare a reader's position to the total length of data that was expected to be read,
-/// to check if everything was read.
-#[inline]
-fn all_read(read_position: u64, total_len: usize) -> bool {
-
-    // The as casts don't overflow because we check the size.
-    if size_of::<usize>() <= size_of::<u64>() {
-        let total_len = total_len as u64;
-        read_position == total_len
-
-    } else {
-        let read_len = read_position as usize;
-        read_len == total_len
-    }
-}
-
-fn read_nbt_list(nbt_list_bytes: &[u8]) -> Option<Vec<NbtCompound>> {
-    let mut compounds = Vec::new();
-
-    let input_len = nbt_list_bytes.len();
-    let mut reader = Cursor::new(nbt_list_bytes);
-
-    while !all_read(reader.position(), input_len) {
-
-        let nbt_result = read_compound(
-            &mut reader,
-            IoOptions::bedrock_uncompressed(),
-        );
-        let nbt = match nbt_result {
-            Ok((nbt, _)) => nbt,
-            Err(err) => {
-                // uhhhhh this is clearly temporary TODO
-                println!("Error while reading NbtCompound list in LevelDB: {err:?}");
-                return None
-            }
-        };
-
-        compounds.push(nbt);
-    }
-
-    Some(compounds)
-}
-
-fn nbt_list_to_bytes(compounds: &[NbtCompound]) -> Result<Vec<u8>, NbtIoError> {
-    let mut writer = Cursor::new(Vec::new());
-
-    for compound in compounds {
-        write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, compound)?;
-    }
-
-    Ok(writer.into_inner())
 }
 
 /// For use during development. Instead of printing binary data as entirely binary,
