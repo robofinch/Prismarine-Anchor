@@ -1,3 +1,4 @@
+use std::array;
 use std::{borrow::Cow, cmp::Ordering};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -95,30 +96,25 @@ impl PartialOrd for GameVersion {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum VersionName {
-    Numeric(u32, u32, u32),
+    Numeric(NumericVersion),
     String(String),
 }
 
 impl VersionName {
     pub fn parse_numeric(version: &str) -> Option<Self> {
-        let mut version = version.split(".");
-        let major = u32::from_str_radix(version.next()?, 10).ok()?;
-        let minor = u32::from_str_radix(version.next()?, 10).ok()?;
-        let patch = u32::from_str_radix(version.next()?, 10).ok()?;
+        NumericVersion::parse(version).map(Self::Numeric)
+    }
 
-        if version.next().is_none() {
-            Some(Self::Numeric(major, minor, patch))
-        } else {
-            None
-        }
+    pub fn numeric(major: u32, minor: u32, patch: u32) -> Self {
+        Self::Numeric(NumericVersion(major, minor, patch, 0, 0))
     }
 }
 
 impl PartialOrd for VersionName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if let &Self::Numeric(major, minor, patch) = self {
-            if let &Self::Numeric(other_major, other_minor, other_patch) = other {
-                return Some((major, minor, patch).cmp(&(other_major, other_minor, other_patch)))
+        if let &Self::Numeric(version) = self {
+            if let &Self::Numeric(other_version) = other {
+                return Some(version.cmp(&other_version))
             }
         }
         None
@@ -135,8 +131,100 @@ impl From<String> for VersionName {
 impl Display for VersionName {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            &Self::Numeric(major, minor, patch) => write!(f, "{major}.{minor}.{patch}"),
-            Self::String(string) => write!(f, "{string}"),
+            &Self::Numeric(numeric) => Display::fmt(&numeric, f),
+            Self::String(string)    => Display::fmt(&string,  f),
         }
+    }
+}
+
+/// A type that should be able to describe numeric versions of Minecraft, such as
+/// 1.21.0 (stored here as 1.21.0.0.0), as well as edge cases like 1.16.100.56 in Bedrock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NumericVersion(pub u32, pub u32, pub u32, pub u32, pub u32);
+
+impl NumericVersion {
+    /// Parse a string into a numeric version.
+    ///
+    /// Note that the first component is always the major
+    /// version, so "1.0" is parsed the same as "1.0.0" and not "0.1.0".
+    /// A single component, such as "1", is assumed to be a mistake
+    /// and returns `None`. Additionally, parsing `"1."` will return `None`,
+    /// as it is split into `"1"` and `""`, and the latter cannot be parsed into a number.
+    pub fn parse(version: &str) -> Option<Self> {
+        let mut components = version.split('.');
+
+        let nums: [Option<u32>; 5] = array::from_fn(|idx| {
+            if let Some(next_component) = components.next() {
+                u32::from_str_radix(next_component, 10).ok()
+            } else if idx <= 1 {
+                // This is the either the first or second component, so we either got
+                // "" or something like "1", which is not allowed.
+                None
+            } else {
+                Some(0)
+            }
+        });
+
+        if components.next().is_some() {
+            // There were more than 5 version components
+            return None;
+        }
+
+        Some(Self(nums[0]?, nums[1]?, nums[2]?, nums[3]?, nums[4]?))
+    }
+}
+
+impl Display for NumericVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        // Only show the fourth or fifth components if necessary.
+        match (self.3 == 0, self.4 == 0) {
+            (true,  true)  => write!(f, "{}.{}.{}",       self.0, self.1, self.2),
+            (false, true)  => write!(f, "{}.{}.{}.{}",    self.0, self.1, self.2, self.3),
+            (_,     false) => write!(f, "{}.{}.{}.{}.{}", self.0, self.1, self.2, self.3, self.4),
+        }
+    }
+}
+
+impl From<[u32; 5]> for NumericVersion {
+    fn from(value: [u32; 5]) -> Self {
+        Self(value[0], value[1], value[2], value[3], value[4])
+    }
+}
+
+impl From<(u32, u32, u32, u32, u32)> for NumericVersion {
+    fn from(value: (u32, u32, u32, u32, u32)) -> Self {
+        Self(value.0, value.1, value.2, value.3, value.4)
+    }
+}
+
+impl From<[u32; 3]> for NumericVersion {
+    fn from(value: [u32; 3]) -> Self {
+        Self(value[0], value[1], value[2], 0, 0)
+    }
+}
+
+impl From<(u32, u32, u32)> for NumericVersion {
+    fn from(value: (u32, u32, u32)) -> Self {
+        Self(value.0, value.1, value.2, 0, 0)
+    }
+}
+
+impl From<NumericVersion> for [u32; 5] {
+    fn from(value: NumericVersion) -> Self {
+        [value.0, value.1, value.2, value.3, value.4]
+    }
+}
+
+impl From<NumericVersion> for (u32, u32, u32, u32, u32) {
+    fn from(value: NumericVersion) -> Self {
+        (value.0, value.1, value.2, value.3, value.4)
+    }
+}
+
+impl TryFrom<&str> for NumericVersion {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::parse(value).ok_or(())
     }
 }

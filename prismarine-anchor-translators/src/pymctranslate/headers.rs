@@ -120,7 +120,7 @@ impl VersionMetadata {
         let minor = version.next().unwrap_or(0);
         let patch = version.next().unwrap_or(0);
 
-        let version_name = VersionName::Numeric(major, minor, patch);
+        let version_name = VersionName::numeric(major, minor, patch);
 
         let game_version = match init_json.platform {
             Platform::Universal => GameVersion::Universal,
