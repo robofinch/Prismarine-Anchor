@@ -22,9 +22,10 @@ pub enum Data3DSubchunkBiomes {
     Empty,
     Uniform(u32),
     Palettized(PalettizedBiomes),
-    // TODO: figure out what happens when PaletteVersion is 0 instead of 1,
+    // TODO: figure out what happens when PaletteType is Persistent instead of Runtime,
     // and make another enum variant if needed. RN, if it were to occur,
-    // it would just result in an opaque RawValue instead of a Data3D
+    // it would just result in an opaque RawValue instead of a Data3D.
+    // Note that unlike Subchunk data, only Runtime IDs are supported here, which is the opposite.
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,13 @@ pub enum PaletteBitsPerIndex {
     Eight,
     // I find it annoying that 10 isn't an option (for 3 indices per u32)
     Sixteen,
+}
+
+/// Used to explicitly describe these two states,
+/// but it's basically a bool for "is runtime?" / "is not persistent?"
+enum PaletteType {
+    Persistent,
+    Runtime,
 }
 
 impl Data3D {
@@ -107,12 +115,11 @@ impl Data3DSubchunkBiomes {
         let mut header = [0; 1];
         reader.read_exact(&mut header).ok()?;
         let header = header[0];
-        let palette_version = header & 1;
+        let palette_type = PaletteType::from(header & 1);
         let bits_per_index_or_special = header >> 1;
 
-        if palette_version != 1 {
-            // No clue what the format is when palette_version == 0,
-            // which basically never happens, or so I've heard.
+        if let PaletteType::Persistent = palette_type {
+            // This basically never happens, or so I've heard.
             // TODO: figure it out
             return None;
         }
@@ -526,6 +533,43 @@ impl From<PaletteBitsPerIndex> for u8 {
             PaletteBitsPerIndex::Six      => 6,
             PaletteBitsPerIndex::Eight    => 8,
             PaletteBitsPerIndex::Sixteen  => 16,
+        }
+    }
+}
+
+impl From<bool> for PaletteType {
+    fn from(value: bool) -> Self {
+        if value {
+            PaletteType::Runtime
+        } else {
+            PaletteType::Persistent
+        }
+    }
+}
+
+impl From<PaletteType> for bool {
+    fn from(value: PaletteType) -> Self {
+        match value {
+            PaletteType::Persistent => false,
+            PaletteType::Runtime    => true,
+        }
+    }
+}
+
+impl From<u8> for PaletteType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => PaletteType::Persistent,
+            _ => PaletteType::Runtime,
+        }
+    }
+}
+
+impl From<PaletteType> for u8 {
+    fn from(value: PaletteType) -> Self {
+        match value {
+            PaletteType::Persistent => 0,
+            PaletteType::Runtime    => 1,
         }
     }
 }
