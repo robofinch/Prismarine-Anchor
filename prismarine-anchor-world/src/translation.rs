@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
 
 use thiserror::Error;
 
-use prismarine_anchor_translation::translator::{GameVersion, Translator};
+use prismarine_anchor_translation::{datatypes::GameVersion, translator::Translator};
 
 
 type InternalTranslator = dyn Translator<anyhow::Error, BlockMetadata, (), ()>;
