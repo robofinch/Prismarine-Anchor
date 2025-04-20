@@ -40,10 +40,6 @@ pub mod finalized_state;
 pub mod biome_state;
 #[cfg(feature = "conversion_data")]
 pub mod conversion_data;
-#[cfg(feature = "caves_and_cliffs_blending")]
-pub mod caves_and_cliffs_blending;
-#[cfg(feature = "blending_biome_height")]
-pub mod blending_biome_height;
 #[cfg(feature = "blending_data")]
 pub mod blending_data;
 #[cfg(feature = "actor_digest")]

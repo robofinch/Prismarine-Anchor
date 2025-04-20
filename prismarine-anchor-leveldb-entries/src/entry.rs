@@ -289,6 +289,7 @@ impl DBEntry {
                 key: vec![],
                 value: vec![],
             })
+            // _ => {}
         }
 
         ValueParseResult::UnrecognizedValue(key)

@@ -64,7 +64,7 @@ pub enum DBKey {
     // TODO: no longer used as of when?
     HardcodedSpawners(DimensionedChunkPos),
     // Found in levilamina, key tag value 119 (b'w'). Related to hardcoded spawners, maybe?
-    // TODO: what is this?
+    // TODO: what is this? is this a levilamina -unique thing?
     AabbVolumes(DimensionedChunkPos),
 
     /// xxHash64 checksums of `SubchunkBlocks`, `BlockEntities`, `Entities`, and `Data2D`
