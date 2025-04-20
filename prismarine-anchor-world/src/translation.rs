@@ -57,14 +57,14 @@ impl Translators {
 
     #[cfg(feature = "py_mc_translate")]
     pub fn load_pymc_translator(
-        &mut self, source: GameVersion, target: GameVersion,
+        &mut self, _source: GameVersion, _target: GameVersion,
     ) -> Result<(), TranslatorLoadError> {
         todo!()
     }
 
     #[cfg(feature = "minecraft_data")]
     pub fn load_mc_data_translator(
-        &mut self, source: GameVersion, target: GameVersion,
+        &mut self, _source: GameVersion, _target: GameVersion,
     ) -> Result<(), TranslatorLoadError> {
         todo!()
     }
