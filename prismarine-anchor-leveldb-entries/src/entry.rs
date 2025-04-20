@@ -1,4 +1,5 @@
 use prismarine_anchor_leveldb_values::{
+    // actor::ActorID,
     actor_digest_version::ActorDigestVersion,
     chunk_position::DimensionedChunkPos,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
@@ -58,8 +59,10 @@ pub enum BedrockLevelDBEntry {
 
     // ConversionData(DimensionedChunkPos),
 
-    // CavesAndCliffsBlending(DimensionedChunkPos),
-    // BlendingBiomeHeight(DimensionedChunkPos),
+    // Not used, apparently, so Vec<u8> is the best we can do without more info.
+    CavesAndCliffsBlending(DimensionedChunkPos, Vec<u8>),
+    // Not used, apparently, so Vec<u8> is the best we can do without more info.
+    BlendingBiomeHeight(DimensionedChunkPos, Vec<u8>),
     // BlendingData(DimensionedChunkPos),
 
     // ActorDigest(DimensionedChunkPos),
@@ -258,6 +261,16 @@ impl BedrockLevelDBEntry {
                     );
                 }
             }
+            BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos) => {
+                return ValueParseResult::Parsed(
+                    Self::CavesAndCliffsBlending(chunk_pos, value.to_vec())
+                );
+            }
+            BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos) => {
+                return ValueParseResult::Parsed(
+                    Self::BlendingBiomeHeight(chunk_pos, value.to_vec())
+                );
+            }
             BedrockLevelDBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
                     return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
@@ -295,6 +308,10 @@ impl BedrockLevelDBEntry {
             Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::RandomTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)    => BedrockLevelDBKey::RandomTicks(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(*chunk_pos),
+            Self::CavesAndCliffsBlending(chunk_pos, ..)
+                => BedrockLevelDBKey::CavesAndCliffsBlending(*chunk_pos),
+            Self::BlendingBiomeHeight(chunk_pos, ..)
+                => BedrockLevelDBKey::BlendingBiomeHeight(*chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)
                 => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
             Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key.clone()),
@@ -316,6 +333,10 @@ impl BedrockLevelDBEntry {
             Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)    => BedrockLevelDBKey::RandomTicks(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(chunk_pos),
+            Self::CavesAndCliffsBlending(chunk_pos, ..)
+                => BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos),
+            Self::BlendingBiomeHeight(chunk_pos, ..)
+                => BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)
                 => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
             Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key),
@@ -342,6 +363,8 @@ impl BedrockLevelDBEntry {
             Self::PendingTicks(.., compounds)         => compounds.to_bytes(true)?,
             Self::RandomTicks(.., compounds)          => compounds.to_bytes(true)?,
             Self::MetaDataHash(.., hash)              => hash.to_le_bytes().to_vec(),
+            Self::CavesAndCliffsBlending(.., raw)     => raw.clone(),
+            Self::BlendingBiomeHeight(.., raw)        => raw.clone(),
             Self::LevelChunkMetaDataDictionary(dict)  => {
                 dict.to_bytes(opts.error_on_excessive_length)?
             }
@@ -373,6 +396,16 @@ impl BedrockLevelDBEntry {
             Self::RawValue { key, value } => {
                 let key_bytes = key.to_bytes(opts.into());
                 Ok((key_bytes, value))
+            }
+            Self::CavesAndCliffsBlending(chunk_pos, raw) => {
+                let key = BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos);
+                let key_bytes = key.to_bytes(opts.into());
+                Ok((key_bytes, raw))
+            }
+            Self::BlendingBiomeHeight(chunk_pos, raw) => {
+                let key = BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos);
+                let key_bytes = key.to_bytes(opts.into());
+                Ok((key_bytes, raw))
             }
             // TODO: maybe some other entries could also be more memory efficient, too.
             _ => {
