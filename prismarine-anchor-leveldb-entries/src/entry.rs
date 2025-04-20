@@ -5,7 +5,6 @@ use prismarine_anchor_leveldb_values::{
     data_2d::Data2D,
     data_3d::Data3D,
     legacy_data_2d::LegacyData2D,
-    legacy_version::LegacyChunkVersion,
     metadata::LevelChunkMetaDataDictionary,
     version::ChunkVersion,
 };
@@ -30,7 +29,7 @@ pub enum BedrockLevelDBEntry {
     // ================================
 
     Version(DimensionedChunkPos, ChunkVersion),
-    LegacyVersion(DimensionedChunkPos, LegacyChunkVersion),
+    LegacyVersion(DimensionedChunkPos, ChunkVersion),
     ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
 
     Data3D(DimensionedChunkPos, Data3D),
@@ -191,7 +190,7 @@ impl BedrockLevelDBEntry {
             }
             BedrockLevelDBKey::LegacyVersion(chunk_pos) => {
                 if value.len() == 1 {
-                    if let Some(chunk_version) = LegacyChunkVersion::parse(value[0]) {
+                    if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
                         return ValueParseResult::Parsed(
                             Self::LegacyVersion(chunk_pos, chunk_version)
                         );

@@ -10,8 +10,6 @@ pub mod concatenated_nbt_compounds; // For multiple sorts of values
 
 #[cfg(feature = "version")]
 pub mod version;
-#[cfg(feature = "legacy_version")]
-pub mod legacy_version;
 #[cfg(feature = "actor_digest_version")]
 pub mod actor_digest_version;
 #[cfg(feature = "data_3d")]
@@ -145,7 +143,6 @@ fn all_read(read_position: u64, total_len: usize) -> bool {
 #[cfg(any(
     doc,
     feature = "actor_digest_version",
-    feature = "legacy_version",
     feature = "metadata",
     feature = "version",
 ))]
