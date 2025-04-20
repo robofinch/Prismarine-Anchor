@@ -8,10 +8,13 @@ use prismarine_anchor_leveldb_values::metadata::MetaDataWriteError;
 use prismarine_anchor_nbt::io::NbtIoError;
 
 
-pub use self::{entry::BedrockLevelDBEntry, key::BedrockLevelDBKey};
+pub use self::{entry::DBEntry, key::DBKey};
 
 
-/// Settings for converting a `BedrockLevelDBKey` into raw key bytes for use in a LevelDB.
+// Note in case the LevelDB part didn't make it obvious: this is for Minecraft Bedrock.
+
+
+/// Settings for converting a `DBKey` into raw key bytes for use in a LevelDB.
 ///
 /// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
 /// numeric IDs written when a `NumericDimension` is serialized.
@@ -28,7 +31,7 @@ pub struct KeyToBytesOptions {
     pub write_overworld_name: bool,
 }
 
-/// Settings for converting a `BedrockLevelDBEntry` into raw value bytes for use in a LevelDB.
+/// Settings for converting a `DBEntry` into raw value bytes for use in a LevelDB.
 ///
 /// If `error_on_excessive_length` is true, then if a `LevelChunkMetaDataDictionary` with more
 /// than 2^32 values is attempted to be written to bytes, an error is returned. If false,
@@ -40,7 +43,7 @@ pub struct ValueToBytesOptions {
     pub error_on_excessive_length: bool,
 }
 
-/// Settings for converting a `BedrockLevelDBEntry`
+/// Settings for converting a `DBEntry`
 /// into raw key and value bytes for use in a LevelDB.
 ///
 /// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
@@ -83,15 +86,15 @@ impl From<EntryToBytesOptions> for ValueToBytesOptions {
 
 #[derive(Debug, Clone)]
 pub enum ValueParseResult {
-    Parsed(BedrockLevelDBEntry),
-    UnrecognizedValue(BedrockLevelDBKey),
+    Parsed(DBEntry),
+    UnrecognizedValue(DBKey),
 }
 
 #[derive(Debug, Clone)]
 pub enum EntryParseResult {
-    Parsed(BedrockLevelDBEntry),
+    Parsed(DBEntry),
     UnrecognizedKey,
-    UnrecognizedValue(BedrockLevelDBKey),
+    UnrecognizedValue(DBKey),
 }
 
 impl From<ValueParseResult> for EntryParseResult {
@@ -126,7 +129,7 @@ impl From<MetaDataWriteError> for ValueToBytesError {
 ///
 /// For example:
 /// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
-#[allow(unused)]
+#[allow(dead_code)]
 fn print_debug(value: &[u8]) {
     let mut nums = value.iter().peekable();
 

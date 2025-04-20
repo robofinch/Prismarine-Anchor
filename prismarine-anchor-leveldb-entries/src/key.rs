@@ -18,7 +18,7 @@ use super::KeyToBytesOptions;
 /// [minecraft.wiki]: https://minecraft.wiki/w/Bedrock_Edition_level_format#Chunk_key_format
 // TODO: are "since 1.18.0" and "since 1.0.0" the precise versions that something changed?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum BedrockLevelDBKey {
+pub enum DBKey {
     // ================================
     //  Chunk-specific data
     // ================================
@@ -184,7 +184,7 @@ pub enum BedrockLevelDBKey {
     RawKey(Vec<u8>),
 }
 
-impl BedrockLevelDBKey {
+impl DBKey {
     pub fn parse_key(raw_key: &[u8]) -> Self {
         Self::parse_recognized_key(raw_key).unwrap_or_else(|| Self::RawKey(raw_key.to_owned()))
     }
@@ -372,7 +372,7 @@ impl BedrockLevelDBKey {
         None
     }
 
-    /// Extend the provided `Vec` with the raw key bytes of a `BedrockLevelDBKey`,
+    /// Extend the provided `Vec` with the raw key bytes of a `DBKey`,
     /// using the provided serialization settings.
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>, opts: KeyToBytesOptions) {
 
@@ -580,7 +580,7 @@ impl BedrockLevelDBKey {
         bytes.push(key_tag);
     }
 
-    /// Get the raw key bytes of a `BedrockLevelDBKey` with the provided serialization options.
+    /// Get the raw key bytes of a `DBKey` with the provided serialization options.
     pub fn to_bytes(&self, opts: KeyToBytesOptions) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes, opts);
@@ -588,13 +588,13 @@ impl BedrockLevelDBKey {
     }
 }
 
-impl From<&[u8]> for BedrockLevelDBKey {
+impl From<&[u8]> for DBKey {
     fn from(raw_key: &[u8]) -> Self {
         Self::parse_key(raw_key)
     }
 }
 
-impl From<Vec<u8>> for BedrockLevelDBKey {
+impl From<Vec<u8>> for DBKey {
     fn from(raw_key: Vec<u8>) -> Self {
         Self::parse_key_vec(raw_key)
     }

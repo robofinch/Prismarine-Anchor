@@ -13,7 +13,7 @@ use rusty_leveldb::{env::Env, DB as LevelDB, Status};
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_entries::{
-    BedrockLevelDBEntry, BedrockLevelDBKey,
+    DBEntry, DBKey,
     EntryToBytesOptions, KeyToBytesOptions, ValueToBytesError,
 };
 use prismarine_anchor_nbt::io as nbt_io;
@@ -170,18 +170,16 @@ impl BedrockWorldFiles {
     }
 
     /// Read the entry in the LevelDB with the provided key and serialization options,
-    /// and parse it into a `BedrockLevelDBEntry` if present.
-    pub fn get(
-        &mut self, key: BedrockLevelDBKey, opts: KeyToBytesOptions,
-    ) -> Option<BedrockLevelDBEntry> {
+    /// and parse it into a `DBEntry` if present.
+    pub fn get(&mut self, key: DBKey, opts: KeyToBytesOptions) -> Option<DBEntry> {
 
         self.db.get(&key.to_bytes(opts))
-            .map(|value| BedrockLevelDBEntry::parse_value_vec(key, value))
+            .map(|value| DBEntry::parse_value_vec(key, value))
     }
 
     /// Write the provided entry into the LevelDB using the provided serialization options.
     pub fn put(
-        &mut self, entry: BedrockLevelDBEntry, opts: EntryToBytesOptions,
+        &mut self, entry: DBEntry, opts: EntryToBytesOptions,
     ) -> Result<(), BedrockWorldFileError> {
 
         let (key, value) = entry.into_bytes(opts)

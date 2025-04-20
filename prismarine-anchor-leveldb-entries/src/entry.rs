@@ -7,11 +7,11 @@ use prismarine_anchor_leveldb_values::{
     data_3d::Data3D,
     legacy_data_2d::LegacyData2D,
     metadata::LevelChunkMetaDataDictionary,
-    version::ChunkVersion,
+    chunk_version::ChunkVersion,
 };
 
 use crate::{
-    key::BedrockLevelDBKey,
+    key::DBKey,
     EntryParseResult, EntryToBytesOptions, ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
 
@@ -24,7 +24,7 @@ use crate::{
 /// [minecraft.wiki]: https://minecraft.wiki/w/Bedrock_Edition_level_format#Chunk_key_format
 /// [LeviLamina]: https://github.com/LiteLDev/LeviLamina
 #[derive(Debug, Clone)]
-pub enum BedrockLevelDBEntry {
+pub enum DBEntry {
     // ================================
     //  Chunk-specific data
     // ================================
@@ -121,12 +121,12 @@ pub enum BedrockLevelDBEntry {
         value: Vec<u8>,
     },
     RawValue {
-        key: BedrockLevelDBKey,
+        key: DBKey,
         value: Vec<u8>,
     },
 }
 
-impl BedrockLevelDBEntry {
+impl DBEntry {
     pub fn parse_entry(key: &[u8], value: &[u8]) -> Self {
         match Self::parse_recognized_entry(key, value) {
             EntryParseResult::Parsed(entry) => entry,
@@ -156,13 +156,13 @@ impl BedrockLevelDBEntry {
     }
 
     pub fn parse_recognized_entry(key: &[u8], value: &[u8]) -> EntryParseResult {
-        let Some(key) = BedrockLevelDBKey::parse_recognized_key(key) else {
+        let Some(key) = DBKey::parse_recognized_key(key) else {
             return EntryParseResult::UnrecognizedKey;
         };
         Self::parse_recognized_value(key, value).into()
     }
 
-    pub fn parse_value(key: BedrockLevelDBKey, value: &[u8]) -> Self {
+    pub fn parse_value(key: DBKey, value: &[u8]) -> Self {
         match Self::parse_recognized_value(key, value) {
             ValueParseResult::Parsed(parsed) => parsed,
             ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
@@ -172,7 +172,7 @@ impl BedrockLevelDBEntry {
         }
     }
 
-    pub fn parse_value_vec(key: BedrockLevelDBKey, value: Vec<u8>) -> Self {
+    pub fn parse_value_vec(key: DBKey, value: Vec<u8>) -> Self {
         match Self::parse_recognized_value(key, &value) {
             ValueParseResult::Parsed(parsed) => parsed,
             ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
@@ -182,16 +182,16 @@ impl BedrockLevelDBEntry {
         }
     }
 
-    pub fn parse_recognized_value(key: BedrockLevelDBKey, value: &[u8]) -> ValueParseResult {
+    pub fn parse_recognized_value(key: DBKey, value: &[u8]) -> ValueParseResult {
         match key {
-            BedrockLevelDBKey::Version(chunk_pos) => {
+            DBKey::Version(chunk_pos) => {
                 if value.len() == 1 {
                     if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
                         return ValueParseResult::Parsed(Self::Version(chunk_pos, chunk_version));
                     }
                 }
             }
-            BedrockLevelDBKey::LegacyVersion(chunk_pos) => {
+            DBKey::LegacyVersion(chunk_pos) => {
                 if value.len() == 1 {
                     if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
                         return ValueParseResult::Parsed(
@@ -200,7 +200,7 @@ impl BedrockLevelDBEntry {
                     }
                 }
             }
-            BedrockLevelDBKey::ActorDigestVersion(chunk_pos) => {
+            DBKey::ActorDigestVersion(chunk_pos) => {
                 if value.len() == 1 {
                     if let Ok(digest_version) = ActorDigestVersion::try_from(value[0]) {
                         return ValueParseResult::Parsed(
@@ -209,83 +209,83 @@ impl BedrockLevelDBEntry {
                     }
                 }
             }
-            BedrockLevelDBKey::Data3D(chunk_pos) => {
+            DBKey::Data3D(chunk_pos) => {
                 if let Some(data_3d) = Data3D::parse(value) {
                     return ValueParseResult::Parsed(
-                        BedrockLevelDBEntry::Data3D(chunk_pos, data_3d)
+                        DBEntry::Data3D(chunk_pos, data_3d)
                     );
                 }
             }
-            BedrockLevelDBKey::Data2D(chunk_pos) => {
+            DBKey::Data2D(chunk_pos) => {
                 if let Some(data_2d) = Data2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        BedrockLevelDBEntry::Data2D(chunk_pos, data_2d)
+                        DBEntry::Data2D(chunk_pos, data_2d)
                     );
                 }
             }
-            BedrockLevelDBKey::LegacyData2D(chunk_pos) => {
+            DBKey::LegacyData2D(chunk_pos) => {
                 if let Some(legacy_data_2d) = LegacyData2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        BedrockLevelDBEntry::LegacyData2D(chunk_pos, legacy_data_2d)
+                        DBEntry::LegacyData2D(chunk_pos, legacy_data_2d)
                     );
                 }
             }
-            BedrockLevelDBKey::BlockEntities(chunk_pos) => {
+            DBKey::BlockEntities(chunk_pos) => {
                 // The true is definitely needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             },
-            BedrockLevelDBKey::LegacyEntities(chunk_pos) => {
+            DBKey::LegacyEntities(chunk_pos) => {
                 // TODO: Not sure if true is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::LegacyEntities(chunk_pos, compounds));
                 }
             },
-            BedrockLevelDBKey::PendingTicks(chunk_pos) => {
+            DBKey::PendingTicks(chunk_pos) => {
                 // TODO: Not sure if true is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             },
-            BedrockLevelDBKey::RandomTicks(chunk_pos) => {
+            DBKey::RandomTicks(chunk_pos) => {
                 // TODO: Not sure if true is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return ValueParseResult::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             },
-            BedrockLevelDBKey::MetaDataHash(chunk_pos) => {
+            DBKey::MetaDataHash(chunk_pos) => {
                 if let Ok(bytes) = <[u8; 8]>::try_from(value) {
                     return ValueParseResult::Parsed(
                         Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes))
                     );
                 }
             }
-            BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos) => {
+            DBKey::CavesAndCliffsBlending(chunk_pos) => {
                 return ValueParseResult::Parsed(
                     Self::CavesAndCliffsBlending(chunk_pos, value.to_vec())
                 );
             }
-            BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos) => {
+            DBKey::BlendingBiomeHeight(chunk_pos) => {
                 return ValueParseResult::Parsed(
                     Self::BlendingBiomeHeight(chunk_pos, value.to_vec())
                 );
             }
-            BedrockLevelDBKey::LevelChunkMetaDataDictionary => {
+            DBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
                     return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
                 }
                 // TODO: use the error value to log debug information
                 // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
             }
-            BedrockLevelDBKey::RawKey(key) => {
+            DBKey::RawKey(key) => {
                 return ValueParseResult::Parsed(Self::RawEntry {
                     key,
                     value: value.to_vec(),
                 });
             }
             // TODO: explicitly handle every case. This is just to make it compile.
-            _ => return ValueParseResult::Parsed(BedrockLevelDBEntry::RawEntry {
+            _ => return ValueParseResult::Parsed(DBEntry::RawEntry {
                 key: vec![],
                 value: vec![],
             })
@@ -294,53 +294,49 @@ impl BedrockLevelDBEntry {
         ValueParseResult::UnrecognizedValue(key)
     }
 
-    pub fn to_key(&self) -> BedrockLevelDBKey {
+    pub fn to_key(&self) -> DBKey {
         match self {
-            Self::Version(chunk_pos, ..)        => BedrockLevelDBKey::Version(*chunk_pos),
-            Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(*chunk_pos),
-            Self::ActorDigestVersion(chunk_pos, ..)
-                => BedrockLevelDBKey::ActorDigestVersion(*chunk_pos),
-            Self::Data3D(chunk_pos, ..)         => BedrockLevelDBKey::Data3D(*chunk_pos),
-            Self::Data2D(chunk_pos, ..)         => BedrockLevelDBKey::Data2D(*chunk_pos),
-            Self::LegacyData2D(chunk_pos, ..)   => BedrockLevelDBKey::LegacyData2D(*chunk_pos),
-            Self::BlockEntities(chunk_pos, ..)  => BedrockLevelDBKey::BlockEntities(*chunk_pos),
-            Self::LegacyEntities(chunk_pos, ..) => BedrockLevelDBKey::LegacyEntities(*chunk_pos),
-            Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::RandomTicks(*chunk_pos),
-            Self::RandomTicks(chunk_pos, ..)    => BedrockLevelDBKey::RandomTicks(*chunk_pos),
-            Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(*chunk_pos),
+            Self::Version(chunk_pos, ..)            => DBKey::Version(*chunk_pos),
+            Self::LegacyVersion(chunk_pos, ..)      => DBKey::LegacyVersion(*chunk_pos),
+            Self::ActorDigestVersion(chunk_pos, ..) => DBKey::ActorDigestVersion(*chunk_pos),
+            Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(*chunk_pos),
+            Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(*chunk_pos),
+            Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(*chunk_pos),
+            Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
+            Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
+            Self::PendingTicks(chunk_pos, ..)       => DBKey::RandomTicks(*chunk_pos),
+            Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
+            Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
             Self::CavesAndCliffsBlending(chunk_pos, ..)
-                => BedrockLevelDBKey::CavesAndCliffsBlending(*chunk_pos),
+                => DBKey::CavesAndCliffsBlending(*chunk_pos),
             Self::BlendingBiomeHeight(chunk_pos, ..)
-                => BedrockLevelDBKey::BlendingBiomeHeight(*chunk_pos),
-            Self::LevelChunkMetaDataDictionary(_)
-                => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
-            Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key.clone()),
-            Self::RawValue { key, .. }          => key.clone(),
+                => DBKey::BlendingBiomeHeight(*chunk_pos),
+            Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
+            Self::RawValue { key, .. }              => key.clone(),
         }
     }
 
-    pub fn into_key(self) -> BedrockLevelDBKey {
+    pub fn into_key(self) -> DBKey {
         match self {
-            Self::Version(chunk_pos, ..)        => BedrockLevelDBKey::Version(chunk_pos),
-            Self::LegacyVersion(chunk_pos, ..)  => BedrockLevelDBKey::LegacyVersion(chunk_pos),
-            Self::ActorDigestVersion(chunk_pos, ..)
-                => BedrockLevelDBKey::ActorDigestVersion(chunk_pos),
-            Self::Data3D(chunk_pos, ..)         => BedrockLevelDBKey::Data3D(chunk_pos),
-            Self::Data2D(chunk_pos, ..)         => BedrockLevelDBKey::Data2D(chunk_pos),
-            Self::LegacyData2D(chunk_pos, ..)   => BedrockLevelDBKey::LegacyData2D(chunk_pos),
-            Self::BlockEntities(chunk_pos, ..)  => BedrockLevelDBKey::BlockEntities(chunk_pos),
-            Self::LegacyEntities(chunk_pos, ..) => BedrockLevelDBKey::LegacyEntities(chunk_pos),
-            Self::PendingTicks(chunk_pos, ..)   => BedrockLevelDBKey::PendingTicks(chunk_pos),
-            Self::RandomTicks(chunk_pos, ..)    => BedrockLevelDBKey::RandomTicks(chunk_pos),
-            Self::MetaDataHash(chunk_pos, ..)   => BedrockLevelDBKey::MetaDataHash(chunk_pos),
+            Self::Version(chunk_pos, ..)            => DBKey::Version(chunk_pos),
+            Self::LegacyVersion(chunk_pos, ..)      => DBKey::LegacyVersion(chunk_pos),
+            Self::ActorDigestVersion(chunk_pos, ..) => DBKey::ActorDigestVersion(chunk_pos),
+            Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(chunk_pos),
+            Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(chunk_pos),
+            Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(chunk_pos),
+            Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(chunk_pos),
+            Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(chunk_pos),
+            Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
+            Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
+            Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
             Self::CavesAndCliffsBlending(chunk_pos, ..)
-                => BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos),
+                => DBKey::CavesAndCliffsBlending(chunk_pos),
             Self::BlendingBiomeHeight(chunk_pos, ..)
-                => BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos),
-            Self::LevelChunkMetaDataDictionary(_)
-                => BedrockLevelDBKey::LevelChunkMetaDataDictionary,
-            Self::RawEntry { key, .. }          => BedrockLevelDBKey::RawKey(key),
-            Self::RawValue { key, .. }          => key,
+                => DBKey::BlendingBiomeHeight(chunk_pos),
+            Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::RawEntry { key, .. }              => DBKey::RawKey(key),
+            Self::RawValue { key, .. }              => key,
         }
     }
 
@@ -398,12 +394,12 @@ impl BedrockLevelDBEntry {
                 Ok((key_bytes, value))
             }
             Self::CavesAndCliffsBlending(chunk_pos, raw) => {
-                let key = BedrockLevelDBKey::CavesAndCliffsBlending(chunk_pos);
+                let key = DBKey::CavesAndCliffsBlending(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
                 Ok((key_bytes, raw))
             }
             Self::BlendingBiomeHeight(chunk_pos, raw) => {
-                let key = BedrockLevelDBKey::BlendingBiomeHeight(chunk_pos);
+                let key = DBKey::BlendingBiomeHeight(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
                 Ok((key_bytes, raw))
             }
@@ -423,13 +419,13 @@ impl BedrockLevelDBEntry {
     }
 }
 
-impl From<(&[u8], &[u8])> for BedrockLevelDBEntry {
+impl From<(&[u8], &[u8])> for DBEntry {
     fn from(raw_entry: (&[u8], &[u8])) -> Self {
         Self::parse_entry(raw_entry.0, raw_entry.1)
     }
 }
 
-impl From<(Vec<u8>, Vec<u8>)> for BedrockLevelDBEntry {
+impl From<(Vec<u8>, Vec<u8>)> for DBEntry {
     fn from(raw_entry: (Vec<u8>, Vec<u8>)) -> Self {
         Self::parse_entry_vec(raw_entry.0, raw_entry.1)
     }

@@ -8,8 +8,8 @@ pub mod uuid;
 #[cfg(feature = "concatenated_nbt_compounds")]
 pub mod concatenated_nbt_compounds; // For multiple sorts of values
 
-#[cfg(feature = "version")]
-pub mod version;
+#[cfg(feature = "chunk_version")]
+pub mod chunk_version;
 #[cfg(feature = "actor_digest_version")]
 pub mod actor_digest_version;
 #[cfg(feature = "data_3d")]
@@ -144,7 +144,7 @@ fn all_read(read_position: u64, total_len: usize) -> bool {
     doc,
     feature = "actor_digest_version",
     feature = "metadata",
-    feature = "version",
+    feature = "chunk_version",
 ))]
 #[macro_export]
 macro_rules! bijective_enum_map {
@@ -169,6 +169,7 @@ macro_rules! bijective_enum_map {
             }
         }
     };
+
     { $enum_name:ty, $into:ty, $try_from:ty, $($enum_variant:ident : $value:expr),+ $(,)? } => {
         bijective_map_enum!($enum_name:ty, $into:ty, $try_from:ty, $($enum_variant <=> $value),+)
     };
