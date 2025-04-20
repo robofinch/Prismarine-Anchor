@@ -13,7 +13,8 @@ use prismarine_anchor_nbt::{
 };
 
 use crate::dimensions::NamedDimension;
-use super::all_read;
+// use crate::
+use super::{all_read, bijective_enum_map};
 
 
 #[derive(Debug, Clone)]
@@ -421,81 +422,41 @@ pub enum MetaDataType {
     SkullFlatteningPerformed,
 }
 
-// Two-way map with From and TryFrom, for mapping MetaDataTypes to and from u8's and strings.
-macro_rules! map_meta_data_type {
-    (
-        $other_type:ty, $similar_type:ty,
-        $zero:expr, $one:expr, $two:expr, $three:expr, $four:expr, $five:expr, $six:expr,
-        $seven:expr, $eight:expr, $nine:expr, $ten:expr, $eleven:expr, $twelve:expr, $thirteen:expr,
-    ) => {
-        impl From<MetaDataType> for $other_type {
-            #[inline]
-            fn from(value: MetaDataType) -> Self {
-                match value {
-                    MetaDataType::LastSavedBaseGameVersion        => $zero,
-                    MetaDataType::OriginalBaseGameVersion         => $one,
-                    MetaDataType::BiomeBaseGameVersion            => $two,
-                    MetaDataType::DimensionName                   => $three,
-                    MetaDataType::GenerationSeed                  => $four,
-                    MetaDataType::GeneratorType                   => $five,
-                    MetaDataType::WorldGen1_18AppliedBelow0       => $six,
-                    MetaDataType::Overworld1_18HeightExtended     => $seven,
-                    MetaDataType::BlendingVersion                 => $eight,
-                    MetaDataType::OriginalDimensionHeightRange    => $nine,
-                    MetaDataType::LastSavedDimensionHeightRange   => $ten,
-                    MetaDataType::UnderwaterLavaLakeFixed         => $eleven,
-                    MetaDataType::WorldGenBelowZeroFixed          => $twelve,
-                    MetaDataType::SkullFlatteningPerformed        => $thirteen,
-                }
-            }
-        }
-
-        impl TryFrom<$similar_type> for MetaDataType {
-            type Error = ();
-
-            #[inline]
-            fn try_from(value: $similar_type) -> Result<Self, Self::Error> {
-                Ok(match value {
-                    $zero     => Self::LastSavedBaseGameVersion,
-                    $one      => Self::OriginalBaseGameVersion,
-                    $two      => Self::BiomeBaseGameVersion,
-                    $three    => Self::DimensionName,
-                    $four     => Self::GenerationSeed,
-                    $five     => Self::GeneratorType,
-                    $six      => Self::WorldGen1_18AppliedBelow0,
-                    $seven    => Self::Overworld1_18HeightExtended,
-                    $eight    => Self::BlendingVersion,
-                    $nine     => Self::OriginalDimensionHeightRange,
-                    $ten      => Self::LastSavedDimensionHeightRange,
-                    $eleven   => Self::UnderwaterLavaLakeFixed,
-                    $twelve   => Self::WorldGenBelowZeroFixed,
-                    $thirteen => Self::SkullFlatteningPerformed,
-                    _ => return Err(()),
-                })
-            }
-        }
-    };
+bijective_enum_map! {
+    MetaDataType, u8, u8,
+    LastSavedBaseGameVersion        <=> 0,
+    OriginalBaseGameVersion         <=> 1,
+    BiomeBaseGameVersion            <=> 2,
+    DimensionName                   <=> 3,
+    GenerationSeed                  <=> 4,
+    GeneratorType                   <=> 5,
+    WorldGen1_18AppliedBelow0       <=> 6,
+    Overworld1_18HeightExtended     <=> 7,
+    BlendingVersion                 <=> 8,
+    OriginalDimensionHeightRange    <=> 9,
+    LastSavedDimensionHeightRange   <=> 10,
+    UnderwaterLavaLakeFixed         <=> 11,
+    WorldGenBelowZeroFixed          <=> 12,
+    SkullFlatteningPerformed        <=> 13,
 }
 
-// Map the MetaDataTypes to and from u8's and strings.
-map_meta_data_type!(u8, u8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,);
-map_meta_data_type!(
-    &'static str, &str,
-    "LastSavedBaseGameVersion",
-    "OriginalBaseGameVersion",
-    "BiomeBaseGameVersion",
-    "DimensionName",
-    "GenerationSeed",
-    "GeneratorType",
-    "WorldGen1_18AppliedBelow0",
-    "Overworld1_18HeightExtended",
-    "BlendingVersion",
-    "OriginalDimensionHeightRange",
-    "LastSavedDimensionHeightRange",
-    "UnderwaterLavaLakeFixed",
-    "WorldGenBelowZeroFixed",
-    "SkullFlatteningPerformed",
-);
+bijective_enum_map! {
+    MetaDataType, &'static str, &str,
+    LastSavedBaseGameVersion        <=> "LastSavedBaseGameVersion",
+    OriginalBaseGameVersion         <=> "OriginalBaseGameVersion",
+    BiomeBaseGameVersion            <=> "BiomeBaseGameVersion",
+    DimensionName                   <=> "DimensionName",
+    GenerationSeed                  <=> "GenerationSeed",
+    GeneratorType                   <=> "GeneratorType",
+    WorldGen1_18AppliedBelow0       <=> "WorldGen1_18AppliedBelow0",
+    Overworld1_18HeightExtended     <=> "Overworld1_18HeightExtended",
+    BlendingVersion                 <=> "BlendingVersion",
+    OriginalDimensionHeightRange    <=> "OriginalDimensionHeightRange",
+    LastSavedDimensionHeightRange   <=> "LastSavedDimensionHeightRange",
+    UnderwaterLavaLakeFixed         <=> "UnderwaterLavaLakeFixed",
+    WorldGenBelowZeroFixed          <=> "WorldGenBelowZeroFixed",
+    SkullFlatteningPerformed        <=> "SkullFlatteningPerformed",
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlendingVersion {
@@ -509,39 +470,16 @@ pub enum BlendingVersion {
     V1_21_60,
 }
 
-impl From<BlendingVersion> for i16 {
-    #[inline]
-    fn from(value: BlendingVersion) -> Self {
-        match value {
-            BlendingVersion::V1_19_0   => 0,
-            BlendingVersion::V1_19_0_1 => 1,
-            BlendingVersion::V1_19_0_2 => 2,
-            BlendingVersion::V1_19_0_3 => 3,
-            BlendingVersion::V1_20_0   => 4,
-            BlendingVersion::V1_20_0_1 => 5,
-            BlendingVersion::V1_21_50  => 6,
-            BlendingVersion::V1_21_60  => 7,
-        }
-    }
-}
-
-impl TryFrom<i16> for BlendingVersion {
-    type Error = ();
-
-    #[inline]
-    fn try_from(value: i16) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => BlendingVersion::V1_19_0,
-            1 => BlendingVersion::V1_19_0_1,
-            2 => BlendingVersion::V1_19_0_2,
-            3 => BlendingVersion::V1_19_0_3,
-            4 => BlendingVersion::V1_20_0,
-            5 => BlendingVersion::V1_20_0_1,
-            6 => BlendingVersion::V1_21_50,
-            7 => BlendingVersion::V1_21_60,
-            _ => return Err(())
-        })
-    }
+bijective_enum_map! {
+    BlendingVersion, i16, i16,
+    V1_19_0   <=> 0,
+    V1_19_0_1 <=> 1,
+    V1_19_0_2 <=> 2,
+    V1_19_0_3 <=> 3,
+    V1_20_0   <=> 4,
+    V1_20_0_1 <=> 5,
+    V1_21_50  <=> 6,
+    V1_21_60  <=> 7,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -551,29 +489,11 @@ pub enum GeneratorType {
     Flat,
 }
 
-impl From<GeneratorType> for i32 {
-    #[inline]
-    fn from(value: GeneratorType) -> Self {
-        match value {
-            GeneratorType::Old      => 0,
-            GeneratorType::Infinite => 1,
-            GeneratorType::Flat     => 2,
-        }
-    }
-}
-
-impl TryFrom<i32> for GeneratorType {
-    type Error = ();
-
-    #[inline]
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => GeneratorType::Old,
-            1 => GeneratorType::Infinite,
-            2 => GeneratorType::Flat,
-            _ => return Err(()),
-        })
-    }
+bijective_enum_map! {
+    GeneratorType, i32, i32,
+    Old      <=> 0,
+    Infinite <=> 1,
+    Flat     <=> 2,
 }
 
 #[derive(Error, Debug)]

@@ -87,7 +87,11 @@ pub mod flat_world_layers;
 
 /// Compare a reader's position to the total length of data that was expected to be read,
 /// to check if everything was read.
-#[cfg(any(feature = "data_3d", feature = "concatenated_nbt_compounds", feature = "metadata"))]
+#[cfg(any(
+    feature = "data_3d",
+    feature = "concatenated_nbt_compounds",
+    feature = "metadata",
+))]
 #[inline]
 fn all_read(read_position: u64, total_len: usize) -> bool {
 
@@ -102,13 +106,101 @@ fn all_read(read_position: u64, total_len: usize) -> bool {
     }
 }
 
+/// Map an enum into and from two other types using `From` and `TryFrom` (with unit error).
+///
+/// The two other types should be similar enough that the same value expression works for either;
+/// in practice, they should usually be the same, but it is useful for converting
+/// into `&'static str` and trying to convert from `&str`, for example.
+///
+/// # Examples:
+/// ```
+/// # use prismarine_anchor_leveldb_values::bijective_enum_map;
+///
+/// #[derive(Debug, PartialEq, Eq)]
+/// enum AtMostTwo {
+///     Zero,
+///     One,
+///     Two,
+/// }
+///
+/// #[derive(Debug, PartialEq, Eq)]
+/// enum Empty {}
+///
+/// bijective_enum_map! {
+///     AtMostTwo, u8, u8,
+///     Zero <=> 0,
+///     One  <=> 1,
+///     Two  <=> 2,
+/// }
+///
+/// bijective_enum_map! {
+///     Empty, &'static str, &str,
+/// }
+///
+/// assert_eq!(u8::from(AtMostTwo::One), 1u8);
+/// assert_eq!(AtMostTwo::try_from(2u8), Ok(AtMostTwo::Two));
+/// assert_eq!(AtMostTwo::try_from(4u8), Err(()));
+/// assert_eq!(Empty::try_from("42"), Err(()))
+/// ```
+#[cfg(any(
+    doc,
+    feature = "actor_digest_version",
+    feature = "legacy_version",
+    feature = "metadata",
+    feature = "version",
+))]
+#[macro_export]
+macro_rules! bijective_enum_map {
+    { $enum_name:ty, $into:ty, $try_from:ty, $($enum_variant:ident <=> $value:expr),+ $(,)? } => {
+        impl From<$enum_name> for $into {
+            #[inline]
+            fn from(value: $enum_name) -> Self {
+                match value {
+                    $( <$enum_name>::$enum_variant => $value ),+
+                }
+            }
+        }
+        impl TryFrom<$try_from> for $enum_name {
+            type Error = ();
+
+            #[inline]
+            fn try_from(value: $try_from) -> Result<Self, Self::Error> {
+                Ok(match value {
+                    $( $value => Self::$enum_variant ),+,
+                    _ => return Err(())
+                })
+            }
+        }
+    };
+    { $enum_name:ty, $into:ty, $try_from:ty, $($enum_variant:ident : $value:expr),+ $(,)? } => {
+        bijective_map_enum!($enum_name:ty, $into:ty, $try_from:ty, $($enum_variant <=> $value),+)
+    };
+
+    { $enum_name:ty, $into:ty, $try_from:ty $(,)? } => {
+        impl From<$enum_name> for $into {
+            #[inline]
+            fn from(value: $enum_name) -> Self {
+                match value {}
+            }
+        }
+        impl TryFrom<$try_from> for $enum_name {
+            type Error = ();
+
+            #[inline]
+            fn try_from(_value: $try_from) -> Result<Self, Self::Error> {
+                Err(())
+            }
+        }
+    };
+}
+
 /// For use during development. Instead of printing binary data as entirely binary,
 /// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
 /// with binary data interspersed.
 ///
 /// For example:
 /// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
-#[allow(unused)]
+#[allow(dead_code)]
 fn print_debug(value: &[u8]) {
     let mut nums = value.iter().peekable();
 

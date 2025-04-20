@@ -1,25 +1,24 @@
+use crate::bijective_enum_map;
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LegacyChunkVersion(pub u8);
+pub enum LegacyChunkVersion {
+}
 
 impl LegacyChunkVersion {
-    // TODO: figure out what the possible values are
     #[inline]
     pub fn parse(version: u8) -> Option<Self> {
-        Some(Self(version))
+        Self::try_from(version).ok()
     }
-}
 
-impl From<LegacyChunkVersion> for u8 {
     #[inline]
-    fn from(value: LegacyChunkVersion) -> Self {
-        value.0
+    pub fn to_byte(self) -> u8 {
+        u8::from(self)
     }
 }
 
-impl TryFrom<u8> for LegacyChunkVersion {
-    type Error = ();
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Self::parse(value).ok_or(())
-    }
+// TODO: figure out which version values are only allowed for `ChunkVersion`,
+// not `LegacyChunkVersion`, and vice-versa.
+bijective_enum_map! {
+    LegacyChunkVersion, u8, u8,
 }

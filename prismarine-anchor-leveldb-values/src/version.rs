@@ -1,26 +1,22 @@
+use crate::bijective_enum_map;
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChunkVersion(pub u8);
+pub enum ChunkVersion {
+}
 
 impl ChunkVersion {
-    /// The most recent `ChunkVersion`s are in the 40s.
-    // TODO: figure out what the possible values are
     #[inline]
     pub fn parse(version: u8) -> Option<Self> {
-        Some(Self(version))
+        Self::try_from(version).ok()
     }
-}
 
-impl From<ChunkVersion> for u8 {
     #[inline]
-    fn from(value: ChunkVersion) -> Self {
-        value.0
+    pub fn to_byte(self) -> u8 {
+        u8::from(self)
     }
 }
 
-impl TryFrom<u8> for ChunkVersion {
-    type Error = ();
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Self::parse(value).ok_or(())
-    }
+bijective_enum_map! {
+    ChunkVersion, u8, u8,
 }
