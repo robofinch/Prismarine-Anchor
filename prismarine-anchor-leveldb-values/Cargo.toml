@@ -7,7 +7,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-prismarine-anchor-nbt   = { workspace = true, optional = true }
+prismarine-anchor-nbt           = { workspace = true, optional = true }
+prismarine-anchor-translation   = { workspace = true, optional = true }
 
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
@@ -36,9 +37,9 @@ dimensions                  = []
 chunk_position              = []
 uuid                        = []
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
-version                     = []
-legacy_version              = []
-actor_digest_version        = []
+version                     = ["dep:prismarine-anchor-translation"]
+legacy_version              = ["dep:prismarine-anchor-translation"]
+actor_digest_version        = ["dep:prismarine-anchor-translation"]
 data_3d                     = ["dep:zerocopy"]
 data_2d                     = ["dep:zerocopy"]
 legacy_data_2d              = ["dep:zerocopy"]

@@ -5,6 +5,7 @@ pub struct ActorID {
 }
 
 impl ActorID {
+    #[inline]
     pub fn parse(bytes: [u8; 8]) -> Self {
         let upper = [bytes[0], bytes[1], bytes[2], bytes[3]];
         let lower = [bytes[4], bytes[5], bytes[6], bytes[7]];
@@ -16,6 +17,7 @@ impl ActorID {
         }
     }
 
+    #[inline]
     pub fn to_bytes(self) -> [u8; 8] {
         let upper = self.upper.to_be_bytes();
         let lower = self.lower.to_be_bytes();

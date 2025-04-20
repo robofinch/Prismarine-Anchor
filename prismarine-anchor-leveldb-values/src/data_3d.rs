@@ -103,6 +103,7 @@ impl Data3D {
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);
@@ -523,6 +524,7 @@ impl PaletteBitsPerIndex {
 }
 
 impl From<PaletteBitsPerIndex> for u8 {
+    #[inline]
     fn from(value: PaletteBitsPerIndex) -> Self {
         match value {
             PaletteBitsPerIndex::One      => 1,
@@ -538,6 +540,7 @@ impl From<PaletteBitsPerIndex> for u8 {
 }
 
 impl From<bool> for PaletteType {
+    #[inline]
     fn from(value: bool) -> Self {
         if value {
             PaletteType::Runtime
@@ -548,6 +551,7 @@ impl From<bool> for PaletteType {
 }
 
 impl From<PaletteType> for bool {
+    #[inline]
     fn from(value: PaletteType) -> Self {
         match value {
             PaletteType::Persistent => false,
@@ -557,6 +561,7 @@ impl From<PaletteType> for bool {
 }
 
 impl From<u8> for PaletteType {
+    #[inline]
     fn from(value: u8) -> Self {
         match value {
             0 => PaletteType::Persistent,
@@ -566,6 +571,7 @@ impl From<u8> for PaletteType {
 }
 
 impl From<PaletteType> for u8 {
+    #[inline]
     fn from(value: PaletteType) -> Self {
         match value {
             PaletteType::Persistent => 0,

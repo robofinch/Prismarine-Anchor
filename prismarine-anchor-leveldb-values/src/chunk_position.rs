@@ -69,6 +69,7 @@ impl DimensionedChunkPos {
     /// a `NumericDimension`. If the dimension is the Overworld,
     /// its dimension ID doesn't need to be serialized,
     /// but if `write_overworld_id` is true, then it will be.
+    #[inline]
     pub fn to_bytes(self, write_overworld_id: bool) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes, write_overworld_id);
@@ -80,6 +81,7 @@ impl DimensionedChunkPos {
 impl TryFrom<&[u8]> for DimensionedChunkPos {
     type Error = ();
 
+    #[inline]
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::new_raw(value).ok_or(())
     }

@@ -67,7 +67,6 @@ impl LegacyData2D {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-
         let heightmap: [u16; 256] = transmute!(self.heightmap);
         let heightmap: [[u8; 2]; 256] = heightmap.map(u16::to_le_bytes);
         let heightmap: [u8; 512] = transmute!(heightmap);
