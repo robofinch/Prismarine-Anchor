@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Serialize, Deserialize};
 
-use prismarine_anchor_translation::datatypes::MINECRAFT_NAMESPACE;
-use prismarine_anchor_translation::translator::{GameVersion, VersionName};
+use prismarine_anchor_translation::datatypes::{MINECRAFT_NAMESPACE, GameVersion, VersionName};
 
 use super::{MappingParseError, MappingParseOptions, NamespacedIdentifier};
 
