@@ -9,7 +9,7 @@ pub enum ChunkVersion {
     V10, V11, V12, V13, V14, V15, V16, V17, V18, V19,
     V20, V21, V22, V23, V24, V25, V26, V27, V28, V29,
     V30, V31, V32, V33, V34, V35, V36, V37, V38, V39,
-    V40,
+    V40, V41,
 }
 
 impl ChunkVersion {
@@ -52,8 +52,9 @@ impl ChunkVersion {
     /// if the caves and cliffs experimental feature was enabled.
     pub fn chunk_version_for(game_version: NumericVersion) -> Option<Self> {
 
-        // TODO: this doesn't seem perfectly accurate, I have an alpha save which uses
-        // chunk version 4 - maybe i'm not looking at quite the right game version,
+        // TODO: this doesn't seem to cover everything, I have an alpha save whose
+        // last saved version *seems* to be plain 0's, which uses chunk version 4 -
+        // maybe i'm not looking at quite the right data for game version,
         // but I wouldn't trust this for the oldest versions.
 
         let versions = [
@@ -62,7 +63,7 @@ impl ChunkVersion {
             // Skip 16 and 17
             Self::V18, Self::V19, Self::V20, Self::V21, Self::V22,
             // Skip experimental versions
-            Self::V39, Self::V40,
+            Self::V39, Self::V40, Self::V41,
         ];
         let game_versions = versions.map(Self::lowest_game_version);
 
@@ -96,7 +97,7 @@ impl ChunkVersion {
             // Skip 16 and 17
             Self::V18, Self::V19, Self::V20, Self::V21, Self::V22,
             Self::V25, Self::V29, Self::V31, // Skip 23-24, 26-28, 30, and 32-38
-            Self::V39, Self::V40,
+            Self::V39, Self::V40, Self::V41,
         ];
         let game_versions = versions.map(Self::lowest_game_version);
 
@@ -124,57 +125,86 @@ impl ChunkVersion {
             Self::V2  => NumericVersion::from([0, 9, 5]),
             Self::V3  => NumericVersion::from([0, 17, 0]),
             Self::V4  => NumericVersion::from([0, 18, 0]),
+            // V5 seems to be internally called VConsole1ToV18_0
             Self::V5  => NumericVersion::from([0, 18, 0]),
-            // TODO: didn't some things change in 1.2.13? Is "1.2.0" really precise?
             Self::V6  => NumericVersion::from([1, 2, 0]),
+            // V7 seems to be internally called V1_2_0Bis
             Self::V7  => NumericVersion::from([1, 2, 0]),
             Self::V8  => NumericVersion::from([1, 3, 0]),
             Self::V9  => NumericVersion::from([1, 8, 0]),
             Self::V10 => NumericVersion::from([1, 9, 0]),
             Self::V11 => NumericVersion::from([1, 10, 0]),
             Self::V12 => NumericVersion::from([1, 11, 0]),
+            // TODO: Maybe 1.11.10 instead of 1.11.1?
             Self::V13 => NumericVersion::from([1, 11, 1]),
+            // TODO: Maybe 1.11.20 instead of 1.11.2?
             Self::V14 => NumericVersion::from([1, 11, 2]),
             Self::V15 => NumericVersion::from([1, 12, 0]),
-            // UNKNOWN: sometime a bit before 1.16
-            Self::V16 => NumericVersion::from([1, 16, 0]),
-            // UNKNOWN: sometime a bit before 1.16
-            Self::V17 => NumericVersion::from([1, 16, 0]),
+            Self::V16 => NumericVersion::from([1, 14, 0]),
+            Self::V17 => NumericVersion::from([1, 15, 0]),
             Self::V18 => NumericVersion::from([1, 16, 0]),
+            // V19 seems to be internally called V1_16_0Bis
             Self::V19 => NumericVersion::from([1, 16, 0]),
+            // Is .56 overly precise? Might be 1.16.100
             Self::V20 => NumericVersion::from([1, 16, 100, 56, 0]),
+            // V21 seems to be internally called V1_16_100Bis
             Self::V21 => NumericVersion::from([1, 16, 100, 58, 0]),
             Self::V22 => NumericVersion::from([1, 16, 210]),
-            // UNKNOWN: presumably somewhere starting at 1.17.0 and strictly before 1.17.30
+
+            // Experimental stuff. Also, note that 1.16.300 does not seem to exist.
+            // TODO: all these experimental version values. are probably inaccurate.
+
+            // UNKNOWN: presumably somewhere around 1.17
+            // V23 seems to be internally called V1_16_300CavesCliffsPart1
             Self::V23 => NumericVersion::from([1, 17, 0]),
-            // UNKNOWN: presumably somewhere starting at 1.17.0 and strictly before 1.17.30
+            // UNKNOWN: presumably somewhere around 1.17
+            // V24 seems to be internally called V1_16_300CavesCliffsInternalV1
             Self::V24 => NumericVersion::from([1, 17, 0]),
             // Note: probably used from 1.17.0 up to 1.17.30.
             // This is returned for 1.17.0 when the caves and cliffs experiment is enabled.
+            // V25 seems to be internally called V1_16_300CavesCliffsPart2
             Self::V25 => NumericVersion::from([1, 17, 0]),
             // UNKNOWN: before 1.17.30
+            // V26 seems to be internally called V1_16_300CavesCliffsInternalV2
             Self::V26 => NumericVersion::from([1, 17, 30]),
             // UNKNOWN: before 1.17.30
+            // V27 seems to be internally called V1_16_300CavesCliffsPart3
             Self::V27 => NumericVersion::from([1, 17, 30]),
             // UNKNOWN: before 1.17.30
+            // V28 seems to be internally called V1_16_300CavesCliffsInternalV3
             Self::V28 => NumericVersion::from([1, 17, 30]),
             // This is returned for 1.17.30 when the caves and cliffs experiment is enabled.
+            // V29 seems to be internally called V1_16_300CavesCliffsPart4
             Self::V29 => NumericVersion::from([1, 17, 30]),
             // UNKNOWN: probably between 1.7.30 and 1.17.40
+            // V30 seems to be internally called V1_16_300CavesCliffsInternalV4
             Self::V30 => NumericVersion::from([1, 17, 40]),
             // This is returned for 1.17.40 when the caves and cliffs experiment is enabled.
+            // V31 seems to be internally called V1_16_300CavesCliffsPart5
             Self::V31 => NumericVersion::from([1, 17, 40]),
             // 32-38: UNKNOWN: probably after 1.17.40, definitely before 1.18.0.
             // AFAIK the last pre-1.18.0 version is 1.17.41, so I've put that here.
+            // V32 seems to be internally called V1_16_300CavesCliffsInternalV5
             Self::V32 => NumericVersion::from([1, 17, 41]),
+            // V33 seems to be internally called V1_18_0
+            // ....interesting. I guess it *is* preparation for 1.18.0 features
             Self::V33 => NumericVersion::from([1, 17, 41]),
+            // V34 seems to be internally called V1_18_0Internal
             Self::V34 => NumericVersion::from([1, 17, 41]),
+            // V35 seems to be internally called V1_18_1
             Self::V35 => NumericVersion::from([1, 17, 41]),
+            // V36 seems to be internally called V1_18_1Internal
             Self::V36 => NumericVersion::from([1, 17, 41]),
+            // V37 seems to be internally called V1_18_2
             Self::V37 => NumericVersion::from([1, 17, 41]),
+            // V38 seems to be internally called V1_18_2Internal
             Self::V38 => NumericVersion::from([1, 17, 41]),
+
+            // Non-experimental stuff
+
             Self::V39 => NumericVersion::from([1, 18, 0]),
             Self::V40 => NumericVersion::from([1, 18, 30]),
+            Self::V41 => NumericVersion::from([1, 21, 40]),
         }
     }
 }
@@ -189,5 +219,5 @@ bijective_enum_map! {
     V25 <=> 25,   V26 <=> 26,   V27 <=> 27,   V28 <=> 28,   V29 <=> 29,
     V30 <=> 30,   V31 <=> 31,   V32 <=> 32,   V33 <=> 33,   V34 <=> 34,
     V35 <=> 35,   V36 <=> 36,   V37 <=> 37,   V38 <=> 38,   V39 <=> 39,
-    V40 <=> 40,
+    V40 <=> 40,   V41 <=> 41,
 }
