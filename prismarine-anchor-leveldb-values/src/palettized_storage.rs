@@ -101,6 +101,7 @@ pub fn write_le_u32s(u32s: &[u32], bytes: &mut Vec<u8>) -> Result<(), Infallible
 
 impl<T> PalettizedStorage<T> {
     // TODO: return a Result instead of an Option
+    // TODO: have the option to not accept the special cases
     pub fn parse<R: Read>(
         reader: &mut R,
         bits_per_index: HeaderBitsPerIndex,
@@ -152,6 +153,7 @@ impl<T> PalettizedStorage<T> {
         }
     }
 
+    // TODO: have the option to error on the special cases
     pub fn extend_serialized<E>(
         &self,
         bytes: &mut Vec<u8>,

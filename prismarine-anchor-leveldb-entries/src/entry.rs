@@ -1,6 +1,7 @@
 use prismarine_anchor_leveldb_values::{
     // actor::ActorID,
     actor_digest_version::ActorDigestVersion,
+    blending_data::BlendingData,
     chunk_position::DimensionedChunkPos,
     chunk_version::ChunkVersion,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
@@ -65,7 +66,7 @@ pub enum DBEntry {
     CavesAndCliffsBlending(DimensionedChunkPos, Vec<u8>),
     // Not used, apparently, so Vec<u8> is the best we can do without more info.
     BlendingBiomeHeight(DimensionedChunkPos, Vec<u8>),
-    // BlendingData(DimensionedChunkPos),
+    BlendingData(DimensionedChunkPos, BlendingData),
 
     // ActorDigest(DimensionedChunkPos),
 
@@ -281,6 +282,13 @@ impl DBEntry {
                     Self::BlendingBiomeHeight(chunk_pos, value.to_vec())
                 );
             }
+            DBKey::BlendingData(chunk_pos) => {
+                if let Some(blending_data) = BlendingData::parse(value) {
+                    return ValueParseResult::Parsed(
+                        Self::BlendingData(chunk_pos, blending_data)
+                    );
+                }
+            }
             DBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
                     return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
@@ -324,6 +332,7 @@ impl DBEntry {
                 => DBKey::CavesAndCliffsBlending(*chunk_pos),
             Self::BlendingBiomeHeight(chunk_pos, ..)
                 => DBKey::BlendingBiomeHeight(*chunk_pos),
+            Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
@@ -349,6 +358,7 @@ impl DBEntry {
                 => DBKey::CavesAndCliffsBlending(chunk_pos),
             Self::BlendingBiomeHeight(chunk_pos, ..)
                 => DBKey::BlendingBiomeHeight(chunk_pos),
+            Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key),
             Self::RawValue { key, .. }              => key,
@@ -377,6 +387,7 @@ impl DBEntry {
             Self::MetaDataHash(.., hash)              => hash.to_le_bytes().to_vec(),
             Self::CavesAndCliffsBlending(.., raw)     => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)        => raw.clone(),
+            Self::BlendingData(.., blending_data)     => blending_data.to_bytes(),
             Self::LevelChunkMetaDataDictionary(dict)  => {
                 dict.to_bytes(opts.error_on_excessive_length)?
             }
