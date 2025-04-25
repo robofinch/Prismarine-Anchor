@@ -33,7 +33,7 @@ all = [
     "position_tracking", "flat_world_layers"
 ]
 dimensions                  = []
-chunk_position              = []
+chunk_position              = ["dimensions"]
 uuid                        = []
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
 palettized_storage          = ["dep:zerocopy"]

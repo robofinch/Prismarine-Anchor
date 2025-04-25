@@ -1,4 +1,3 @@
-#[cfg(feature = "dimensions")]
 use crate::dimensions::NumericDimension;
 
 
@@ -14,11 +13,9 @@ pub struct ChunkPosition {
 }
 
 /// The location of a chunk in a world, including its dimension.
-#[cfg(feature = "dimensions")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DimensionedChunkPos(ChunkPosition, NumericDimension);
 
-#[cfg(feature = "dimensions")]
 impl DimensionedChunkPos {
     /// Attempt to parse the bytes as a `ChunkPosition` followed by an optional `NumericDimension`.
     /// The dimension defaults to the Overworld if not present.
@@ -77,7 +74,6 @@ impl DimensionedChunkPos {
     }
 }
 
-#[cfg(feature = "dimensions")]
 impl TryFrom<&[u8]> for DimensionedChunkPos {
     type Error = ();
 

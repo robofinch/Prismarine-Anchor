@@ -40,6 +40,8 @@ default = [ "named_escapes" ]
 # TODO: Need to actually use document_features for the
 # below comments to be visible in the generated docs
 
+# NOTE: whenever a new feature is added, the Makefile might need to be updated.
+
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "dep:indexmap" ]
 ## Provides an NBT tag wrapper implementing `Eq`, `Ord`, and `Hash`.
