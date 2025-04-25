@@ -64,7 +64,7 @@ pub enum DBKey {
     // TODO: no longer used as of when?
     HardcodedSpawners(DimensionedChunkPos),
     // Found in levilamina, key tag value 119 (b'w'). Related to hardcoded spawners, maybe?
-    // TODO: what is this? is this a levilamina -unique thing?
+    // Apparently something to do with trial chambers... maybe other structures too?
     AabbVolumes(DimensionedChunkPos),
 
     /// xxHash64 checksums of `SubchunkBlocks`, `BlockEntities`, `Entities`, and `Data2D`
@@ -168,6 +168,7 @@ pub enum DBKey {
     // New and exciting tags, with very little information about them
     PositionTrackingDB(u32),
     PositionTrackingLastId,
+    // BiomeIdsTable
 
     /// This key, `game_flatworldlayers`, only seems to be used in very old versions.
     FlatWorldLayers,

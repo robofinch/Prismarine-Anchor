@@ -7,6 +7,8 @@ pub mod uuid;
 
 #[cfg(feature = "concatenated_nbt_compounds")]
 pub mod concatenated_nbt_compounds; // For multiple sorts of values
+#[cfg(feature = "palettized_storage")]
+pub mod palettized_storage;
 
 #[cfg(feature = "chunk_version")]
 pub mod chunk_version;

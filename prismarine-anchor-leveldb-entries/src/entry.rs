@@ -2,17 +2,19 @@ use prismarine_anchor_leveldb_values::{
     // actor::ActorID,
     actor_digest_version::ActorDigestVersion,
     chunk_position::DimensionedChunkPos,
+    chunk_version::ChunkVersion,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
     data_2d::Data2D,
     data_3d::Data3D,
     legacy_data_2d::LegacyData2D,
     metadata::LevelChunkMetaDataDictionary,
-    chunk_version::ChunkVersion,
+    subchunk_blocks::SubchunkBlocks,
 };
 
 use crate::{
     key::DBKey,
-    EntryParseResult, EntryToBytesOptions, ValueToBytesError, ValueToBytesOptions, ValueParseResult,
+    EntryParseResult, EntryToBytesOptions,
+    ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
 
 /// The entries in a world's LevelDB database used by Minecraft Bedrock,
@@ -33,11 +35,11 @@ pub enum DBEntry {
     LegacyVersion(DimensionedChunkPos, ChunkVersion),
     ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
 
-    Data3D(DimensionedChunkPos, Data3D),
-    Data2D(DimensionedChunkPos, Data2D),
-    LegacyData2D(DimensionedChunkPos, LegacyData2D),
+    Data3D(DimensionedChunkPos, Box<Data3D>),
+    Data2D(DimensionedChunkPos, Box<Data2D>),
+    LegacyData2D(DimensionedChunkPos, Box<LegacyData2D>),
 
-    // SubchunkBlocks(DimensionedChunkPos, i8),
+    SubchunkBlocks(DimensionedChunkPos, i8, SubchunkBlocks),
     // LegacyTerrain(DimensionedChunkPos),
     // LegacyExtraBlockData(DimensionedChunkPos),
 
@@ -104,6 +106,7 @@ pub enum DBEntry {
 
     // PositionTrackingDB(u32),
     // PositionTrackingLastId,
+    // BiomeIdsTable
 
     // FlatWorldLayers,
 
@@ -212,22 +215,29 @@ impl DBEntry {
             DBKey::Data3D(chunk_pos) => {
                 if let Some(data_3d) = Data3D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::Data3D(chunk_pos, data_3d)
+                        DBEntry::Data3D(chunk_pos, Box::new(data_3d))
                     );
                 }
             }
             DBKey::Data2D(chunk_pos) => {
                 if let Some(data_2d) = Data2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::Data2D(chunk_pos, data_2d)
+                        DBEntry::Data2D(chunk_pos, Box::new(data_2d))
                     );
                 }
             }
             DBKey::LegacyData2D(chunk_pos) => {
                 if let Some(legacy_data_2d) = LegacyData2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::LegacyData2D(chunk_pos, legacy_data_2d)
+                        DBEntry::LegacyData2D(chunk_pos, Box::new(legacy_data_2d))
                     );
+                }
+            }
+            DBKey::SubchunkBlocks(chunk_pos, y_index) => {
+                if let Some(subchunk_blocks) = SubchunkBlocks::parse(value) {
+                    return ValueParseResult::Parsed(
+                        DBEntry::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks)
+                    )
                 }
             }
             DBKey::BlockEntities(chunk_pos) => {
@@ -285,11 +295,11 @@ impl DBEntry {
                 });
             }
             // TODO: explicitly handle every case. This is just to make it compile.
-            _ => return ValueParseResult::Parsed(DBEntry::RawEntry {
-                key: vec![],
-                value: vec![],
-            })
-            // _ => {}
+            // _ => return ValueParseResult::Parsed(DBEntry::RawEntry {
+            //     key: vec![],
+            //     value: vec![],
+            // })
+            _ => {}
         }
 
         ValueParseResult::UnrecognizedValue(key)
@@ -303,6 +313,8 @@ impl DBEntry {
             Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(*chunk_pos),
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(*chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(*chunk_pos),
+            Self::SubchunkBlocks(chunk_pos, y_index, ..)
+                => DBKey::SubchunkBlocks(*chunk_pos, *y_index),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::RandomTicks(*chunk_pos),
@@ -326,6 +338,8 @@ impl DBEntry {
             Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(chunk_pos),
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(chunk_pos),
+            Self::SubchunkBlocks(chunk_pos, y_index, ..)
+                => DBKey::SubchunkBlocks(chunk_pos, y_index),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(chunk_pos),
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
@@ -355,6 +369,7 @@ impl DBEntry {
             Self::Data3D(.., data)                    => data.to_bytes(),
             Self::Data2D(.., data)                    => data.to_bytes(),
             Self::LegacyData2D(.., data)              => data.to_bytes(),
+            Self::SubchunkBlocks(.., blocks)          => blocks.to_bytes()?,
             Self::BlockEntities(.., compounds)        => compounds.to_bytes(true)?,
             Self::LegacyEntities(.., compounds)       => compounds.to_bytes(true)?,
             Self::PendingTicks(.., compounds)         => compounds.to_bytes(true)?,

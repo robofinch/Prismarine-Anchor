@@ -18,7 +18,7 @@ zerocopy        = { workspace = true, features = ["derive"], optional = true }
 
 [features]
 all = [
-    "dimensions", "chunk_position", "uuid", "concatenated_nbt_compounds",
+    "dimensions", "chunk_position", "uuid", "concatenated_nbt_compounds", "palettized_storage",
     "chunk_version", "actor_digest_version",
     "data_3d", "data_2d", "legacy_data_2d",
     "subchunk_blocks", "legacy_terrain", "legacy_extra_block_data",
@@ -36,12 +36,15 @@ dimensions                  = []
 chunk_position              = []
 uuid                        = []
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
+palettized_storage          = ["dep:zerocopy"]
 chunk_version               = ["dep:prismarine-anchor-translation"]
 actor_digest_version        = ["dep:prismarine-anchor-translation"]
-data_3d                     = ["dep:zerocopy"]
+data_3d                     = ["dep:zerocopy", "palettized_storage"]
 data_2d                     = ["dep:zerocopy"]
 legacy_data_2d              = ["dep:zerocopy"]
-subchunk_blocks             = []
+subchunk_blocks             = [
+    "palettized_storage", "prismarine-anchor-nbt/allow_any_root"
+]
 legacy_terrain              = []
 legacy_extra_block_data     = []
 border_blocks               = []

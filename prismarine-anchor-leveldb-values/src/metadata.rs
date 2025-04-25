@@ -12,9 +12,8 @@ use prismarine_anchor_nbt::{
     settings::{Endianness, IoOptions},
 };
 
-use crate::dimensions::NamedDimension;
-// use crate::
-use super::{all_read, bijective_enum_map};
+use crate::bijective_enum_map;
+use crate::{all_read, dimensions::NamedDimension};
 
 
 #[derive(Debug, Clone)]

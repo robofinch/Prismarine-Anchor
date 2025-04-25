@@ -3,7 +3,7 @@ use std::io::Cursor;
 use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
 use prismarine_anchor_nbt::io::{read_compound, write_compound, NbtIoError};
 
-use super::all_read;
+use crate::all_read;
 
 
 #[derive(Debug, Clone)]
