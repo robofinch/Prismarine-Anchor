@@ -190,7 +190,7 @@ impl From<IndexJson> for Index {
 }
 
 fn parse_mapping_file(
-    json: MappingJson, opts: MappingParseOptions,
+    json: MappingJson<'_>, opts: MappingParseOptions,
 ) -> Result<MappingFile, MappingParseError> {
 
     let functions_and_options = json.0.into_iter().map(|function_json| {
@@ -215,9 +215,9 @@ struct FunctionJson<'a> {
     options: &'a RawValue,
 }
 
-impl<'a> FunctionJson<'a> {
+impl FunctionJson<'_> {
     fn parse_multiple(
-        function_vec: Vec<FunctionJson>, opts: MappingParseOptions,
+        function_vec: Vec<FunctionJson<'_>>, opts: MappingParseOptions,
     ) -> Result<Box<[MappingFunction]>, MappingParseError> {
 
         function_vec.into_iter().map(|function| {
@@ -343,7 +343,10 @@ fn parse_map_block_name(
     options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let blockname_map: HashMap<String, Vec<FunctionJson>> = serde_json::from_str(options_json)?;
+    let blockname_map: HashMap<
+        String,
+        Vec<FunctionJson<'_>>,
+    > = serde_json::from_str(options_json)?;
 
     let blockname_map = blockname_map.into_iter().map(|(key, function_vec)| {
         Ok((
@@ -367,7 +370,7 @@ fn parse_map_nbt(
         default: Option<Vec<FunctionJson<'a>>>,
     }
 
-    let json: MapNbtJson = serde_json::from_str(options_json)?;
+    let json: MapNbtJson<'_> = serde_json::from_str(options_json)?;
 
     let mut nbt_map = if let Some(cases) = json.cases {
         cases.into_iter().map(|(key, function_vec)| {
@@ -393,7 +396,10 @@ fn parse_map_properties(
     options_json: &str, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
 
-    let json: HashMap<PropertyName, HashMap<String, Vec<FunctionJson>>> = serde_json::from_str(options_json)?;
+    let json: HashMap<
+        PropertyName,
+        HashMap<String, Vec<FunctionJson<'_>>>,
+    > = serde_json::from_str(options_json)?;
 
     // Most normal nested iteration
     let property_map = json.into_iter().map(|(property_name, value_map)| {
@@ -492,7 +498,7 @@ fn parse_multiblock(
         functions: Vec<FunctionJson<'a>>,
     }
 
-    let json_vec: Vec<MultiblockEntry> = serde_json::from_str(options_json)?;
+    let json_vec: Vec<MultiblockEntry<'_>> = serde_json::from_str(options_json)?;
 
     let multiblock_entries = json_vec.into_iter().map(|json| {
         if json.coords.len() != 3 {
@@ -520,14 +526,12 @@ fn parse_walk_nbt(
 
         let path: Vec<(IndexJson, String)> = serde_json::from_str(path_json)?;
 
-        let path_steps = path.into_iter().map(|(index, next_container_type)| {
+        path.into_iter().map(|(index, next_container_type)| {
             Ok((
                 index.into(),
                 container_type(&next_container_type)?,
             ))
-        }).collect::<Result<_, MappingParseError>>()?;
-
-        path_steps
+        }).collect::<Result<_, MappingParseError>>()?
     } else {
        Box::new([])
     };
@@ -551,10 +555,10 @@ fn parse_walk_nbt(
         nested_default: Option<Vec<FunctionJson<'a>>>,
     }
 
-    let json: WalkInputOptionsJson = serde_json::from_str(options_json)?;
+    let json: WalkInputOptionsJson<'_> = serde_json::from_str(options_json)?;
 
     fn parse_walk_input_options(
-        json: WalkInputOptionsJson, opts: MappingParseOptions,
+        json: WalkInputOptionsJson<'_>, opts: MappingParseOptions,
     ) -> Result<NestedWalkInputNbt, MappingParseError> {
 
         let carry_default = MappingFunction::CarryNbt {

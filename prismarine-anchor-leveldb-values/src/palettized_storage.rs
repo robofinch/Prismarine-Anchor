@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use std::{array, slice};
 use std::{collections::BTreeSet, convert::Infallible, io::Read};
 

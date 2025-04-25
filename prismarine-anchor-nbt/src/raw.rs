@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use std::{ptr, slice, str};
 use std::{borrow::Cow, mem::ManuallyDrop};
 use std::io::{Read, Result as IoResult, Write};
@@ -107,7 +109,7 @@ pub fn read_f64<R: Read>(reader: &mut R, opts: IoOptions) -> IoResult<f64> {
 }
 
 #[inline]
-pub fn string_from_bytes(bytes: &[u8], opts: IoOptions) -> NbtResult<Cow<str>> {
+pub fn string_from_bytes(bytes: &[u8], opts: IoOptions) -> NbtResult<Cow<'_, str>> {
     match opts.string_encoding {
         StringEncoding::Utf8 => match str::from_utf8(bytes) {
             Ok(string) => Ok(Cow::Borrowed(string)),
@@ -121,7 +123,7 @@ pub fn string_from_bytes(bytes: &[u8], opts: IoOptions) -> NbtResult<Cow<str>> {
 }
 
 #[inline]
-pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<[u8]> {
+pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<'_, [u8]> {
     match opts.string_encoding {
         StringEncoding::Utf8 => Cow::Borrowed(string.as_bytes()),
         StringEncoding::Cesu8 => cesu8::to_java_cesu8(string)
@@ -456,4 +458,8 @@ unsafe fn convert_int_array_in_place<I, const SIZE: usize>(
     let capacity = me.capacity();
 
     unsafe { Vec::from_raw_parts(ptr, length / SIZE, capacity / SIZE) }
+}
+
+pub fn ref_i8_to_ref_u8(byte: &i8) -> &u8 {
+    unsafe { &*(byte as *const i8 as *const u8) }
 }

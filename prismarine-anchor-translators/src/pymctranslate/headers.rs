@@ -163,8 +163,8 @@ impl BiomeMap {
             })
             .collect::<Result<_, MappingParseError>>()?;
 
-        let number_to_biome = biome_to_number.iter().filter_map(|(key, value)| {
-            Some((value.clone()?, key.clone()))
+        let number_to_biome = biome_to_number.iter().filter_map(|(key, &value)| {
+            Some((value?, key.clone()))
         }).collect();
 
         let plains = NamespacedIdentifier {

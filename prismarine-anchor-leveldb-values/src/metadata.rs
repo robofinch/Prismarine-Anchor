@@ -160,6 +160,12 @@ impl LevelChunkMetaDataDictionary {
     }
 }
 
+impl Default for LevelChunkMetaDataDictionary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetaData {
     pub last_saved_base_game_version:       Option<String>,
@@ -399,7 +405,7 @@ impl From<MetaData> for NbtCompound {
         add_short_flag!(value.skull_flattening_performed, SkullFlatteningPerformed);
 
         // preserve_order is enabled in order to ensure that the compound remains sorted.
-        NbtCompound::from_iter(compound.into_iter())
+        NbtCompound::from_iter(compound)
     }
 }
 

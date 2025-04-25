@@ -123,6 +123,19 @@ impl From<MetaDataWriteError> for ValueToBytesError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct EntryBytes {
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}
+
+#[derive(Error, Debug)]
+#[error("error while converting a DBEntry's value to bytes: {value_error}")]
+pub struct EntryToBytesError {
+    pub key: Vec<u8>,
+    pub value_error: ValueToBytesError,
+}
+
 /// For use during development. Instead of printing binary data as entirely binary,
 /// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
 /// with binary data interspersed.
@@ -133,7 +146,7 @@ impl From<MetaDataWriteError> for ValueToBytesError {
 fn print_debug(value: &[u8]) {
     let mut nums = value.iter().peekable();
 
-    while let Some(_) = nums.peek() {
+    while nums.peek().is_some() {
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
                 if ch.is_ascii_alphanumeric()
@@ -162,5 +175,5 @@ fn print_debug(value: &[u8]) {
         }
         print!("]");
     }
-    println!("")
+    println!()
 }

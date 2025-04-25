@@ -14,7 +14,7 @@ use prismarine_anchor_leveldb_values::{
 
 use crate::{
     key::DBKey,
-    EntryParseResult, EntryToBytesOptions,
+    EntryParseResult, EntryToBytesOptions, EntryBytes, EntryToBytesError,
     ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
 
@@ -49,6 +49,7 @@ pub enum DBEntry {
     PendingTicks(DimensionedChunkPos,   ConcatenatedNbtCompounds),
     RandomTicks(DimensionedChunkPos,    ConcatenatedNbtCompounds),
 
+    // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
     // HardcodedSpawners(DimensionedChunkPos),
     // AabbVolumes(DimensionedChunkPos),
@@ -399,36 +400,39 @@ impl DBEntry {
     pub fn to_bytes(
         &self,
         opts: EntryToBytesOptions,
-    ) -> Result<(Vec<u8>, Vec<u8>), (Vec<u8>, ValueToBytesError)> {
+    ) -> Result<EntryBytes, EntryToBytesError> {
 
         let key = self.to_key().to_bytes(opts.into());
 
         match self.to_value_bytes(opts.into()) {
-            Ok(value) => Ok((key, value)),
-            Err(err)  => Err((key, err))
+            Ok(value) => Ok(EntryBytes { key, value }),
+            Err(err)  => Err(EntryToBytesError { key, value_error: err })
         }
     }
 
     pub fn into_bytes(
         self,
         opts: EntryToBytesOptions,
-    ) -> Result<(Vec<u8>, Vec<u8>), (Vec<u8>, ValueToBytesError)> {
+    ) -> Result<EntryBytes, EntryToBytesError> {
 
         match self {
-            Self::RawEntry { key, value } => Ok((key, value)),
+            Self::RawEntry { key, value } => Ok(EntryBytes { key, value }),
             Self::RawValue { key, value } => {
                 let key_bytes = key.to_bytes(opts.into());
-                Ok((key_bytes, value))
+
+                Ok(EntryBytes { key: key_bytes, value })
             }
             Self::CavesAndCliffsBlending(chunk_pos, raw) => {
                 let key = DBKey::CavesAndCliffsBlending(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
-                Ok((key_bytes, raw))
+
+                Ok(EntryBytes { key: key_bytes, value: raw })
             }
             Self::BlendingBiomeHeight(chunk_pos, raw) => {
                 let key = DBKey::BlendingBiomeHeight(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
-                Ok((key_bytes, raw))
+
+                Ok(EntryBytes { key: key_bytes, value: raw })
             }
             // TODO: maybe some other entries could also be more memory efficient, too.
             _ => {
@@ -438,8 +442,14 @@ impl DBEntry {
                     .to_bytes(opts.into());
 
                 match value_bytes {
-                    Ok(value) => Ok((key_bytes, value)),
-                    Err(err)  => Err((key_bytes, err)),
+                    Ok(value) => Ok(EntryBytes {
+                        key: key_bytes,
+                        value,
+                    }),
+                    Err(err)  => Err(EntryToBytesError {
+                        key: key_bytes,
+                        value_error: err,
+                    }),
                 }
             }
         }

@@ -643,7 +643,7 @@ fn float_value(
 /// Returns `Some(true)` if a plus sign or no sign was read,
 /// and `Some(false)` if a minus sign was read. Consumes a `+` or `-`, otherwise peeks.
 /// Returns `None` if the `chars` iterator ended.
-fn read_sign(chars: &mut CharIter) -> Option<bool> {
+fn read_sign(chars: &mut CharIter<'_>) -> Option<bool> {
     match chars.peek() {
         Some('+') => {
             chars.next();
@@ -686,7 +686,7 @@ enum ReadDigitsResult {
 /// ## Panics
 /// Panics if radix is not between 2 and 36, inclusive.
 fn read_digits(
-    chars: &mut CharIter,
+    chars: &mut CharIter<'_>,
     radix: u32,
     allow_underscores: bool,
     allow_first_none: bool,
@@ -757,7 +757,7 @@ fn read_digits(
 /// (True indicates unsigned, false indicates signed.)
 /// A `None` return value indicates that no suffix could be parsed,
 /// and this may or may not be an error.
-fn finish_integer(mut input: CharIter, radix: u32) -> Option<(bool, IntSuffix)> {
+fn finish_integer(mut input: CharIter<'_>, radix: u32) -> Option<(bool, IntSuffix)> {
     // Read the suffix before the 'U' or 'S' that might prefix it,
     // because a single 'S' should be interpreted as a Short (of some signedness),
     // not a Signed [integer].

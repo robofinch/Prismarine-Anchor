@@ -65,8 +65,10 @@ pub enum NbtTag {
     /// A UTF-8 string.
     String(String),
     /// A "string" tag that may be invalid UTF-8. This **does not** have strong support
-    /// in this library; it exists solely to handle strange edge cases. It is not properly
-    /// handled in SNBT; the methods in the `io` module support it.
+    /// in this library; it exists solely to handle strange edge cases.
+    /// The methods in the `io` module support it.
+    /// It is serialized into invalid but human-readable SNBT. When serialized through serde,
+    /// it is treated as a ByteArray instead.
     ByteString(Vec<u8>),
     /// An NBT tag list.
     List(NbtList),
@@ -216,7 +218,7 @@ impl NbtTag {
     /// via the standard library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:?}", TagWithOptions::new(&self, opts))
+        format!("{:?}", TagWithOptions::new(self, opts))
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with extra spacing for readability.
@@ -227,7 +229,7 @@ impl NbtTag {
     /// library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_pretty_snbt_with_limit(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:#?}", TagWithOptions::new(&self, opts))
+        format!("{:#?}", TagWithOptions::new(self, opts))
     }
 
     /// Returns whether or not the given string needs to be quoted to form valid SNBT.
@@ -273,12 +275,7 @@ impl NbtTag {
         }
 
         // Determine the best option for the surrounding quotes to minimize escape sequences
-        let surrounding: char;
-        if string.contains('"') {
-            surrounding = '\'';
-        } else {
-            surrounding = '"';
-        }
+        let surrounding = if string.contains('"') { '\'' } else { '"' };
 
         let mut snbt_string = String::with_capacity(2 + string.len());
         snbt_string.push(surrounding);
@@ -490,7 +487,9 @@ impl NbtTag {
                     }
                 }
             }
-            NbtTag::ByteArray(value) => write_list(&**value, indent, ts.unwrap(), f),
+            // TODO: doesn't there need to be a type suffix on each element in write_list,
+            // not just the header (at least in the older version?)
+            NbtTag::ByteArray(value) => write_list(value, indent, ts.unwrap(), f),
             NbtTag::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
             NbtTag::ByteString(value) => {
                 if let Ok(string) = String::from_utf8(value.clone()) {
@@ -499,7 +498,8 @@ impl NbtTag {
                     // If you're writing an invalid string to SNBT... well, the output
                     // has to be a valid string. This isn't valid SNBT, but it should be
                     // useful for debugging, I think.
-                    write_list(&*value, indent, "ByteString", f)
+                    // TODO: make it be [ByteString; 1b, 2b, 3b, 3b] for instance
+                    write_list(value, indent, "ByteString", f)
                 }
             }
             NbtTag::List(value) => if current_depth >= opts.depth_limit.0 {
@@ -538,8 +538,8 @@ impl NbtTag {
             } else {
                 value.recursively_format_snbt(indent, f, current_depth, opts)
             },
-            NbtTag::IntArray(value)  => write_list(&**value, indent, ts.unwrap(), f),
-            NbtTag::LongArray(value) => write_list(&**value, indent, ts.unwrap(), f),
+            NbtTag::IntArray(value)  => write_list(value, indent, ts.unwrap(), f),
+            NbtTag::LongArray(value) => write_list(value, indent, ts.unwrap(), f),
         }
     }
 }
@@ -722,7 +722,7 @@ impl<'a> TryFrom<&'a NbtTag> for &'a u8 {
     #[inline]
     fn try_from(tag: &'a NbtTag) -> Result<Self, Self::Error> {
         if let NbtTag::Byte(value) = tag {
-            Ok(unsafe { &*(value as *const i8 as *const u8) })
+            Ok(raw::ref_i8_to_ref_u8(value))
         } else {
             Err(NbtStructureError::type_mismatch("Byte", tag.tag_name()))
         }
@@ -1114,14 +1114,14 @@ impl Deref for NbtList {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &*self.0
+        &self.0
     }
 }
 
 impl DerefMut for NbtList {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
+        &mut self.0
     }
 }
 
@@ -1595,6 +1595,7 @@ mod serde_impl {
                 &NbtTag::Float(value)      => serializer.serialize_f32(value),
                 &NbtTag::Double(value)     => serializer.serialize_f64(value),
                 NbtTag::ByteArray(array)   => Array::from(array).serialize(serializer),
+                NbtTag::ByteString(array)  => Array::from(array).serialize(serializer),
                 NbtTag::String(value)      => serializer.serialize_str(value),
                 NbtTag::List(list)         => list.serialize(serializer),
                 NbtTag::Compound(compound) => compound.serialize(serializer),

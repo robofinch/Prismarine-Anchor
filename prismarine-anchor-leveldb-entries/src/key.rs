@@ -218,7 +218,7 @@ impl DBKey {
             // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents)
             // should never be allowed as tags here, to avoid a collision.
             let tag = raw_key[raw_key.len() - 1];
-            if (43 <= tag && tag <= 65 && tag != 47) || tag == 118 || tag == 119 {
+            if ((43..=65).contains(&tag) && tag != 47) || tag == 118 || tag == 119 {
 
                 if let Ok(dimensioned_pos) = DimensionedChunkPos::try_from(
                     &raw_key[..raw_key.len() - 1]
@@ -270,7 +270,7 @@ impl DBKey {
         }
 
         // NOT else if: some of these keys may be 9, 10, 13, or 14 bytes long.
-        if let Ok(key_string) = str::from_utf8(&raw_key) {
+        if let Ok(key_string) = str::from_utf8(raw_key) {
             let parts: Vec<&str> = key_string.split('_').collect();
 
             // The majority of the rest of the keys will likely be villages and maps

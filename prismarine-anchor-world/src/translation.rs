@@ -103,8 +103,10 @@ impl Translators {
 
         let mut possibilities = self.translators.keys()
             .filter(|key| {
-                if searching_for_source && &target == &key.1 {
+                if searching_for_source && target == key.1 {
                     if let Some(ordering) = source.partial_cmp(&key.0) {
+                        // I think the match is more readable
+                        #[allow(clippy::match_like_matches_macro)]
                         return match (searching_for_next, ordering) {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,
@@ -113,8 +115,10 @@ impl Translators {
                         }
                     }
 
-                } else if !searching_for_source && &source == &key.0 {
+                } else if !searching_for_source && source == key.0 {
                     if let Some(ordering) = target.partial_cmp(&key.1) {
+                        // I think the match is more readable
+                        #[allow(clippy::match_like_matches_macro)]
                         return match (searching_for_next, ordering) {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,
@@ -138,6 +142,12 @@ impl Translators {
         });
 
         self.translators.get(possibilities.first()?).map(Box::as_ref)
+    }
+}
+
+impl Default for Translators {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

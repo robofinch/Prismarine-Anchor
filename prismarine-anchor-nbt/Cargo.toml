@@ -17,6 +17,9 @@ rust-version.workspace = true
 #                     here, the license file for quartz_nbt needed to be included
 # Zlib              - no req's if you don't modify their code
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow      .workspace = true
 byteorder   .workspace = true

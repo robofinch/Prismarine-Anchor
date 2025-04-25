@@ -296,8 +296,8 @@ fn parse_list(
     }
 }
 
-fn parse_prim_list<'a, T>(
-    tokens: &mut Lexer<'a>,
+fn parse_prim_list<T>(
+    tokens: &mut Lexer<'_>,
     open_square: &TokenData,
 ) -> Result<NbtTag, SnbtError>
 where
@@ -451,7 +451,7 @@ fn parse_tag_list(
 
                             if !list_holds_compounds {
                                 // Convert the rest of the list to compound tags
-                                list = list.into_iter().map(|tag| to_compound(tag)).collect();
+                                list = list.into_iter().map(to_compound).collect();
 
                                 descrim = mem::discriminant(&compounded_element);
                                 list_holds_compounds = true;
@@ -479,8 +479,8 @@ fn parse_tag_list(
     }
 }
 
-fn parse_compound_tag<'a>(
-    tokens: &mut Lexer<'a>,
+fn parse_compound_tag(
+    tokens: &mut Lexer<'_>,
     open_curly: &TokenData,
     current_depth: u32,
 ) -> Result<(NbtCompound, usize), SnbtError> {

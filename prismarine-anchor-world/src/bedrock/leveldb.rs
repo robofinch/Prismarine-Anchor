@@ -46,20 +46,16 @@ pub fn new_leveldb(
 /// Indicates whether world data should be read and written as compressed,
 /// and whether the Zlib header should be present in the data read and written.
 #[allow(unused)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DBCompressor {
     None,
     ZlibWithHeader,
     /// Also known by terms like ZlibRaw
+    #[default]
     ZlibWithoutHeader,
 }
 
-impl Default for DBCompressor {
-    fn default() -> Self {
-        DBCompressor::ZlibWithoutHeader
-    }
-}
-
+#[derive(Debug)]
 struct ZlibCompressor {
     include_zlib_header: bool,
     compression_level: Compression

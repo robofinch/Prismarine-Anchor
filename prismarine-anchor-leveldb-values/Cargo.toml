@@ -6,6 +6,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 prismarine-anchor-nbt           = { workspace = true, optional = true }
 prismarine-anchor-translation   = { workspace = true, optional = true }

@@ -1,3 +1,10 @@
+// TODO / FIXME: the whole translation stuff probably needs to be organized better.
+// Need a better planned structure, and Result types here that aren't solely targeted
+// at Amulet. Note that right now, the massive results and tuples below make clippy mad.
+#![allow(clippy::type_complexity)]
+#![allow(clippy::result_large_err)]
+
+
 use std::borrow::Cow;
 
 use crate::datatypes::{Block, BlockEntity, BlockOrEntity, BlockPosition, Entity, Item};

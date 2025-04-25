@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use std::{fmt, io};
 use std::{borrow::Cow, error::Error, marker::PhantomData};
 use std::{

@@ -14,8 +14,8 @@ use prismarine_anchor_nbt::{NbtCompound, NbtTag};
 // (HashMaps do not implement Hash or Ord, BTreeMaps implement both).
 pub type BlockProperties = BTreeMap<String, BlockProperty>;
 
-pub const UNIVERSAL_NAMESPACE: &'static str = "universal_minecraft";
-pub const MINECRAFT_NAMESPACE: &'static str = "minecraft";
+pub const UNIVERSAL_NAMESPACE: &str = "universal_minecraft";
+pub const MINECRAFT_NAMESPACE: &str = "minecraft";
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -99,7 +99,7 @@ impl Block {
     ) -> Self {
         Self {
             identifier,
-            properties: properties.unwrap_or_else(|| BlockProperties::new()),
+            properties: properties.unwrap_or_else(BlockProperties::new),
             // Vec::new() is cheap
             extra_layers: extra_layers.unwrap_or(Vec::new()),
         }
@@ -131,7 +131,7 @@ impl Block {
         let mut layer_queue = VecDeque::from(extra_layers);
 
         while let Some(mut block) = layer_queue.pop_front() {
-            let inner_layers = mem::replace(&mut block.extra_layers, Vec::new());
+            let inner_layers = mem::take(&mut block.extra_layers);
 
             // There's no method like .extend_front(), we have to manually push each element in
             // the vec to the front of the queue (in the correct order)
@@ -250,9 +250,9 @@ impl NamespacedIdentifier {
 
             } else {
                 let mut quoted = String::with_capacity(identifier.len() + 2);
-                quoted.push_str("\"");
+                quoted.push('\"');
                 quoted.push_str(&identifier);
-                quoted.push_str("\"");
+                quoted.push('\"');
                 return Err(IdentifierParseError::InvalidIdentifier(quoted));
             }
         };

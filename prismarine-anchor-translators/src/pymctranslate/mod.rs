@@ -102,6 +102,7 @@ pub enum MappingParseError {
 }
 
 impl MappingParseError {
+    #[inline]
     pub fn invalid_property(tag: NbtTag) -> Self {
         Self::InvalidProperty(tag_description(&tag.tag_type()))
     }
@@ -121,9 +122,10 @@ pub fn block_property_from_str(
             error,
         })?;
 
-    Ok(tag.try_into().map_err(MappingParseError::invalid_property)?)
+    tag.try_into().map_err(MappingParseError::invalid_property)
 }
 
+#[inline]
 pub fn tag_description(tag: &NbtType) -> &'static str {
     match tag {
         NbtType::Byte      => "a Byte",
@@ -141,9 +143,9 @@ pub fn tag_description(tag: &NbtType) -> &'static str {
     }
 }
 
+#[inline]
 pub fn container_type(name: &str) -> Result<NbtContainerType, MappingParseError> {
-    let type_name: &str = &name;
-    match type_name {
+    match name {
         "compound"   => Ok(NbtContainerType::Compound),
         "list"       => Ok(NbtContainerType::List),
         "byte_array" => Ok(NbtContainerType::ByteArray),
@@ -153,9 +155,9 @@ pub fn container_type(name: &str) -> Result<NbtContainerType, MappingParseError>
     }
 }
 
+#[inline]
 pub fn nbt_type(name: &str) -> Result<NbtType, MappingParseError> {
-    let type_name: &str = &name;
-    match type_name {
+    match name {
         "byte"       => Ok(NbtType::Byte),
         "short"      => Ok(NbtType::Short),
         "int"        => Ok(NbtType::Int),

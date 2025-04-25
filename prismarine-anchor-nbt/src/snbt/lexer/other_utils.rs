@@ -39,9 +39,9 @@ fn chars_to_u8(chars: [char; 2]) -> Option<u8> {
 fn chars_to_u16(chars: [char; 4]) -> Option<u16> {
     let nibbles = chars.map(|c| c.to_digit(16));
 
-    let mut sum = nibbles[0]?;
-    for i in 1..4 {
-        sum = (sum << 4) + nibbles[i]?;
+    let mut sum: u32 = nibbles[0]?;
+    for nibble in nibbles {
+        sum = (sum << 4) + nibble?;
     }
 
     // The sum is actually in range of u16, because the nibbles fit in u8's
@@ -51,9 +51,9 @@ fn chars_to_u16(chars: [char; 4]) -> Option<u16> {
 fn chars_to_u32(chars: [char; 8]) -> Option<u32> {
     let nibbles = chars.map(|c| c.to_digit(16));
 
-    let mut sum = nibbles[0]?;
-    for i in 1..8 {
-        sum = (sum << 4) +  nibbles[i]?;
+    let mut sum: u32 = 0;
+    for nibble in nibbles {
+        sum = (sum << 4) + nibble?;
     }
 
     Some(sum)
@@ -63,13 +63,13 @@ fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
     let upper = chars.0.map(|c| c.to_digit(16));
     let lower = chars.1.map(|c| c.to_digit(16));
 
-    let mut sum = upper[0]?;
+    let mut sum: u32 = 0;
 
-    for i in 1..4 {
-        sum = (sum << 4) +  upper[i]?;
+    for nibble in upper {
+        sum = (sum << 4) + nibble?;
     }
-    for i in 0..4 {
-        sum = (sum << 4) +  lower[i]?;
+    for nibble in lower {
+        sum = (sum << 4) + nibble?;
     }
 
     Some(sum)
@@ -101,10 +101,10 @@ impl Lexer<'_> {
         if let SnbtVersion::UpdatedJava = self.snbt_version() {
             if token_string.ends_with(FUNC_SUFFIX) {
                 if token_string.starts_with(BOOL_FUNC) {
-                    return Some(self.parse_bool_func(start, char_width, &token_string));
+                    return Some(self.parse_bool_func(start, char_width, token_string));
 
                 } else if token_string.starts_with(UUID_FUNC) {
-                    return Some(self.parse_uuid_func(start, char_width, &token_string));
+                    return Some(self.parse_uuid_func(start, char_width, token_string));
                 }
             }
         }
@@ -589,14 +589,14 @@ impl Lexer<'_> {
             get_char()?, get_char()?, get_char()?, get_char()?,
         ];
 
-        let utf_val = u32::from(chars_to_u32(chars).ok_or_else(|| {
+        let utf_val = chars_to_u32(chars).ok_or_else(|| {
             SnbtError::unexpected_token_at(
                 self.raw,
                 index + 2, // Skip the '\\' and 'U', which are each byte length 1
                 8,
                 "eight hexadecimal digits",
             )
-        })?);
+        })?;
 
         let escaped = char::from_u32(utf_val)
             .ok_or(SnbtError::unknown_escape_sequence(

@@ -105,3 +105,8 @@ unsafe_op_in_unsafe_fn = "warn"                         # `unsafe_op_in_unsafe_f
 unused_extern_crates = "warn"
 unused_import_braces = "warn"
 unused_lifetimes = "warn"
+
+[workspace.lints.clippy]
+from_str_radix_10 = "allow"
+let_with_type_underscore = "allow"
+unwrap_or_default = "allow"

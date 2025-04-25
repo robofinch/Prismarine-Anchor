@@ -263,20 +263,15 @@ impl<'a> Lexer<'a> {
         } else {
             // Unquoted string.
             // Loop until we reach a character which isn't allowed in the string
-            loop {
-                if let Some(ch) = self.peek_ch() {
-                    if !allowed_unquoted(ch) {
-                        break;
-                    } else {
-                        // We read a valid Some(char)
-                        char_width += 1;
-                        self.next_ch();
-                    }
-                } else {
-                    // End of string
+            while let Some(ch) = self.peek_ch() {
+                if !allowed_unquoted(ch) {
                     break;
+                } else {
+                    // We read a valid Some(char)
+                    char_width += 1;
+                    self.next_ch();
                 }
-            };
+            }
 
             // If we reached the end of the string, we want to parse the entire rest
             // of the string. In that case, self.index is at the end of the string.
@@ -288,13 +283,13 @@ impl<'a> Lexer<'a> {
             raw_token_buffer = Cow::Borrowed(&self.raw[start .. self.index]);
         }
 
-        Ok(self.parse_token(
+        self.parse_token(
             raw_token_buffer,
             start,
             char_width,
             quoted,
-            expecting_string
-        )?)
+            expecting_string,
+        )
     }
 
     /// Parses an isolated token

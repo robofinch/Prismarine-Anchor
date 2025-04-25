@@ -20,12 +20,12 @@ pub struct SpecificationFile {
 
 impl SpecificationFile {
     #[inline]
-    pub fn property_options(&self, property: PropertyNameStr) -> Option<&Vec<BlockProperty>> {
+    pub fn property_options(&self, property: PropertyNameStr<'_>) -> Option<&Vec<BlockProperty>> {
         Some(&self.properties_and_defaults.get(property)?.0)
     }
 
     #[inline]
-    pub fn property_default(&self, property: PropertyNameStr) -> Option<&BlockProperty> {
+    pub fn property_default(&self, property: PropertyNameStr<'_>) -> Option<&BlockProperty> {
         let property = self.properties_and_defaults.get(property)?;
         Some(&property.0[property.1])
     }
@@ -64,7 +64,7 @@ fn parse_specification_file(
         .into_iter().map(|(property, values)| {
 
             let snbt_values = values.into_iter().map(|value| {
-                Ok(block_property_from_str(&value, &property, opts)?)
+                block_property_from_str(&value, &property, opts)
             }).collect::<Result<Vec<BlockProperty>, MappingParseError>>()?;
 
             Ok((property.into_boxed_str(), (snbt_values, 0)))

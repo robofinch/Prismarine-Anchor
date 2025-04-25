@@ -201,7 +201,7 @@ macro_rules! bijective_enum_map {
 fn print_debug(value: &[u8]) {
     let mut nums = value.iter().peekable();
 
-    while let Some(_) = nums.peek() {
+    while nums.peek().is_some() {
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
                 if ch.is_ascii_alphanumeric()
@@ -230,5 +230,5 @@ fn print_debug(value: &[u8]) {
         }
         print!("]");
     }
-    println!("")
+    println!()
 }

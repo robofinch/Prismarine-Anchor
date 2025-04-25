@@ -273,13 +273,13 @@ fn tags_are_equal(tag: &NbtTag, other: &NbtTag, equal: impl FloatEquality) -> bo
                     unmatched_indices.push(i);
                 }
 
-                for value in list {
+                'outer: for value in list {
                     for i in 0..unmatched_indices.len() {
                         let other_val = &other[unmatched_indices[i]];
                         // Recursion isn't ideal, but this is a complex comparison.
                         if tags_are_equal(value, other_val, equal) {
                             unmatched_indices.swap_remove(i);
-                            continue;
+                            continue 'outer;
                         }
                     }
                     // If we got here, this value isn't equal to anything in the other list
@@ -368,7 +368,7 @@ fn compare_tags(tag: &NbtTag, other: &NbtTag, compare: impl FloatOrdering) -> Or
                 }
             }
 
-            return compound.len().cmp(&other.len())
+            compound.len().cmp(&other.len())
         }
         _ => {
             let self_id  = id_for_tag(Some(tag));

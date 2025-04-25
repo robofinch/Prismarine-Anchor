@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use std::io::Cursor;
 
 use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
@@ -150,7 +152,7 @@ impl LegacySubchunkBlocks {
         bytes.extend(&self.packed_block_data);
 
         if let Some(blocklight) = &self.blocklight {
-            bytes.extend(&self.skylight.unwrap_or_else(|| [0; 2048]));
+            bytes.extend(&self.skylight.unwrap_or([0; 2048]));
             bytes.extend(blocklight);
 
         } else if let Some(skylight) = &self.skylight {

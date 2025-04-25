@@ -178,7 +178,7 @@ struct SourceTranslator<'a> {
     types: &'a TranslatorTypes,
 }
 
-impl<'a> ToTokens for SourceTranslator<'a> {
+impl ToTokens for SourceTranslator<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let TranslatorTypes { error, block, entity, item } = self.types;
 

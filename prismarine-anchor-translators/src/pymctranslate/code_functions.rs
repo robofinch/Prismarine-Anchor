@@ -146,8 +146,9 @@ impl CodeFunction {
         if correct_input.len() != code_function.input.len() {
             return Err(MappingParseError::IncorrectInput(code_function.function.into()));
         } else {
-            for i in 0..correct_input.len() {
-                if correct_input[i] != code_function.input[i] {
+            let inputs = correct_input.into_iter().zip(code_function.input);
+            for (correct_input, given_input) in inputs {
+                if correct_input != given_input {
                     return Err(MappingParseError::IncorrectInput(code_function.function.into()));
                 }
             }
@@ -156,8 +157,9 @@ impl CodeFunction {
         if correct_output.len() != code_function.output.len() {
             return Err(MappingParseError::IncorrectOutput(code_function.function.into()));
         } else {
-            for i in 0..correct_input.len() {
-                if correct_output[i] != code_function.output[i] {
+            let outputs = correct_output.into_iter().zip(code_function.output);
+            for (correct_output, given_output) in outputs {
+                if correct_output != given_output {
                     return Err(MappingParseError::IncorrectOutput(code_function.function.into()));
                 }
             }

@@ -31,9 +31,9 @@ impl UUID {
         fn chars_to_u32(chars: [char; 8]) -> Option<u32> {
             let nibbles = chars.map(|c| c.to_digit(16));
 
-            let mut sum = nibbles[0]?;
-            for i in 1..8 {
-                sum = (sum << 4) +  nibbles[i]?;
+            let mut sum = 0;
+            for nibble in nibbles {
+                sum = (sum << 4) + nibble?;
             }
 
             Some(sum)
@@ -43,13 +43,13 @@ impl UUID {
             let upper = chars.0.map(|c| c.to_digit(16));
             let lower = chars.1.map(|c| c.to_digit(16));
 
-            let mut sum = upper[0]?;
+            let mut sum = 0;
 
-            for i in 1..4 {
-                sum = (sum << 4) +  upper[i]?;
+            for nibble in upper {
+                sum = (sum << 4) +  nibble?;
             }
-            for i in 0..4 {
-                sum = (sum << 4) +  lower[i]?;
+            for nibble in lower {
+                sum = (sum << 4) +  nibble?;
             }
 
             Some(sum)

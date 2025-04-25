@@ -476,12 +476,12 @@ impl SnbtWriteOptions {
             version:                    SnbtVersion::UpdatedJava,
             depth_limit:                DepthLimit::default(),
             non_finite:                 WriteNonFinite::PrintFloats,
-            enabled_escape_sequences:   EnabledEscapeSequences::from_fn(|e| match e {
-                EscapeSequence::N => false,
-                EscapeSequence::R => false,
-                EscapeSequence::S => false,
-                _ => true
-            })
+            enabled_escape_sequences:   EnabledEscapeSequences::from_fn(
+                |escape| !matches!(
+                    escape,
+                    EscapeSequence::N | EscapeSequence::R | EscapeSequence::S,
+                )
+            )
         }
     }
 
@@ -567,27 +567,21 @@ impl EnabledEscapeSequences {
     /// Enables `\n` (newline), `\r` (carriage return), and `\t` (horizontal tab).
     #[inline]
     pub fn standard_whitespace_escapes() -> Self {
-        Self::from_fn(|escape| match escape {
-            EscapeSequence::N => true,
-            EscapeSequence::R => true,
-            EscapeSequence::T => true,
-            _ => false,
-        })
+        Self::from_fn(|escape| matches!(
+            escape,
+            EscapeSequence::N | EscapeSequence::R | EscapeSequence::S,
+        ))
     }
 
     /// Enables `\b` (backspace), `\f` (form feed), `\n` (newline),
     /// `\r` (carriage return), `\s` (space), and `\t` (horizontal tab).
     #[inline]
     pub fn one_character_escapes() -> Self {
-        Self::from_fn(|escape| match escape {
-            EscapeSequence::B => true,
-            EscapeSequence::F => true,
-            EscapeSequence::N => true,
-            EscapeSequence::R => true,
-            EscapeSequence::S => true,
-            EscapeSequence::T => true,
-            _ => false,
-        })
+        Self::from_fn(|escape| matches!(
+            escape,
+            EscapeSequence::B | EscapeSequence::F | EscapeSequence::N
+                | EscapeSequence::R | EscapeSequence::S | EscapeSequence::T,
+        ))
     }
 
     /// Enables unicode escapes: `\x`, `\u`, and `\U` for two-, four-, or eight-character
@@ -596,13 +590,11 @@ impl EnabledEscapeSequences {
     /// is not enabled.
     #[inline]
     pub fn unicode_escapes() -> Self {
-        Self::from_fn(|escape| match escape {
-            EscapeSequence::UnicodeTwo => true,
-            EscapeSequence::UnicodeFour => true,
-            EscapeSequence::UnicodeEight => true,
-            EscapeSequence::UnicodeNamed => true,
-            _ => false,
-        })
+        Self::from_fn(|escape| matches!(
+            escape,
+            EscapeSequence::UnicodeTwo | EscapeSequence::UnicodeFour
+                | EscapeSequence::UnicodeEight | EscapeSequence::UnicodeNamed
+        ))
     }
 
     /// Whether the provided escape sequence is enabled

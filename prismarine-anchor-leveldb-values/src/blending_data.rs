@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use std::array;
 
 
@@ -17,7 +19,8 @@ pub enum BlendingData {
 impl BlendingData {
     pub fn parse(value: &[u8]) -> Option<Self> {
         println!("Parsing blending data");
-        if value.is_empty() {
+        // Need at least one byte
+        if value.len() < 1 {
             return None;
         }
 
@@ -35,7 +38,7 @@ impl BlendingData {
                 let i16_bytes = &value[2..34];
                 let i8_data  = value[34] as i8;
 
-                let mut i16_bytes = i16_bytes.into_iter();
+                let mut i16_bytes = i16_bytes.iter();
                 let i16_data = array::from_fn(|_| {
                     // This doesn't panic because the u16_data iter contains
                     // exactly 32 u8's.

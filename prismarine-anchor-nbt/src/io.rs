@@ -322,7 +322,7 @@ pub fn write_list(
 
 /// Write any NBT tag to the provided writer, using the provided encoding. If a root name for the
 /// tag is not provided, then the empty string is used.
-#[cfg(any(feature = "allow_any_root"))]
+#[cfg(feature = "allow_any_root")]
 pub fn write_any_nbt(
     writer: &mut impl Write,
     opts: IoOptions,
@@ -354,7 +354,7 @@ fn write_named_compound_uncompressed(
     raw::write_u8(writer, opts, 0xA)?;
     raw::write_string(writer, opts, root_name.unwrap_or(""))?;
 
-    if 0 >= opts.depth_limit.0 && !root.is_empty() {
+    if 0 == opts.depth_limit.0 && !root.is_empty() {
         return Err(NbtIoError::ExceededDepthLimit {
             limit: opts.depth_limit
         });

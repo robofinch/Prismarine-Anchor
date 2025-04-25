@@ -13,7 +13,7 @@ use rusty_leveldb::{env::Env, DB as LevelDB, Status};
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_entries::{
-    DBEntry, DBKey,
+    DBEntry, DBKey, EntryBytes,
     EntryToBytesOptions, KeyToBytesOptions, ValueToBytesError,
 };
 use prismarine_anchor_nbt::io as nbt_io;
@@ -182,8 +182,8 @@ impl BedrockWorldFiles {
         &mut self, entry: DBEntry, opts: EntryToBytesOptions,
     ) -> Result<(), BedrockWorldFileError> {
 
-        let (key, value) = entry.into_bytes(opts)
-            .map_err(|(_, err)| err)?;
+        let EntryBytes { key, value } = entry.into_bytes(opts)
+            .map_err(|err| err.value_error)?;
 
         self.db.put(&key, &value).map_err(|err| {
             BedrockWorldFileError::StatusCode(
