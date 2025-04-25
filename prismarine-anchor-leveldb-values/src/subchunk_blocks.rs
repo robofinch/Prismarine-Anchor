@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
-use prismarine_anchor_nbt::io::{write_compound, NbtIoError};
-use prismarine_anchor_nbt::{io::read_compound, settings::IoOptions, NbtCompound};
+use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
+use prismarine_anchor_nbt::io::{read_compound, write_compound, NbtIoError};
 
 use crate::all_read;
 use crate::palettized_storage::{PaletteHeader, PaletteType, PalettizedStorage};

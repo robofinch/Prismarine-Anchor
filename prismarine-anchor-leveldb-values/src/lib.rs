@@ -84,9 +84,10 @@ pub mod flat_world_layers;
 /// Compare a reader's position to the total length of data that was expected to be read,
 /// to check if everything was read.
 #[cfg(any(
-    feature = "data_3d",
     feature = "concatenated_nbt_compounds",
+    feature = "data_3d",
     feature = "metadata",
+    feature = "subchunk_blocks",
 ))]
 #[inline]
 fn all_read(read_position: u64, total_len: usize) -> bool {
@@ -141,8 +142,8 @@ fn all_read(read_position: u64, total_len: usize) -> bool {
 #[cfg(any(
     doc,
     feature = "actor_digest_version",
-    feature = "metadata",
     feature = "chunk_version",
+    feature = "metadata",
 ))]
 #[macro_export]
 macro_rules! bijective_enum_map {
