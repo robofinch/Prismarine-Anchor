@@ -10,10 +10,10 @@ pub enum BlendingData {
         version: u8,
     },
     VersionAndData {
-        version: u8,
+        version:  u8,
         i16_data: [Option<i16>; 16],
-        i8_data: i8,
-    }
+        i8_data:  i8,
+    },
 }
 
 impl BlendingData {
@@ -34,9 +34,9 @@ impl BlendingData {
         } else if value[0] == 1 {
             println!("Will return None if len != 2 + 32 + 1");
             if value.len() == 2 + 32 + 1 {
-                let version  = value[1];
+                let version   = value[1];
                 let i16_bytes = &value[2..34];
-                let i8_data  = value[34] as i8;
+                let i8_data   = value[34] as i8;
 
                 let mut i16_bytes = i16_bytes.iter();
                 let i16_data = array::from_fn(|_| {
@@ -47,14 +47,14 @@ impl BlendingData {
                         *i16_bytes.next().unwrap(),
                     ]);
 
-                    if entry == i16::MAX {
-                        None
-                    } else {
-                        Some(entry)
-                    }
+                    if entry == i16::MAX { None } else { Some(entry) }
                 });
 
-                Some(Self::VersionAndData { version, i16_data, i8_data })
+                Some(Self::VersionAndData {
+                    version,
+                    i16_data,
+                    i8_data,
+                })
             } else {
                 None
             }
@@ -69,7 +69,11 @@ impl BlendingData {
             Self::Version { version } => {
                 bytes.extend([0, *version]);
             }
-            Self::VersionAndData { version, i16_data, i8_data } => {
+            Self::VersionAndData {
+                version,
+                i16_data,
+                i8_data,
+            } => {
                 bytes.reserve(35);
                 bytes.extend([1, *version]);
                 for entry in i16_data {
@@ -80,6 +84,7 @@ impl BlendingData {
         }
     }
 
+    #[inline]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);

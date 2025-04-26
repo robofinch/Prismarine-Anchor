@@ -78,7 +78,7 @@ impl ComparableNbtTag {
         // The exact check would've caught anything.
         if !matches!(
             &self.0,
-            NbtTag::Float(_) | NbtTag::Double(_) | NbtTag::List(_) | NbtTag::Compound(_)
+            NbtTag::Float(_) | NbtTag::Double(_) | NbtTag::List(_) | NbtTag::Compound(_),
         ) {
             return None;
         }
@@ -145,9 +145,7 @@ impl ComparableNbtTag {
             all_matches.extend(in_range);
 
             match all_matches.binary_search_by_key(&self, |(key, _)| key) {
-                Ok(found_index) => {
-                    Some(all_matches[found_index].1)
-                }
+                Ok(found_index) => Some(all_matches[found_index].1),
                 Err(pos_index) => {
                     if pos_index >= all_matches.len() {
                         Some(all_matches[all_matches.len() - 1].1)
@@ -168,9 +166,15 @@ impl ComparableNbtTag {
         D: Fn(f64) -> f64,
     {
         if let NbtTag::Float(f) = self.0 {
-            return (Self(NbtTag::Float(map_float(f))), true)
+            return (
+                Self(NbtTag::Float(map_float(f))),
+                true,
+            );
         } else if let NbtTag::Double(d) = self.0 {
-            return (Self(NbtTag::Double(map_double(d))), true)
+            return (
+                Self(NbtTag::Double(map_double(d))),
+                true,
+            );
         }
 
         let mut output: NbtTag = self.0.clone();
@@ -180,25 +184,22 @@ impl ComparableNbtTag {
         map_queue.push_back(&mut output);
 
         while let Some(tag) = map_queue.pop_front() {
-            match tag {
-                NbtTag::List(list) => {
-                    for tag in list.iter_mut() {
-                        match tag {
-                            NbtTag::Float(f) => {
-                                *f = map_float(*f);
-                                found_float = true;
-                            }
-                            NbtTag::Double(d) => {
-                                *d = map_double(*d);
-                                found_float = true;
-                            }
-                            list @ NbtTag::List(_) => map_queue.push_back(list),
-                            compound @ NbtTag::Compound(_) => map_queue.push_back(compound),
-                            _ => {}
+            if let NbtTag::List(list) = tag {
+                for tag in list {
+                    match tag {
+                        NbtTag::Float(f) => {
+                            *f = map_float(*f);
+                            found_float = true;
                         }
+                        NbtTag::Double(d) => {
+                            *d = map_double(*d);
+                            found_float = true;
+                        }
+                        list     @ NbtTag::List(_)     => map_queue.push_back(list),
+                        compound @ NbtTag::Compound(_) => map_queue.push_back(compound),
+                        _ => {}
                     }
                 }
-                _ => {}
             }
         }
 
@@ -248,26 +249,24 @@ impl Ord for ComparableNbtTag {
 //  Main recursive functions
 // ================================================================
 
-fn tags_are_equal<E: FloatEquality>(
-    tag: &NbtTag, other: &NbtTag, equal: E,
-) -> bool {
+fn tags_are_equal<E: FloatEquality>(tag: &NbtTag, other: &NbtTag, equal: E) -> bool {
     let mut compare_queue = VecDeque::new();
 
     compare_queue.push_back((tag, other));
 
     while let Some((self_tag, other_tag)) = compare_queue.pop_front() {
         match (self_tag, other_tag) {
-            (NbtTag::Byte(n),   NbtTag::Byte(k))  if n == k => {}
-            (NbtTag::Short(n),  NbtTag::Short(k)) if n == k => {}
-            (NbtTag::Int(n),    NbtTag::Int(k))   if n == k => {}
-            (NbtTag::Long(n),   NbtTag::Long(k))  if n == k => {}
-            (NbtTag::Float(f),  NbtTag::Float(other))  if equal.equal_f32(*f, *other) => {}
-            (NbtTag::Double(d), NbtTag::Double(other)) if equal.equal_f64(*d, *other) => {}
+            (NbtTag::Byte(n),        NbtTag::Byte(k))          if n == k => {}
+            (NbtTag::Short(n),       NbtTag::Short(k))         if n == k => {}
+            (NbtTag::Int(n),         NbtTag::Int(k))           if n == k => {}
+            (NbtTag::Long(n),        NbtTag::Long(k))          if n == k => {}
+            (NbtTag::Float(f),       NbtTag::Float(other))     if equal.equal_f32(*f, *other) => {}
+            (NbtTag::Double(d),      NbtTag::Double(other))    if equal.equal_f64(*d, *other) => {}
             (NbtTag::ByteArray(arr), NbtTag::ByteArray(other)) if arr == other => {}
             (NbtTag::IntArray(arr),  NbtTag::IntArray(other))  if arr == other => {}
             (NbtTag::LongArray(arr), NbtTag::LongArray(other)) if arr == other => {}
-            (NbtTag::String(s), NbtTag::String(other)) if s == other => {}
-            (NbtTag::List(list), NbtTag::List(other)) => {
+            (NbtTag::String(s),      NbtTag::String(other))    if s   == other => {}
+            (NbtTag::List(list),     NbtTag::List(other)) => {
                 if list.len() != other.len() {
                     return false;
                 }
@@ -300,35 +299,33 @@ fn tags_are_equal<E: FloatEquality>(
 
                 for (key, value) in compound {
                     let Ok(other_val) = other.get(key) else {
-                        return false
+                        return false;
                     };
 
                     // Try to limit recursion.
                     compare_queue.push_back((value, other_val));
                 }
             }
-            _ => return false
+            _ => return false,
         } // End of match
     } // End of loop
 
     true
 }
 
-fn compare_tags<O: FloatOrdering>(
-    tag: &NbtTag, other: &NbtTag, compare: O,
-) -> Ordering {
+fn compare_tags<O: FloatOrdering>(tag: &NbtTag, other: &NbtTag, compare: O) -> Ordering {
     match (tag, other) {
-        (NbtTag::Byte(n),   NbtTag::Byte(k))  => n.cmp(k),
-        (NbtTag::Short(n),  NbtTag::Short(k)) => n.cmp(k),
-        (NbtTag::Int(n),    NbtTag::Int(k))   => n.cmp(k),
-        (NbtTag::Long(n),   NbtTag::Long(k))  => n.cmp(k),
-        (NbtTag::Float(f),  NbtTag::Float(other))  => compare.cmp_f32(*f, *other),
-        (NbtTag::Double(d), NbtTag::Double(other)) => compare.cmp_f64(*d, *other),
+        (NbtTag::Byte(n),        NbtTag::Byte(k))          => n.cmp(k),
+        (NbtTag::Short(n),       NbtTag::Short(k))         => n.cmp(k),
+        (NbtTag::Int(n),         NbtTag::Int(k))           => n.cmp(k),
+        (NbtTag::Long(n),        NbtTag::Long(k))          => n.cmp(k),
+        (NbtTag::Float(f),       NbtTag::Float(other))     => compare.cmp_f32(*f, *other),
+        (NbtTag::Double(d),      NbtTag::Double(other))    => compare.cmp_f64(*d, *other),
         (NbtTag::ByteArray(arr), NbtTag::ByteArray(other)) => arr.cmp(other),
         (NbtTag::IntArray(arr),  NbtTag::IntArray(other))  => arr.cmp(other),
         (NbtTag::LongArray(arr), NbtTag::LongArray(other)) => arr.cmp(other),
-        (NbtTag::String(s), NbtTag::String(other)) => s.cmp(other),
-        (NbtTag::List(list), NbtTag::List(other)) => {
+        (NbtTag::String(s),      NbtTag::String(other))    => s.cmp(other),
+        (NbtTag::List(list),     NbtTag::List(other))      => {
             // Sort lists of references to get a list-order-independent way of comparing lists
 
             let mut sorted_list: Vec<&_> = list.iter().collect();
@@ -355,7 +352,6 @@ fn compare_tags<O: FloatOrdering>(
             other_keys.sort();
 
             for i in 0..sorted_keys.len().min(other_keys.len()) {
-
                 let key = sorted_keys[i];
                 let other_key = other_keys[i];
 

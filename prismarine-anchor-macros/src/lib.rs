@@ -2,7 +2,7 @@ mod generate;
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, Token};
-use syn::{punctuated::Punctuated, spanned::Spanned as _, Attribute, DeriveInput, Type};
+use syn::{Attribute, DeriveInput, punctuated::Punctuated, spanned::Spanned as _, Type};
 
 use self::generate::generate_impl;
 
@@ -16,7 +16,8 @@ pub fn custom_translator(tokens: TokenStream) -> TokenStream {
     match parse_input(&input) {
         Ok(types) => generate_impl(&input.ident, &types),
         Err(err) => err.into_compile_error(),
-    }.into()
+    }
+    .into()
 }
 
 struct TranslatorTypes {
@@ -27,12 +28,18 @@ struct TranslatorTypes {
 }
 
 fn parse_input(input: &DeriveInput) -> syn::Result<TranslatorTypes> {
-    if let Some(attr) = input.attrs.iter().find(|attr| {
-        attr.path().is_ident("translator_types")
-    }) {
+    if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("translator_types"))
+    {
         parse_types(attr)
+
     } else {
-        Err(syn::Error::new(input.span(), "expected four comma-separated types"))
+        Err(syn::Error::new(
+            input.span(),
+            "expected four comma-separated types",
+        ))
     }
 }
 
@@ -40,7 +47,10 @@ fn parse_types(attr: &Attribute) -> syn::Result<TranslatorTypes> {
     let types: _ = attr.parse_args_with(Punctuated::<Type, Token![,]>::parse_terminated)?;
 
     if types.len() != 4 {
-        return Err(syn::Error::new(types.span(), "expected four comma-separated types"));
+        return Err(syn::Error::new(
+            types.span(),
+            "expected four comma-separated types",
+        ));
     }
 
     let mut types = types.into_iter();

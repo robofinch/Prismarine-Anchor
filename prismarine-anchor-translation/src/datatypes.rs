@@ -85,16 +85,16 @@ impl TryFrom<NbtTag> for BlockProperty {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Block {
-    pub identifier: NamespacedIdentifier,
-    pub properties: BlockProperties,
+    pub identifier:   NamespacedIdentifier,
+    pub properties:   BlockProperties,
     pub extra_layers: Vec<Block>,
 }
 
 impl Block {
     #[inline]
     pub fn new(
-        identifier: NamespacedIdentifier,
-        properties: Option<BlockProperties>,
+        identifier:   NamespacedIdentifier,
+        properties:   Option<BlockProperties>,
         extra_layers: Option<Vec<Self>>,
     ) -> Self {
         Self {
@@ -110,9 +110,9 @@ impl Block {
         Self {
             identifier: NamespacedIdentifier {
                 namespace: UNIVERSAL_NAMESPACE.into(),
-                path: "air".into(),
+                path:      "air".into(),
             },
-            properties: BlockProperties::new(),
+            properties:   BlockProperties::new(),
             extra_layers: Vec::new(),
         }
     }
@@ -145,18 +145,15 @@ impl Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockEntity {
-    pub identifier: NamespacedIdentifier,
-    pub position: BlockPosition,
-    pub nbt: NbtCompound,
+    pub identifier:    NamespacedIdentifier,
+    pub position:      BlockPosition,
+    pub nbt:           NbtCompound,
     pub nbt_root_name: Box<str>,
 }
 
 impl BlockEntity {
     #[inline]
-    pub fn new(
-        identifier: NamespacedIdentifier,
-        position: BlockPosition,
-    ) -> Self {
+    pub fn new(identifier: NamespacedIdentifier, position: BlockPosition) -> Self {
         Self {
             identifier,
             position,
@@ -167,9 +164,9 @@ impl BlockEntity {
 
     #[inline]
     pub fn new_with_nbt(
-        identifier: NamespacedIdentifier,
-        position: BlockPosition,
-        nbt: NbtCompound,
+        identifier:    NamespacedIdentifier,
+        position:      BlockPosition,
+        nbt:           NbtCompound,
         nbt_root_name: Box<str>,
     ) -> Self {
         Self {
@@ -183,18 +180,18 @@ impl BlockEntity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
-    pub identifier: NamespacedIdentifier,
-    pub position: FloatingWorldPos,
-    pub nbt: NbtCompound,
+    pub identifier:    NamespacedIdentifier,
+    pub position:      FloatingWorldPos,
+    pub nbt:           NbtCompound,
     pub nbt_root_name: Box<str>,
 }
 
 impl Entity {
     #[inline]
     pub fn new(
-        identifier: NamespacedIdentifier,
-        position: FloatingWorldPos,
-        nbt: NbtCompound,
+        identifier:    NamespacedIdentifier,
+        position:      FloatingWorldPos,
+        nbt:           NbtCompound,
         nbt_root_name: Box<str>,
     ) -> Self {
         Self {
@@ -215,7 +212,7 @@ pub enum BlockOrEntity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub identifier: NamespacedIdentifier,
-    pub nbt: NbtCompound,
+    pub nbt:        NbtCompound,
 }
 
 impl Item {
@@ -229,14 +226,14 @@ impl Item {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NamespacedIdentifier {
     pub namespace: Box<str>,
-    pub path: Box<str>,
+    pub path:      Box<str>,
 }
 
 impl NamespacedIdentifier {
     pub fn parse_string(
-        mut identifier: String, opts: IdentifierParseOptions,
+        mut identifier: String,
+        opts:           IdentifierParseOptions,
     ) -> Result<Self, IdentifierParseError> {
-
         let path = match identifier.find(':') {
             // "+ 1" because the UTF-8 byte length of ':' is 1
             Some(colon_pos) => {
@@ -245,15 +242,16 @@ impl NamespacedIdentifier {
                 identifier.pop();
                 path
             }
-            None => if let Some(namespace) = opts.default_namespace {
-                mem::replace(&mut identifier, namespace.to_owned())
-
-            } else {
-                let mut quoted = String::with_capacity(identifier.len() + 2);
-                quoted.push('\"');
-                quoted.push_str(&identifier);
-                quoted.push('\"');
-                return Err(IdentifierParseError::InvalidIdentifier(quoted));
+            None => {
+                if let Some(namespace) = opts.default_namespace {
+                    mem::replace(&mut identifier, namespace.to_owned())
+                } else {
+                    let mut quoted = String::with_capacity(identifier.len() + 2);
+                    quoted.push('\"');
+                    quoted.push_str(&identifier);
+                    quoted.push('\"');
+                    return Err(IdentifierParseError::InvalidIdentifier(quoted));
+                }
             }
         };
 
@@ -279,23 +277,22 @@ impl NamespacedIdentifier {
             }) {
                 return Err(IdentifierParseError::InvalidPathCharacter(path, ch));
             }
-
         } else {
             // The character constraints used by Bedrock are a lot looser
             if namespace.find(':').is_some() {
-                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, ':'))
+                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, ':'));
             }
             if namespace.find('/').is_some() {
-                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, '/'))
+                return Err(IdentifierParseError::InvalidNamespaceCharacter(path, '/'));
             }
             if path.find(':').is_some() {
-                return Err(IdentifierParseError::InvalidPathCharacter(path, ':'))
+                return Err(IdentifierParseError::InvalidPathCharacter(path, ':'));
             }
         }
 
         Ok(Self {
             namespace: namespace.into_boxed_str(),
-            path: path.into_boxed_str(),
+            path:      path.into_boxed_str(),
         })
     }
 }
@@ -312,7 +309,7 @@ pub struct IdentifierParseOptions {
     /// If `Some`, if the `namespace:` part of `namespace:path` is missing, assume
     /// that the namespace is this string. If this is `None` and a namespace is missing,
     /// an error is returned from appropriate functions.
-    pub default_namespace: Option<&'static str>,
+    pub default_namespace:          Option<&'static str>,
     /// If true, use Java Edition's stricter restrictions for the characters
     /// which may appear in a [`NamespacedIdentifier`].
     pub java_character_constraints: bool,
@@ -323,7 +320,7 @@ impl Default for IdentifierParseOptions {
     #[inline]
     fn default() -> Self {
         Self {
-            default_namespace: None,
+            default_namespace:          None,
             java_character_constraints: true,
         }
     }
@@ -353,15 +350,13 @@ impl PartialOrd for GameVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         #[expect(clippy::match_same_arms, reason = "clarity")]
         match (self, other) {
-            (Self::Universal, Self::Universal)
-                => Some(Ordering::Equal),
-            (Self::Bedrock(v), Self::Bedrock(other_v))
-                => v.partial_cmp(other_v),
-            (Self::Java(v), Self::Java(other_v))
-                => v.partial_cmp(other_v),
-            (Self::Other(name, v), Self::Other(other_name, other_v)) if name == other_name
-                => v.partial_cmp(other_v),
-            _ => None
+            (Self::Universal,  Self::Universal)        => Some(Ordering::Equal),
+            (Self::Bedrock(v), Self::Bedrock(other_v)) => v.partial_cmp(other_v),
+            (Self::Java(v),    Self::Java(other_v))    => v.partial_cmp(other_v),
+            (Self::Other(name, v), Self::Other(other_name, other_v)) if name == other_name => {
+                v.partial_cmp(other_v)
+            }
+            _ => None,
         }
     }
 }
@@ -388,7 +383,7 @@ impl PartialOrd for VersionName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if let &Self::Numeric(version) = self {
             if let &Self::Numeric(other_version) = other {
-                return Some(version.cmp(&other_version))
+                return Some(version.cmp(&other_version));
             }
         }
         None
@@ -406,7 +401,7 @@ impl Display for VersionName {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             &Self::Numeric(numeric) => Display::fmt(&numeric, f),
-            Self::String(string)    => Display::fmt(&string,  f),
+            Self::String(string)    => Display::fmt(&string, f),
         }
     }
 }
@@ -452,9 +447,9 @@ impl Display for NumericVersion {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Only show the fourth or fifth components if necessary.
         match (self.3 == 0, self.4 == 0) {
-            (true,  true)  => write!(f, "{}.{}.{}",       self.0, self.1, self.2),
-            (false, true)  => write!(f, "{}.{}.{}.{}",    self.0, self.1, self.2, self.3),
-            (_,     false) => write!(f, "{}.{}.{}.{}.{}", self.0, self.1, self.2, self.3, self.4),
+            (true, true)  => write!(f, "{}.{}.{}",       self.0, self.1, self.2),
+            (false, true) => write!(f, "{}.{}.{}.{}",    self.0, self.1, self.2, self.3),
+            (_, false)    => write!(f, "{}.{}.{}.{}.{}", self.0, self.1, self.2, self.3, self.4),
         }
     }
 }

@@ -1,6 +1,6 @@
 use flate2::Compression;
 #[cfg(feature = "derive_serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 
 // ================================
@@ -21,12 +21,16 @@ use serde::{Serialize, Deserialize};
 /// if the limit is too high and unreasonably nested data is received,
 /// a crash could occur from the nested function calls exceeding the maximum stack size.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct DepthLimit(pub(crate) u32);
 
 impl Default for DepthLimit {
-    /// The maximum depth that NBT compounds and tags can be nested in the standard Minecraft specification.
+    /// The maximum depth that NBT compounds and tags can be nested in the standard Minecraft
+    /// specification.
     fn default() -> Self {
         Self(512)
     }
@@ -36,14 +40,12 @@ impl DepthLimit {
     pub fn limit(self) -> u32 {
         self.0
     }
-}
 
-#[cfg(feature = "configurable_depth")]
-impl DepthLimit {
     /// A limit on how deeply the recursive NBT tags (Compounds and Lists) may be nested.
     /// Note that this crate uses recursive functions to read and write NBT data;
     /// if the limit is too high and unreasonably nested data is received,
     /// a crash could occur from the nested function calls exceeding the maximum stack size.
+    #[cfg(feature = "configurable_depth")]
     pub fn new(limit: u32) -> Self {
         Self(limit)
     }
@@ -78,13 +80,17 @@ impl DepthLimit {
 
 /// Encoding options for reading/writing NBT data from/to bytes (e.g. from/to a file).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct IoOptions {
-    /// [Endianness] of some NBT data, primarily numeric data. Moreover, in the `NetworkLitleEndian`
-    /// variant, `i32` and `i64` values are written or read with a variable-length varint encoding.
+    /// [Endianness] of some NBT data, primarily numeric data.
+    /// In the `NetworkLitleEndian` variant, `i32` and `i64` values are written and read with a
+    /// variable-length varint encoding.
     ///
-    /// Bedrock Edition is `LittleEndian`, Java is `BigEndian`
+    /// Default: `LittleEndian` for Bedrock, `BigEndian` for Java
     ///
     /// [Endianness]: https://en.wikipedia.org/wiki/Endianness
     pub endianness: Endianness,
@@ -114,11 +120,11 @@ impl IoOptions {
     #[inline]
     pub fn java() -> Self {
         Self {
-            endianness:             Endianness::BigEndian,
-            compression:            NbtCompression::GzipCompressed,
-            string_encoding:        StringEncoding::Cesu8,
-            allow_invalid_strings:  false,
-            depth_limit:            DepthLimit::default(),
+            endianness:            Endianness::BigEndian,
+            compression:           NbtCompression::GzipCompressed,
+            string_encoding:       StringEncoding::Cesu8,
+            allow_invalid_strings: false,
+            depth_limit:           DepthLimit::default(),
         }
     }
 
@@ -135,11 +141,11 @@ impl IoOptions {
     #[inline]
     pub fn bedrock() -> Self {
         Self {
-            endianness:             Endianness::LittleEndian,
-            compression:            NbtCompression::GzipCompressed,
-            string_encoding:        StringEncoding::Utf8,
-            allow_invalid_strings:  false,
-            depth_limit:            DepthLimit::default(),
+            endianness:            Endianness::LittleEndian,
+            compression:           NbtCompression::GzipCompressed,
+            string_encoding:       StringEncoding::Utf8,
+            allow_invalid_strings: false,
+            depth_limit:           DepthLimit::default(),
         }
     }
 
@@ -157,11 +163,11 @@ impl IoOptions {
     #[inline]
     pub fn bedrock_network_uncompressed() -> Self {
         Self {
-            endianness:             Endianness::NetworkLittleEndian,
-            compression:            NbtCompression::Uncompressed,
-            string_encoding:        StringEncoding::Utf8,
-            allow_invalid_strings:  false,
-            depth_limit:            DepthLimit::default(),
+            endianness:            Endianness::NetworkLittleEndian,
+            compression:           NbtCompression::Uncompressed,
+            string_encoding:       StringEncoding::Utf8,
+            allow_invalid_strings: false,
+            depth_limit:           DepthLimit::default(),
         }
     }
 }
@@ -170,7 +176,10 @@ impl IoOptions {
 ///
 /// [Endianness]: https://en.wikipedia.org/wiki/Endianness
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum Endianness {
     /// Used by Java
@@ -189,7 +198,10 @@ pub enum Endianness {
 /// Describes the compression options for NBT data:
 /// uncompressed, Zlib-compressed and Gzip-compressed.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum NbtCompression {
     /// Uncompressed NBT data.
@@ -205,7 +217,10 @@ pub enum NbtCompression {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct CompressionLevel(u8);
 
@@ -225,7 +240,10 @@ impl From<CompressionLevel> for Compression {
 
 /// String encodings used by Minecraft. Java is CESU-8, Bedrock is probably always UTF-8.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum StringEncoding {
     /// Used by Bedrock
@@ -254,7 +272,10 @@ pub enum StringEncoding {
 /// and in particular, outputting character escape sequences only valid in `UpdatedJava` SNBT,
 /// such as `\n` or `\t`, can be enabled.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum SnbtVersion {
     /// For Java 1.21.5 and later. Adds additional parsing features, and is mostly
@@ -309,7 +330,10 @@ pub enum SnbtVersion {
 /// Options for parsing SNBT data into NBT data. See the [`SnbtVersion`] enum and its variants
 /// for information about the two versions of SNBT.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct SnbtParseOptions {
     /// Version of the SNBT format used. Has many effects on how SNBT is parsed. Note that
@@ -363,13 +387,13 @@ impl SnbtParseOptions {
     #[inline]
     pub fn default_updated() -> Self {
         Self {
-            version:                    SnbtVersion::UpdatedJava,
-            depth_limit:                DepthLimit::default(),
-            true_false:                 ParseTrueFalse::AsDetected,
-            non_finite:                 ParseNonFinite::AsDetected,
-            replace_non_finite:         true,
-            enabled_escape_sequences:   EnabledEscapeSequences::all_escapes(),
-            handle_invalid_escape:      HandleInvalidEscape::Error,
+            version:                  SnbtVersion::UpdatedJava,
+            depth_limit:              DepthLimit::default(),
+            true_false:               ParseTrueFalse::AsDetected,
+            non_finite:               ParseNonFinite::AsDetected,
+            replace_non_finite:       true,
+            enabled_escape_sequences: EnabledEscapeSequences::all_escapes(),
+            handle_invalid_escape:    HandleInvalidEscape::Error,
         }
     }
 
@@ -377,13 +401,13 @@ impl SnbtParseOptions {
     #[inline]
     pub fn default_original() -> Self {
         Self {
-            version:                    SnbtVersion::Original,
-            depth_limit:                DepthLimit::default(),
-            true_false:                 ParseTrueFalse::AsDetected,
-            non_finite:                 ParseNonFinite::AsDetected,
-            replace_non_finite:         true,
-            enabled_escape_sequences:   EnabledEscapeSequences::no_escapes(),
-            handle_invalid_escape:      HandleInvalidEscape::Error,
+            version:                  SnbtVersion::Original,
+            depth_limit:              DepthLimit::default(),
+            true_false:               ParseTrueFalse::AsDetected,
+            non_finite:               ParseNonFinite::AsDetected,
+            replace_non_finite:       true,
+            enabled_escape_sequences: EnabledEscapeSequences::no_escapes(),
+            handle_invalid_escape:    HandleInvalidEscape::Error,
         }
     }
 }
@@ -395,7 +419,10 @@ impl SnbtParseOptions {
 /// as unquoted strings, or parsed as bytes unless they are an `NbtCompound` key or
 /// an element of an `NbtList` of String tags.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum ParseTrueFalse {
     AsByte,
@@ -419,7 +446,10 @@ pub enum ParseTrueFalse {
 ///
 /// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum ParseNonFinite {
     AsDetected,
@@ -430,7 +460,10 @@ pub enum ParseNonFinite {
 
 /// How to handle an invalid or disabled escape sequence in a quoted string when parsing SNBT data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum HandleInvalidEscape {
     /// Copy the escape sequence verbatim into the final string
@@ -444,7 +477,10 @@ pub enum HandleInvalidEscape {
 /// Options for writing NBT data to SNBT. See the [`SnbtVersion`] enum and its variants
 /// for information about the two versions of SNBT.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct SnbtWriteOptions {
     /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT.
@@ -454,12 +490,12 @@ pub struct SnbtWriteOptions {
     /// The maximum depth that NBT compounds and tags can be recursively nested.
     ///
     /// Default: 512, the limit used by Minecraft.
-    pub depth_limit: DepthLimit,
+    pub depth_limit:              DepthLimit,
     /// How to print an infinite or NaN float/double tag, or if writing should
     /// halt with an error (if possible).
     ///
     /// Default: `PrintFloats` ()
-    pub non_finite: WriteNonFinite,
+    pub non_finite:               WriteNonFinite,
     /// Which escape sequences will be used when writing an NBT string tag into a quoted
     /// SNBT string. Note that escapes are not used eagerly when a simpler option is available;
     /// otherwise, enabling unicode escapes would fill the entire string with them. Moreover,
@@ -488,15 +524,15 @@ impl SnbtWriteOptions {
     #[inline]
     pub fn default_updated() -> Self {
         Self {
-            version:                    SnbtVersion::UpdatedJava,
-            depth_limit:                DepthLimit::default(),
-            non_finite:                 WriteNonFinite::PrintFloats,
-            enabled_escape_sequences:   EnabledEscapeSequences::from_fn(
-                |escape| !matches!(
+            version:                  SnbtVersion::UpdatedJava,
+            depth_limit:              DepthLimit::default(),
+            non_finite:               WriteNonFinite::PrintFloats,
+            enabled_escape_sequences: EnabledEscapeSequences::from_fn(|escape| {
+                !matches!(
                     escape,
                     EscapeSequence::N | EscapeSequence::R | EscapeSequence::S,
                 )
-            )
+            }),
         }
     }
 
@@ -504,10 +540,10 @@ impl SnbtWriteOptions {
     #[inline]
     pub fn default_original() -> Self {
         Self {
-            version:                    SnbtVersion::UpdatedJava,
-            depth_limit:                DepthLimit::default(),
-            non_finite:                 WriteNonFinite::PrintFloats,
-            enabled_escape_sequences:   EnabledEscapeSequences::no_escapes(),
+            version:                  SnbtVersion::UpdatedJava,
+            depth_limit:              DepthLimit::default(),
+            non_finite:               WriteNonFinite::PrintFloats,
+            enabled_escape_sequences: EnabledEscapeSequences::no_escapes(),
         }
     }
 }
@@ -525,7 +561,10 @@ impl SnbtWriteOptions {
 ///
 /// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub enum WriteNonFinite {
     /// Display positive infinity as though it were the `MAX` constant of `f32` or `f64`,
@@ -546,7 +585,10 @@ pub enum WriteNonFinite {
 /// If the `named_escapes` feature is not enabled, the option for enabling
 /// unicode escapes will be ignored.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct EnabledEscapeSequences(u16);
 
@@ -554,7 +596,8 @@ impl EnabledEscapeSequences {
     /// Enables the escape sequences for which the provided function returns `true`.
     #[inline]
     pub fn from_fn<E>(mut enabled_escapes: E) -> Self
-    where E: FnMut(EscapeSequence) -> bool
+    where
+        E: FnMut(EscapeSequence) -> bool,
     {
         use EscapeSequence as ES;
 
@@ -587,21 +630,25 @@ impl EnabledEscapeSequences {
     /// Enables `\n` (newline), `\r` (carriage return), and `\t` (horizontal tab).
     #[inline]
     pub fn standard_whitespace_escapes() -> Self {
-        Self::from_fn(|escape| matches!(
-            escape,
-            EscapeSequence::N | EscapeSequence::R | EscapeSequence::S,
-        ))
+        Self::from_fn(|escape| {
+            matches!(
+                escape,
+                EscapeSequence::N | EscapeSequence::R | EscapeSequence::S,
+            )
+        })
     }
 
     /// Enables `\b` (backspace), `\f` (form feed), `\n` (newline),
     /// `\r` (carriage return), `\s` (space), and `\t` (horizontal tab).
     #[inline]
     pub fn one_character_escapes() -> Self {
-        Self::from_fn(|escape| matches!(
-            escape,
-            EscapeSequence::B | EscapeSequence::F | EscapeSequence::N
-                | EscapeSequence::R | EscapeSequence::S | EscapeSequence::T,
-        ))
+        Self::from_fn(|escape| {
+            matches!(
+                escape,
+                EscapeSequence::B | EscapeSequence::F | EscapeSequence::N
+                    | EscapeSequence::R | EscapeSequence::S | EscapeSequence::T,
+            )
+        })
     }
 
     /// Enables unicode escapes: `\x`, `\u`, and `\U` for two-, four-, or eight-character
@@ -610,23 +657,28 @@ impl EnabledEscapeSequences {
     /// is not enabled.
     #[inline]
     pub fn unicode_escapes() -> Self {
-        Self::from_fn(|escape| matches!(
-            escape,
-            EscapeSequence::UnicodeTwo | EscapeSequence::UnicodeFour
-                | EscapeSequence::UnicodeEight | EscapeSequence::UnicodeNamed
-        ))
+        Self::from_fn(|escape| {
+            matches!(
+                escape,
+                EscapeSequence::UnicodeTwo | EscapeSequence::UnicodeFour
+                    | EscapeSequence::UnicodeEight | EscapeSequence::UnicodeNamed,
+            )
+        })
     }
 
     /// Whether the provided escape sequence is enabled
     #[inline]
     pub fn is_enabled(self, escape: EscapeSequence) -> bool {
-        0 != self.0 & (1 << (escape as u8))
+        self.0 & (1 << (escape as u8)) != 0
     }
 }
 
 /// The various escape sequences allowed in SNBT
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[cfg_attr(
+    feature = "derive_standard",
+    derive(PartialEq, Eq, PartialOrd, Ord, Hash),
+)]
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EscapeSequence {
@@ -643,9 +695,9 @@ pub enum EscapeSequence {
     /// `\t`, horizontal tab
     T = 5,
     /// `\x--`, two-character unicode escapes
-    UnicodeTwo = 6,
+    UnicodeTwo   = 6,
     /// `\u----`, four-character unicode escapes
-    UnicodeFour = 7,
+    UnicodeFour  = 7,
     /// `\U--------`, eight-character unicode escapes
     UnicodeEight = 8,
     /// `\N{----}`, named unicode escapes. (Note that `----` is a placeholder for a name

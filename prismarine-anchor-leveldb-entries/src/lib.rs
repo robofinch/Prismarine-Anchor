@@ -1,5 +1,5 @@
-mod key;
 mod entry;
+mod key;
 
 
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub use self::{entry::DBEntry, key::DBKey};
 /// - `write_overworld_name = true` for any version at or above 1.20.40.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeyToBytesOptions {
-    pub write_overworld_id: bool,
+    pub write_overworld_id:   bool,
     pub write_overworld_name: bool,
 }
 
@@ -125,14 +125,14 @@ impl From<MetaDataWriteError> for ValueToBytesError {
 
 #[derive(Debug, Clone)]
 pub struct EntryBytes {
-    pub key: Vec<u8>,
+    pub key:   Vec<u8>,
     pub value: Vec<u8>,
 }
 
 #[derive(Error, Debug)]
 #[error("error while converting a DBEntry's value to bytes: {value_error}")]
 pub struct EntryToBytesError {
-    pub key: Vec<u8>,
+    pub key:         Vec<u8>,
     pub value_error: ValueToBytesError,
 }
 
@@ -153,24 +153,20 @@ fn print_debug(value: &[u8]) {
     while nums.peek().is_some() {
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric()
-                    || ch == '.' || ch == '-' || ch == '_'
-                {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
                     nums.next();
                     print!("{ch}");
                 } else {
                     break;
                 }
             } else {
-                break
+                break;
             }
         }
         print!("[");
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric()
-                    || ch == '.' || ch == '-' || ch == '_'
-                {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
                     break;
                 }
             }

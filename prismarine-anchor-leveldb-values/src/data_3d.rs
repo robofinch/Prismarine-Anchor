@@ -4,8 +4,8 @@ use zerocopy::transmute;
 
 use crate::all_read;
 use crate::palettized_storage::{
-    read_le_u32s, write_le_u32s,
     PaletteHeader, PaletteType, PalettizedStorage,
+    read_le_u32s, write_le_u32s,
 };
 
 

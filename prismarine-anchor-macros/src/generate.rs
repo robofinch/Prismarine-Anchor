@@ -7,7 +7,7 @@ use super::TranslatorTypes;
 
 #[expect(
     clippy::too_many_lines,
-    reason = "having the quoted impl mostly be in one piece is more readable"
+    reason = "having the quoted impl mostly be in one piece is more readable",
 )]
 pub(crate) fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStream {
     let source_error = &types.error;
@@ -48,10 +48,10 @@ pub(crate) fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStrea
 
             fn translate_block(
                 &self,
-                block: #block,
+                block:        #block,
                 block_entity: #option<#block_entity>,
-                position: #block_position,
-                get_block: &dyn #fn_trait(#block_position) -> (#block, #option<#block_entity>),
+                position:     #block_position,
+                get_block:    &dyn #fn_trait(#block_position) -> (#block, #option<#block_entity>),
             ) -> #result<
                 (#block_or_entity, #block_metadata),
                 (#error, #block, #option<#block_entity>, #block_metadata),
@@ -184,7 +184,12 @@ struct SourceTranslator<'a> {
 
 impl ToTokens for SourceTranslator<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let TranslatorTypes { error, block, entity, item } = self.types;
+        let TranslatorTypes {
+            error,
+            block,
+            entity,
+            item,
+        } = self.types;
 
         let translator = Shorthand::Translator;
 

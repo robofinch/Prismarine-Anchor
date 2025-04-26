@@ -36,10 +36,10 @@ pub trait Translator<Error, BlockMetadata = (), EntityMetadata = (), ItemMetadat
     /// to avoid data being lost from a failed translation.
     fn translate_block(
         &self,
-        block: Block,
+        block:        Block,
         block_entity: Option<BlockEntity>,
-        position: BlockPosition,
-        get_block: &dyn Fn(BlockPosition) -> (Block, Option<BlockEntity>),
+        position:     BlockPosition,
+        get_block:    &dyn Fn(BlockPosition) -> (Block, Option<BlockEntity>),
     ) -> Result<
         (BlockOrEntity, BlockMetadata),
         (Error, Block, Option<BlockEntity>, BlockMetadata)

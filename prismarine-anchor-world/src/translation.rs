@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, cmp::Ordering, collections::HashMap};
 
 use thiserror::Error;
 
@@ -32,14 +32,22 @@ impl Translators {
     /// error type impements `std::error::Error` and `Send + Sync + 'static`,
     /// then it aleady can be converted to [`anyhow::Error`].
     /// (Most types are `Send + Sync + 'static`.)
-    pub fn add_custom_translator<T: Translator<anyhow::Error, BlockMetadata, (), ()> + 'static> (
-        &mut self, source: GameVersion, target: GameVersion, translator: T
-    ) {
-        self.translators.insert((source, target), Box::new(translator));
+    pub fn add_custom_translator<T>(
+        &mut self,
+        source:     GameVersion,
+        target:     GameVersion,
+        translator: T,
+    ) where
+        T: Translator<anyhow::Error, BlockMetadata, (), ()> + 'static,
+    {
+        self.translators
+            .insert((source, target), Box::new(translator));
     }
 
     pub fn load_translator(
-        &mut self, source: GameVersion, target: GameVersion,
+        &mut self,
+        source: GameVersion,
+        target: GameVersion,
     ) -> Result<(), TranslatorLoadError> {
         #[cfg(feature = "py_mc_translate")]
         {
@@ -59,22 +67,30 @@ impl Translators {
 
     #[cfg(feature = "py_mc_translate")]
     pub fn load_pymc_translator(
-        &mut self, _source: GameVersion, _target: GameVersion,
+        &mut self,
+        _source: GameVersion,
+        _target: GameVersion,
     ) -> Result<(), TranslatorLoadError> {
         todo!()
     }
 
     #[cfg(feature = "minecraft_data")]
     pub fn load_mc_data_translator(
-        &mut self, _source: GameVersion, _target: GameVersion,
+        &mut self,
+        _source: GameVersion,
+        _target: GameVersion,
     ) -> Result<(), TranslatorLoadError> {
         todo!()
     }
 
     pub fn get_translator(
-        &self, source: GameVersion, target: GameVersion
+        &self,
+        source: GameVersion,
+        target: GameVersion,
     ) -> Option<&InternalTranslator> {
-        self.translators.get(&(source, target)).map(Box::as_ref)
+        self.translators
+            .get(&(source, target))
+            .map(Box::as_ref)
     }
 
     /// Finds a game version pair similar to `(source, target)` such that a translator
@@ -100,15 +116,19 @@ impl Translators {
     /// where `v` is **less** than or equal to `target`.
     #[expect(
         clippy::fn_params_excessive_bools,
-        reason = "This is temporary. This code needs to be improved."
+        reason = "This is temporary. This code needs to be improved.",
         // TODO: revamp universal translation stuff
     )]
     pub fn find_available_translator(
-        &self, source: &GameVersion, target: &GameVersion,
-        searching_for_source: bool, searching_for_next: bool
+        &self,
+        source:               &GameVersion,
+        target:               &GameVersion,
+        searching_for_source: bool,
+        searching_for_next:   bool,
     ) -> Option<&InternalTranslator> {
-
-        let mut possibilities = self.translators.keys()
+        let mut possibilities = self
+            .translators
+            .keys()
             .filter(|key| {
                 if searching_for_source && target == &key.1 {
                     if let Some(ordering) = source.partial_cmp(&key.0) {
@@ -118,10 +138,9 @@ impl Translators {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,
                             (false, Ordering::Less)    => true,
-                            _ => false
-                        }
+                            _ => false,
+                        };
                     }
-
                 } else if !searching_for_source && source == &key.0 {
                     if let Some(ordering) = target.partial_cmp(&key.1) {
                         // I think the match is more readable
@@ -130,8 +149,8 @@ impl Translators {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,
                             (false, Ordering::Less)    => true,
-                            _ => false
-                        }
+                            _ => false,
+                        };
                     }
                 }
 
@@ -145,10 +164,13 @@ impl Translators {
                 (true,  false) => other.0.partial_cmp(&key.0),
                 (false, true)  => key.1.partial_cmp(&other.1),
                 (false, false) => other.1.partial_cmp(&key.1),
-            }.expect("Anything in possibilities is comparable")
+            }
+            .expect("Anything in possibilities is comparable")
         });
 
-        self.translators.get(possibilities.first()?).map(Box::as_ref)
+        self.translators
+            .get(possibilities.first()?)
+            .map(Box::as_ref)
     }
 }
 

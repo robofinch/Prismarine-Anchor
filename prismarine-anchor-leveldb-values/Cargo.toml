@@ -19,6 +19,17 @@ thiserror       = { workspace = true, optional = true }
 xxhash-rust     = { workspace = true, optional = true }
 zerocopy        = { workspace = true, features = ["derive"], optional = true }
 
+# NOTE:
+# All these features are assumed to be independent of each other
+# (well, aside from whatever dependencies they have);
+# that is, if a feature is enabled, then the behavior of the code enabled by that feature
+# should not change in any substantial way if a different feature is enabled.
+#
+# (A half-exception is enabling `prismarine-anchor-nbt/preserve_order`, but provided that
+# no code here uses the NBT compound's internal map type, that's fine.
+# Going from an unspecified order to a specific order is not a breaking change.)
+#
+# This assumption allows testing to be faster; we need only test each feature individually.
 [features]
 all = [
     "dimensions", "chunk_position", "uuid", "concatenated_nbt_compounds", "palettized_storage",

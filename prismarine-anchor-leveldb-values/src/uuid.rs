@@ -46,22 +46,22 @@ impl UUID {
             let mut sum = 0;
 
             for nibble in upper {
-                sum = (sum << 4) +  nibble?;
+                sum = (sum << 4) + nibble?;
             }
             for nibble in lower {
-                sum = (sum << 4) +  nibble?;
+                sum = (sum << 4) + nibble?;
             }
 
             Some(sum)
         }
 
         // Split the UUID into its parts
-        let first:       [char; 8] = uuid_chars[ 0 .. 8].try_into().unwrap();
-        let second:      [char; 4] = uuid_chars[ 9 ..13].try_into().unwrap();
-        let third:       [char; 4] = uuid_chars[14 ..18].try_into().unwrap();
-        let fourth:      [char; 4] = uuid_chars[19 ..23].try_into().unwrap();
-        let fifth_start: [char; 4] = uuid_chars[24 ..28].try_into().unwrap();
-        let fifth_end:   [char; 8] = uuid_chars[28 ..36].try_into().unwrap();
+        let first:       [char; 8] = uuid_chars[ 0.. 8].try_into().unwrap();
+        let second:      [char; 4] = uuid_chars[ 9..13].try_into().unwrap();
+        let third:       [char; 4] = uuid_chars[14..18].try_into().unwrap();
+        let fourth:      [char; 4] = uuid_chars[19..23].try_into().unwrap();
+        let fifth_start: [char; 4] = uuid_chars[24..28].try_into().unwrap();
+        let fifth_end:   [char; 8] = uuid_chars[28..36].try_into().unwrap();
 
         Some(Self([
             chars_to_u32(first)?,

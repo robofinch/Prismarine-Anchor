@@ -1,20 +1,22 @@
+use std::fmt;
 use std::{cell::Cell, marker::PhantomData};
-use std::io::{Cursor, Write};
+use std::{
+    fmt::{Debug, Formatter},
+    io::{Cursor, Write},
+};
 
 use serde::Serialize;
 use serde::ser::{
-    Impossible,
-    SerializeMap,
-    SerializeSeq,
-    SerializeStruct,
-    SerializeStructVariant,
-    SerializeTuple,
-    SerializeTupleStruct,
-    SerializeTupleVariant,
+    Impossible, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
+    SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
 };
 
 use crate::raw;
 use crate::{io::NbtIoError, settings::IoOptions};
+use crate::raw::{
+    BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, FLOAT_ID, INT_ARRAY_ID,
+    INT_ID, LIST_ID, LONG_ID, LONG_ARRAY_ID, SHORT_ID, STRING_ID, TAG_END_ID,
+};
 use super::{
     array::{BYTE_ARRAY_NICHE, INT_ARRAY_NICHE, LONG_ARRAY_NICHE},
     util::{DefaultSerializer, Ser},
@@ -24,6 +26,9 @@ use super::{
 // TODO: actually implement DepthLimit checks. I haven't managed to figure out the boundary
 // between compound or list tags and their elements, so I don't know where to add checks.
 // Some messing around with debug prints should reveal useful info, probably.
+
+// TODO: there are some things here that really, really, really need to be tested.
+// I think I trust the io and snbt code. This, not as much.
 
 
 /// The serializer type for writing binary NBT data.
@@ -38,11 +43,8 @@ impl<'a, W: Write> Serializer<'a, W> {
     /// Constructs a new serializer with the given writer, IO options, and root name.
     /// If no root name is specified, then an empty string is written to the header.
     pub fn new(writer: &'a mut W, opts: IoOptions, root_name: Option<&'a str>) -> Self {
-        SerializerImpl::new(
-            writer,
-            opts,
-            BorrowedPrefix::new(root_name.unwrap_or(""))
-        ).into_serializer()
+        SerializerImpl::new(writer, opts, BorrowedPrefix::new(root_name.unwrap_or("")))
+            .into_serializer()
     }
 }
 
@@ -50,19 +52,27 @@ impl<'a, W: Write> UncheckedSerializer<'a, W> {
     /// Constructs a new unchecked serializer with the given writer, IO options, and root name.
     /// If no root name is specified, then an empty string is written to the header.
     pub fn new(writer: &'a mut W, opts: IoOptions, root_name: Option<&'a str>) -> Self {
-        SerializerImpl::new(
-            writer,
-            opts,
-            BorrowedPrefix::new(root_name.unwrap_or(""))
-        ).into_serializer()
+        SerializerImpl::new(writer, opts, BorrowedPrefix::new(root_name.unwrap_or("")))
+            .into_serializer()
     }
 }
 
 pub struct SerializerImpl<'a, W, C> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:    &'a mut W,
+    opts:      IoOptions,
     root_name: BorrowedPrefix<&'a str>,
-    _phantom: PhantomData<C>,
+    _phantom:  PhantomData<C>,
+}
+
+impl<W, C> Debug for SerializerImpl<'_, W, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SerializerImpl with root_name \"{:?}\" and opts: {:?}",
+            self.root_name,
+            self.opts,
+        )
+    }
 }
 
 impl<'a, W: Write, C: TypeChecker> SerializerImpl<'a, W, C> {
@@ -78,7 +88,7 @@ impl<'a, W: Write, C: TypeChecker> SerializerImpl<'a, W, C> {
 
 impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C> {
     type Error = NbtIoError;
-    type Ok = ();
+    type Ok    = ();
     type SerializeMap           = SerializeCompound<'a, W, C>;
     type SerializeSeq           = Impossible<Self::Ok, Self::Error>;
     type SerializeStruct        = SerializeCompound<'a, W, C>;
@@ -93,7 +103,7 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
         _variant_index: u32,
@@ -101,7 +111,7 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let mut map = self.serialize_map(Some(1))?;
         map.serialize_entry(variant, value)?;
@@ -116,14 +126,15 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.root_name.write(self.writer, self.opts, 0xA)?;
+        self.root_name.write(self.writer, self.opts, COMPOUND_ID)?;
         let prefix = BorrowedPrefix::new(variant);
-        SerializeCompoundEntry::new(self.writer, self.opts, 0, prefix).serialize_seq(Some(len))
+        SerializeCompoundEntry::new(self.writer, self.opts, 0, prefix)
+            .serialize_seq(Some(len))
     }
 
     #[inline]
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        self.root_name.write(self.writer, self.opts, 0xA)?;
+        self.root_name.write(self.writer, self.opts, COMPOUND_ID)?;
         Ok(SerializeCompound::new(self.writer, self.opts, 0))
     }
 
@@ -131,7 +142,7 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
     fn serialize_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         <Self as DefaultSerializer>::serialize_map(self, Some(len))
     }
@@ -139,13 +150,13 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
     #[inline]
     fn serialize_struct_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        _len: usize,
+        variant:        &'static str,
+        _len:           usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.root_name.write(self.writer, self.opts, 0xA)?;
-        raw::write_u8(self.writer, self.opts, 0xA)?;
+        self.root_name.write(self.writer, self.opts, COMPOUND_ID)?;
+        raw::write_u8(self.writer, self.opts, COMPOUND_ID)?;
         raw::write_string(self.writer, self.opts, variant)?;
         // The extra closing tag is added by the SerializeStructVariant impl
         Ok(SerializeCompound::new(self.writer, self.opts, 0))
@@ -158,13 +169,14 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
 }
 
 struct SerializeArray<'a, W> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:        &'a mut W,
+    opts:          IoOptions,
     current_depth: u32,
 }
 
 impl<'a, W> SerializeArray<'a, W>
-where W: Write
+where
+    W: Write,
 {
     #[inline]
     fn new(writer: &'a mut W, opts: IoOptions, current_depth: u32) -> Self {
@@ -176,11 +188,12 @@ where W: Write
     }
 }
 
-impl<'a, W> DefaultSerializer for SerializeArray<'a, W>
-where W: Write
+impl<W> DefaultSerializer for SerializeArray<'_, W>
+where
+    W: Write,
 {
     type Error = NbtIoError;
-    type Ok = ();
+    type Ok    = ();
     type SerializeMap           = Impossible<Self::Ok, Self::Error>;
     type SerializeSeq           = Self;
     type SerializeStruct        = Impossible<Self::Ok, Self::Error>;
@@ -217,25 +230,33 @@ where W: Write
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_seq(Some(len))
     }
 }
 
-impl<'a, W> SerializeSeq for SerializeArray<'a, W>
-where W: Write
+impl<W> SerializeSeq for SerializeArray<'_, W>
+where
+    W: Write,
 {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         value.serialize(
             SerializeListElement::new(
-                self.writer, self.opts, self.current_depth, NoPrefix, &UNCHECKED
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                NoPrefix,
+                &UNCHECKED,
+            )
+            .into_serializer(),
         )
     }
 
@@ -245,15 +266,18 @@ where W: Write
     }
 }
 
-impl<'a, W> SerializeTuple for SerializeArray<'a, W>
-where W: Write
+impl<W> SerializeTuple for SerializeArray<'_, W>
+where
+    W: Write,
 {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         <Self as SerializeSeq>::serialize_element(self, value)
     }
 
@@ -263,15 +287,18 @@ where W: Write
     }
 }
 
-impl<'a, W> SerializeTupleStruct for SerializeArray<'a, W>
-where W: Write
+impl<W> SerializeTupleStruct for SerializeArray<'_, W>
+where
+    W: Write,
 {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         <Self as SerializeSeq>::serialize_element(self, value)
     }
 
@@ -282,11 +309,23 @@ where W: Write
 }
 
 pub struct SerializeList<'a, W, C> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:        &'a mut W,
+    opts:          IoOptions,
     current_depth: u32,
-    length: Option<i32>,
-    type_checker: C,
+    length:        Option<i32>,
+    type_checker:  C,
+}
+
+impl<W, C> Debug for SerializeList<'_, W, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SerializeList with length {:?} at nesting depth {:?} with opts: {:?}",
+            self.length,
+            self.current_depth,
+            self.opts,
+        )
+    }
 }
 
 impl<'a, W, C> SerializeList<'a, W, C>
@@ -294,20 +333,27 @@ where
     W: Write,
     C: TypeChecker,
 {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "for consistency with similar structs here, for which new() can fail",
+    )]
     fn new(
-        writer: &'a mut W, opts: IoOptions, current_depth: u32, length: i32
+        writer:        &'a mut W,
+        opts:          IoOptions,
+        current_depth: u32,
+        length:        i32,
     ) -> Result<Self, NbtIoError> {
         Ok(SerializeList {
             writer,
             opts,
             current_depth,
-            length: Some(length),
-            type_checker: C::new(),
+            length:        Some(length),
+            type_checker:  C::new(),
         })
     }
 }
 
-impl<'a, W, C> SerializeSeq for SerializeList<'a, W, C>
+impl<W, C> SerializeSeq for SerializeList<'_, W, C>
 where
     W: Write,
     C: TypeChecker,
@@ -316,8 +362,10 @@ where
     type Ok = ();
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         match self.length.take() {
             None => value.serialize(
                 SerializeListElement::new(
@@ -325,8 +373,9 @@ where
                     self.opts,
                     self.current_depth,
                     NoPrefix,
-                    &self.type_checker
-                ).into_serializer(),
+                    &self.type_checker,
+                )
+                .into_serializer(),
             ),
             Some(length) => value.serialize(
                 SerializeListElement::new(
@@ -335,7 +384,8 @@ where
                     self.current_depth,
                     LengthPrefix::new(length),
                     &self.type_checker,
-                ).into_serializer(),
+                )
+                .into_serializer(),
             ),
         }
     }
@@ -343,16 +393,16 @@ where
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
         // Empty list
-        if let Some(..) = self.length {
-            // Note that the first byte is the id of TAG_End, 0x0.
-            self.writer.write_all(&[0, 0, 0, 0, 0])?;
+        if self.length.is_some() {
+            raw::write_u8(self.writer, self.opts, TAG_END_ID)?;
+            raw::write_usize_as_i32(self.writer, self.opts, 0)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, W, C> SerializeTuple for SerializeList<'a, W, C>
+impl<W, C> SerializeTuple for SerializeList<'_, W, C>
 where
     W: Write,
     C: TypeChecker,
@@ -361,8 +411,10 @@ where
     type Ok = ();
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         <Self as SerializeSeq>::serialize_element(self, value)
     }
 
@@ -372,7 +424,7 @@ where
     }
 }
 
-impl<'a, W, C> SerializeTupleStruct for SerializeList<'a, W, C>
+impl<W, C> SerializeTupleStruct for SerializeList<'_, W, C>
 where
     W: Write,
     C: TypeChecker,
@@ -381,8 +433,10 @@ where
     type Ok = ();
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         <Self as SerializeSeq>::serialize_element(self, value)
     }
 
@@ -392,7 +446,7 @@ where
     }
 }
 
-impl<'a, W, C> SerializeTupleVariant for SerializeList<'a, W, C>
+impl<W, C> SerializeTupleVariant for SerializeList<'_, W, C>
 where
     W: Write,
     C: TypeChecker,
@@ -401,30 +455,33 @@ where
     type Ok = ();
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         <Self as SerializeSeq>::serialize_element(self, value)
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
         // Empty list
-        if let Some(..) = self.length {
-            self.writer.write_all(&[0, 0, 0, 0, 0])?;
+        if self.length.is_some() {
+            raw::write_u8(self.writer, self.opts, TAG_END_ID)?;
+            raw::write_usize_as_i32(self.writer, self.opts, 0)?;
         }
 
         // Add a TAG_End because tuple variants are serialized as { name: [data...] }
-        raw::write_u8(self.writer, self.opts, raw::id_for_tag(None))?;
+        raw::write_u8(self.writer, self.opts, TAG_END_ID)?;
         Ok(())
     }
 }
 
 struct SerializeListElement<'a, W, P, C> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:        &'a mut W,
+    opts:          IoOptions,
     current_depth: u32,
-    prefix: P,
-    type_checker: &'a C,
+    prefix:        P,
+    type_checker:  &'a C,
 }
 
 impl<'a, W, P, C> SerializeListElement<'a, W, P, C>
@@ -435,10 +492,10 @@ where
 {
     #[inline]
     fn new(
-        writer: &'a mut W,
-        opts: IoOptions,
-        current_depth: u32,
-        inner_prefix: P,
+        writer:             &'a mut W,
+        opts:               IoOptions,
+        current_depth:      u32,
+        inner_prefix:       P,
         inner_type_checker: &'a C,
     ) -> Self {
         SerializeListElement {
@@ -458,7 +515,7 @@ where
     C: TypeChecker,
 {
     type Error = NbtIoError;
-    type Ok = ();
+    type Ok    = ();
     type SerializeMap           = SerializeCompound<'a, W, C>;
     type SerializeSeq           = SerializeList<'a, W, C>;
     type SerializeStruct        = SerializeCompound<'a, W, C>;
@@ -474,16 +531,16 @@ where
 
     #[inline]
     fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x1)?;
-        self.prefix.write(self.writer, self.opts, 0x1)?;
+        self.type_checker.verify(BYTE_ID)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ID)?;
         raw::write_bool(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x1)?;
-        self.prefix.write(self.writer, self.opts, 0x1)?;
+        self.type_checker.verify(BYTE_ID)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ID)?;
         raw::write_i8(self.writer, self.opts, value)?;
         Ok(())
     }
@@ -495,56 +552,56 @@ where
 
     #[inline]
     fn serialize_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x2)?;
-        self.prefix.write(self.writer, self.opts, 0x2)?;
+        self.type_checker.verify(SHORT_ID)?;
+        self.prefix.write(self.writer, self.opts, SHORT_ID)?;
         raw::write_i16(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x3)?;
-        self.prefix.write(self.writer, self.opts, 0x3)?;
+        self.type_checker.verify(INT_ID)?;
+        self.prefix.write(self.writer, self.opts, INT_ID)?;
         raw::write_i32(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x4)?;
-        self.prefix.write(self.writer, self.opts, 0x4)?;
+        self.type_checker.verify(LONG_ID)?;
+        self.prefix.write(self.writer, self.opts, LONG_ID)?;
         raw::write_i64(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x5)?;
-        self.prefix.write(self.writer, self.opts, 0x5)?;
+        self.type_checker.verify(FLOAT_ID)?;
+        self.prefix.write(self.writer, self.opts, FLOAT_ID)?;
         raw::write_f32(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x6)?;
-        self.prefix.write(self.writer, self.opts, 0x6)?;
+        self.type_checker.verify(DOUBLE_ID)?;
+        self.prefix.write(self.writer, self.opts, DOUBLE_ID)?;
         raw::write_f64(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x8)?;
-        self.prefix.write(self.writer, self.opts, 0x8)?;
+        self.type_checker.verify(STRING_ID)?;
+        self.prefix.write(self.writer, self.opts, STRING_ID)?;
         raw::write_string(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x7)?;
-        self.prefix.write(self.writer, self.opts, 0x7)?;
+        self.type_checker.verify(BYTE_ARRAY_ID)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ARRAY_ID)?;
         raw::write_usize_as_i32(self.writer, self.opts, value.len())?;
         self.writer.write_all(value)?;
         Ok(())
@@ -556,8 +613,10 @@ where
     }
 
     #[inline]
-    fn serialize_some<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
-    where T: Serialize {
+    fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         Err(NbtIoError::OptionInList)
     }
 
@@ -574,62 +633,66 @@ where
     #[inline]
     fn serialize_unit_variant(
         self,
-        _name: &'static str,
+        _name:         &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        _variant:      &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        self.type_checker.verify(0x3)?;
-        self.prefix.write(self.writer, self.opts, 0x3)?;
+        self.type_checker.verify(INT_ID)?;
+        self.prefix.write(self.writer, self.opts, INT_ID)?;
         raw::write_i32(self.writer, self.opts, variant_index as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
-        name: &'static str,
+        name:  &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         match name {
             BYTE_ARRAY_NICHE => {
-                self.type_checker.verify(0x7)?;
-                self.prefix.write(self.writer, self.opts, 0x7)?;
+                self.type_checker.verify(BYTE_ARRAY_ID)?;
+                self.prefix.write(self.writer, self.opts, BYTE_ARRAY_ID)?;
             }
             INT_ARRAY_NICHE => {
-                self.type_checker.verify(0xB)?;
-                self.prefix.write(self.writer, self.opts, 0xB)?;
+                self.type_checker.verify(INT_ARRAY_ID)?;
+                self.prefix.write(self.writer, self.opts, INT_ARRAY_ID)?;
             }
             LONG_ARRAY_NICHE => {
-                self.type_checker.verify(0xC)?;
-                self.prefix.write(self.writer, self.opts, 0xC)?;
+                self.type_checker.verify(LONG_ARRAY_ID)?;
+                self.prefix.write(self.writer, self.opts, LONG_ARRAY_ID)?;
             }
             _ => return value.serialize(self.into_serializer()),
         }
-        value.serialize(SerializeArray::new(
-            self.writer, self.opts, self.current_depth
-        ).into_serializer())
+        value.serialize(
+            SerializeArray::new(self.writer, self.opts, self.current_depth).into_serializer(),
+        )
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        variant:        &'static str,
+        value:          &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
-        self.type_checker.verify(0xA)?;
-        self.prefix.write(self.writer, self.opts, 0xA)?;
+        self.type_checker.verify(COMPOUND_ID)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
         value.serialize(
             SerializeCompoundEntry::<_, C, _>::new(
-                self.writer, self.opts, self.current_depth, BorrowedPrefix::new(variant)
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                BorrowedPrefix::new(variant),
+            )
+            .into_serializer(),
         )?;
         raw::write_u8(self.writer, self.opts, raw::id_for_tag(None))?;
         Ok(())
@@ -637,9 +700,13 @@ where
 
     #[inline]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        self.type_checker.verify(0x9)?;
-        self.prefix.write(self.writer, self.opts, 0x9)?;
+        self.type_checker.verify(LIST_ID)?;
+        self.prefix.write(self.writer, self.opts, LIST_ID)?;
         let len = len.ok_or(NbtIoError::MissingLength)?;
+        #[expect(
+            clippy::map_err_ignore,
+            reason = "the only possible error ignored is that the usize is too large",
+        )]
         let len = i32::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
 
         SerializeList::new(self.writer, self.opts, self.current_depth, len)
@@ -654,7 +721,7 @@ where
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_seq(Some(len))
     }
@@ -662,16 +729,16 @@ where
     #[inline]
     fn serialize_tuple_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        variant:        &'static str,
+        len:            usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         // [{name: []}]
 
         // Check that we're allowed to have compounds in this list
-        self.type_checker.verify(0xA)?;
-        self.prefix.write(self.writer, self.opts, 0xA)?;
+        self.type_checker.verify(COMPOUND_ID)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
 
         // Write the compound
         let prefix = BorrowedPrefix::new(variant);
@@ -681,16 +748,20 @@ where
 
     #[inline]
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        self.type_checker.verify(0xA)?;
-        self.prefix.write(self.writer, self.opts, 0xA)?;
-        Ok(SerializeCompound::new(self.writer, self.opts, self.current_depth))
+        self.type_checker.verify(COMPOUND_ID)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
+        Ok(SerializeCompound::new(
+            self.writer,
+            self.opts,
+            self.current_depth,
+        ))
     }
 
     #[inline]
     fn serialize_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         self.serialize_map(Some(len))
     }
@@ -698,17 +769,21 @@ where
     #[inline]
     fn serialize_struct_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        _len: usize,
+        variant:        &'static str,
+        _len:           usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.type_checker.verify(0xA)?;
-        self.prefix.write(self.writer, self.opts, 0xA)?;
-        raw::write_u8(self.writer, self.opts, 0xA)?;
+        self.type_checker.verify(COMPOUND_ID)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
+        raw::write_u8(self.writer, self.opts, COMPOUND_ID)?;
         raw::write_string(self.writer, self.opts, variant)?;
         // The extra closing tag is added by the SerializeStructVariant impl
-        Ok(SerializeCompound::new(self.writer, self.opts, self.current_depth))
+        Ok(SerializeCompound::new(
+            self.writer,
+            self.opts,
+            self.current_depth,
+        ))
     }
 
     #[inline]
@@ -718,11 +793,23 @@ where
 }
 
 pub struct SerializeCompound<'a, W, C> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:        &'a mut W,
+    opts:          IoOptions,
     current_depth: u32,
-    key: Option<Box<[u8]>>,
-    _phantom: PhantomData<C>,
+    key:           Option<Box<[u8]>>,
+    _phantom:      PhantomData<C>,
+}
+
+impl<W, C> Debug for SerializeCompound<'_, W, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SerializeCompound with key {:?} at nesting depth {:?} with opts: {:?}",
+            self.key,
+            self.current_depth,
+            self.opts,
+        )
+    }
 }
 
 impl<'a, W: Write, C: TypeChecker> SerializeCompound<'a, W, C> {
@@ -738,13 +825,15 @@ impl<'a, W: Write, C: TypeChecker> SerializeCompound<'a, W, C> {
     }
 }
 
-impl<'a, W: Write, C: TypeChecker> SerializeMap for SerializeCompound<'a, W, C> {
+impl<W: Write, C: TypeChecker> SerializeMap for SerializeCompound<'_, W, C> {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         let mut cursor = Cursor::new(Vec::new());
         key.serialize(SerializeKey::new(&mut cursor, self.opts).into_serializer())?;
         self.key = Some(cursor.into_inner().into_boxed_slice());
@@ -752,8 +841,10 @@ impl<'a, W: Write, C: TypeChecker> SerializeMap for SerializeCompound<'a, W, C> 
     }
 
     #[inline]
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where T: Serialize {
+    fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         let key = self
             .key
             .take()
@@ -761,26 +852,34 @@ impl<'a, W: Write, C: TypeChecker> SerializeMap for SerializeCompound<'a, W, C> 
         let prefix = RawPrefix::new(key);
         value.serialize(
             SerializeCompoundEntry::<_, C, _>::new(
-                self.writer, self.opts, self.current_depth, prefix
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                prefix,
+            )
+            .into_serializer(),
         )
     }
 
     #[inline]
-    fn serialize_entry<K: ?Sized, V: ?Sized>(
+    fn serialize_entry<K, V>(
         &mut self,
-        key: &K,
+        key:   &K,
         value: &V,
     ) -> Result<(), Self::Error>
     where
-        K: Serialize,
-        V: Serialize,
+        K: Serialize + ?Sized,
+        V: Serialize + ?Sized,
     {
         let prefix = BorrowedPrefix::new(key);
         value.serialize(
             SerializeCompoundEntry::<_, C, _>::new(
-                self.writer, self.opts, self.current_depth, prefix
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                prefix,
+            )
+            .into_serializer(),
         )
     }
 
@@ -791,24 +890,28 @@ impl<'a, W: Write, C: TypeChecker> SerializeMap for SerializeCompound<'a, W, C> 
     }
 }
 
-impl<'a, W: Write, C: TypeChecker> SerializeStruct for SerializeCompound<'a, W, C> {
+impl<W: Write, C: TypeChecker> SerializeStruct for SerializeCompound<'_, W, C> {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T>(
         &mut self,
-        key: &'static str,
+        key:   &'static str,
         value: &T,
     ) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let prefix = BorrowedPrefix::new(key);
         value.serialize(
             SerializeCompoundEntry::<_, C, _>::new(
-                self.writer, self.opts, self.current_depth, prefix
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                prefix,
+            )
+            .into_serializer(),
         )
     }
 
@@ -819,18 +922,18 @@ impl<'a, W: Write, C: TypeChecker> SerializeStruct for SerializeCompound<'a, W, 
     }
 }
 
-impl<'a, W: Write, C: TypeChecker> SerializeStructVariant for SerializeCompound<'a, W, C> {
+impl<W: Write, C: TypeChecker> SerializeStructVariant for SerializeCompound<'_, W, C> {
     type Error = NbtIoError;
     type Ok = ();
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T>(
         &mut self,
-        key: &'static str,
+        key:   &'static str,
         value: &T,
     ) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         <Self as SerializeStruct>::serialize_field(self, key, value)
     }
@@ -838,17 +941,20 @@ impl<'a, W: Write, C: TypeChecker> SerializeStructVariant for SerializeCompound<
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
         // Add an extra tag because struct variants are serialized as { name: { fields... } }
-        self.writer.write_all(&[0, 0])?;
+        // self.writer.write_all(&[0, 0])?; <- not `&[0, 0, 0, 0, 0]` or just `&[0]`?
+        // TODO: this case really, really, really needs to be tested
+        raw::write_u8(self.writer, self.opts, TAG_END_ID)?;
+        raw::write_usize_as_i32(self.writer, self.opts, 0)?; // not sure if this line is needed
         Ok(())
     }
 }
 
 struct SerializeCompoundEntry<'a, W, C, P> {
-    writer: &'a mut W,
-    opts: IoOptions,
+    writer:        &'a mut W,
+    opts:          IoOptions,
     current_depth: u32,
-    prefix: P,
-    _phantom: PhantomData<C>,
+    prefix:        P,
+    _phantom:      PhantomData<C>,
 }
 
 impl<'a, W: Write, C: TypeChecker, P: Prefix> SerializeCompoundEntry<'a, W, C, P> {
@@ -871,7 +977,7 @@ where
     P: Prefix,
 {
     type Error = NbtIoError;
-    type Ok = ();
+    type Ok    = ();
     type SerializeMap           = SerializeCompound<'a, W, C>;
     type SerializeSeq           = SerializeList<'a, W, C>;
     type SerializeStruct        = SerializeCompound<'a, W, C>;
@@ -887,14 +993,14 @@ where
 
     #[inline]
     fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x1)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ID)?;
         raw::write_bool(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x1)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ID)?;
         raw::write_i8(self.writer, self.opts, value)?;
         Ok(())
     }
@@ -906,49 +1012,49 @@ where
 
     #[inline]
     fn serialize_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x2)?;
+        self.prefix.write(self.writer, self.opts, SHORT_ID)?;
         raw::write_i16(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x3)?;
+        self.prefix.write(self.writer, self.opts, INT_ID)?;
         raw::write_i32(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x4)?;
+        self.prefix.write(self.writer, self.opts, LONG_ID)?;
         raw::write_i64(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x5)?;
+        self.prefix.write(self.writer, self.opts, FLOAT_ID)?;
         raw::write_f32(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x6)?;
+        self.prefix.write(self.writer, self.opts, DOUBLE_ID)?;
         raw::write_f64(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x8)?;
+        self.prefix.write(self.writer, self.opts, STRING_ID)?;
         raw::write_string(self.writer, self.opts, value)?;
         Ok(())
     }
 
     #[inline]
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x7)?;
+        self.prefix.write(self.writer, self.opts, BYTE_ARRAY_ID)?;
         raw::write_usize_as_i32(self.writer, self.opts, value.len())?;
         self.writer.write_all(value)?;
         Ok(())
@@ -960,8 +1066,10 @@ where
     }
 
     #[inline]
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
-    where T: Serialize {
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         value.serialize(self.into_serializer())
     }
 
@@ -978,57 +1086,61 @@ where
     #[inline]
     fn serialize_unit_variant(
         self,
-        _name: &'static str,
+        _name:         &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        _variant:      &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x3)?;
+        self.prefix.write(self.writer, self.opts, INT_ID)?;
         raw::write_i32(self.writer, self.opts, variant_index as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
-        name: &'static str,
+        name:  &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         match name {
             BYTE_ARRAY_NICHE => {
-                self.prefix.write(self.writer, self.opts, 0x7)?;
+                self.prefix.write(self.writer, self.opts, BYTE_ARRAY_ID)?;
             }
             INT_ARRAY_NICHE => {
-                self.prefix.write(self.writer, self.opts, 0xB)?;
+                self.prefix.write(self.writer, self.opts, INT_ARRAY_ID)?;
             }
             LONG_ARRAY_NICHE => {
-                self.prefix.write(self.writer, self.opts, 0xC)?;
+                self.prefix.write(self.writer, self.opts, LONG_ARRAY_ID)?;
             }
             _ => return value.serialize(self.into_serializer()),
         }
-        value.serialize(SerializeArray::new(
-            self.writer, self.opts, self.current_depth
-        ).into_serializer())
+        value.serialize(
+            SerializeArray::new(self.writer, self.opts, self.current_depth).into_serializer(),
+        )
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        variant:        &'static str,
+        value:          &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
-        self.prefix.write(self.writer, self.opts, 0xA)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
         value.serialize(
             SerializeCompoundEntry::<_, C, _>::new(
-                self.writer, self.opts, self.current_depth, BorrowedPrefix::new(variant)
-            ).into_serializer(),
+                self.writer,
+                self.opts,
+                self.current_depth,
+                BorrowedPrefix::new(variant),
+            )
+            .into_serializer(),
         )?;
         raw::write_u8(self.writer, self.opts, raw::id_for_tag(None))?;
         Ok(())
@@ -1036,8 +1148,12 @@ where
 
     #[inline]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0x9)?;
+        self.prefix.write(self.writer, self.opts, LIST_ID)?;
         let len = len.ok_or(NbtIoError::MissingLength)?;
+        #[expect(
+            clippy::map_err_ignore,
+            reason = "the only possible error ignored is that the usize is too large",
+        )]
         let len = i32::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
 
         SerializeList::new(self.writer, self.opts, self.current_depth, len)
@@ -1052,7 +1168,7 @@ where
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_seq(Some(len))
     }
@@ -1060,29 +1176,32 @@ where
     #[inline]
     fn serialize_tuple_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        variant:        &'static str,
+        len:            usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0xA)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
         let prefix = BorrowedPrefix::new(variant);
-        SerializeCompoundEntry::new(
-            self.writer, self.opts, self.current_depth, prefix
-        ).serialize_seq(Some(len))
+        SerializeCompoundEntry::new(self.writer, self.opts, self.current_depth, prefix)
+            .serialize_seq(Some(len))
     }
 
     #[inline]
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0xA)?;
-        Ok(SerializeCompound::new(self.writer, self.opts, self.current_depth))
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
+        Ok(SerializeCompound::new(
+            self.writer,
+            self.opts,
+            self.current_depth,
+        ))
     }
 
     #[inline]
     fn serialize_struct(
         self,
         _name: &'static str,
-        len: usize,
+        len:   usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         self.serialize_map(Some(len))
     }
@@ -1090,16 +1209,20 @@ where
     #[inline]
     fn serialize_struct_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        _len: usize,
+        variant:        &'static str,
+        _len:           usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.prefix.write(self.writer, self.opts, 0xA)?;
-        raw::write_u8(self.writer, self.opts, 0xA)?;
+        self.prefix.write(self.writer, self.opts, COMPOUND_ID)?;
+        raw::write_u8(self.writer, self.opts, COMPOUND_ID)?;
         raw::write_string(self.writer, self.opts, variant)?;
         // The extra closing tag is added by the SerializeStructVariant impl
-        Ok(SerializeCompound::new(self.writer, self.opts, self.current_depth))
+        Ok(SerializeCompound::new(
+            self.writer,
+            self.opts,
+            self.current_depth,
+        ))
     }
 
     #[inline]
@@ -1110,22 +1233,19 @@ where
 
 struct SerializeKey<'a, W> {
     writer: &'a mut W,
-    opts: IoOptions,
+    opts:   IoOptions,
 }
 
 impl<'a, W: Write> SerializeKey<'a, W> {
     #[inline]
     fn new(writer: &'a mut W, opts: IoOptions) -> Self {
-        SerializeKey {
-            writer,
-            opts
-        }
+        SerializeKey { writer, opts }
     }
 }
 
-impl<'a, W: Write> DefaultSerializer for SerializeKey<'a, W> {
+impl<W: Write> DefaultSerializer for SerializeKey<'_, W> {
     type Error = NbtIoError;
-    type Ok = ();
+    type Ok    = ();
     type SerializeMap           = Impossible<Self::Ok, Self::Error>;
     type SerializeSeq           = Impossible<Self::Ok, Self::Error>;
     type SerializeStruct        = Impossible<Self::Ok, Self::Error>;
@@ -1152,6 +1272,7 @@ pub trait TypeChecker: Sized {
     fn verify(&self, tag_id: u8) -> Result<(), NbtIoError>;
 }
 
+#[derive(Debug)]
 pub struct Unchecked;
 
 const UNCHECKED: Unchecked = Unchecked;
@@ -1159,7 +1280,7 @@ const UNCHECKED: Unchecked = Unchecked;
 impl TypeChecker for Unchecked {
     #[inline]
     fn new() -> Self {
-        Unchecked
+        Self
     }
 
     #[inline]
@@ -1168,6 +1289,7 @@ impl TypeChecker for Unchecked {
     }
 }
 
+#[derive(Debug)]
 pub struct Homogenous {
     id: Cell<Option<u8>>,
 }
@@ -1175,42 +1297,46 @@ pub struct Homogenous {
 impl TypeChecker for Homogenous {
     #[inline]
     fn new() -> Self {
-        Homogenous {
+        Self {
             id: Cell::new(None),
         }
     }
 
     #[inline]
     fn verify(&self, tag_id: u8) -> Result<(), NbtIoError> {
-        match self.id.get() {
-            Some(id) =>
-                if id == tag_id {
-                    Ok(())
-                } else {
-                    Err(NbtIoError::NonHomogenousList {
-                        list_type: id,
-                        encountered_type: tag_id,
-                    })
-                },
-            None => {
-                self.id.set(Some(tag_id));
+        if let Some(id) = self.id.get() {
+            if id == tag_id {
                 Ok(())
+            } else {
+                Err(NbtIoError::NonHomogenousList {
+                    list_type:        id,
+                    encountered_type: tag_id,
+                })
             }
+        } else {
+            self.id.set(Some(tag_id));
+            Ok(())
         }
     }
 }
 
-pub trait Prefix: Sized {
+pub(super) trait Prefix: Sized {
     fn write_raw<W: Write>(self, writer: &mut W, opts: IoOptions) -> Result<(), NbtIoError>;
 
     #[inline]
-    fn write<W: Write>(self, writer: &mut W, opts: IoOptions, tag_id: u8) -> Result<(), NbtIoError> {
+    fn write<W: Write>(
+        self,
+        writer: &mut W,
+        opts: IoOptions,
+        tag_id: u8,
+    ) -> Result<(), NbtIoError> {
         raw::write_u8(writer, opts, tag_id)?;
         self.write_raw(writer, opts)
     }
 }
 
-pub struct NoPrefix;
+#[derive(Debug)]
+pub(super) struct NoPrefix;
 
 impl Prefix for NoPrefix {
     #[inline]
@@ -1219,7 +1345,12 @@ impl Prefix for NoPrefix {
     }
 
     #[inline]
-    fn write<W: Write>(self, _writer: &mut W, _opts: IoOptions, _tag_id: u8) -> Result<(), NbtIoError> {
+    fn write<W: Write>(
+        self,
+        _writer: &mut W,
+        _opts: IoOptions,
+        _tag_id: u8,
+    ) -> Result<(), NbtIoError> {
         Ok(())
     }
 }
@@ -1231,7 +1362,7 @@ struct LengthPrefix {
 impl LengthPrefix {
     #[inline]
     fn new(length: i32) -> Self {
-        LengthPrefix { length }
+        Self { length }
     }
 }
 
@@ -1243,14 +1374,15 @@ impl Prefix for LengthPrefix {
     }
 }
 
-pub struct BorrowedPrefix<K> {
+#[derive(Debug)]
+pub(super) struct BorrowedPrefix<K> {
     key: K,
 }
 
 impl<K: Serialize> BorrowedPrefix<K> {
     #[inline]
     fn new(key: K) -> Self {
-        BorrowedPrefix { key }
+        Self { key }
     }
 }
 
@@ -1269,7 +1401,7 @@ struct RawPrefix {
 impl RawPrefix {
     #[inline]
     fn new(raw: Box<[u8]>) -> Self {
-        RawPrefix { raw }
+        Self { raw }
     }
 }
 

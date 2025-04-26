@@ -16,8 +16,8 @@ use thiserror::Error;
 
 use prismarine_anchor_nbt::snbt;
 use prismarine_anchor_nbt::{
-    snbt::SnbtError, settings::SnbtParseOptions,
-    NbtTag, NbtContainerType, NbtType,
+    NbtContainerType, NbtTag, NbtType,
+    settings::SnbtParseOptions, snbt::SnbtError,
 };
 use prismarine_anchor_translation::datatypes::{
     BlockProperty, IdentifierParseError, IdentifierParseOptions, NamespacedIdentifier,
@@ -25,9 +25,8 @@ use prismarine_anchor_translation::datatypes::{
 
 // make unused warnings go away for now
 // TODO: do something about them for real
-pub use self::mappings::MappingFile;
-pub use self::specifications::SpecificationFile;
-pub use self::headers::{VersionMetadata, BiomeMap, NumericalBlockMap, Platform, WaterloggingInfo};
+pub use self::{mappings::MappingFile, specifications::SpecificationFile};
+pub use self::headers::{BiomeMap, NumericalBlockMap, Platform, VersionMetadata, WaterloggingInfo};
 
 
 /// Useful for annotating types more precisely.
@@ -45,8 +44,9 @@ pub type PropertyNameBoxed = Box<str>;
 
 
 #[derive(Debug)]
-pub struct PyMcMappings; // {
-    // blockstate, option numeric, biome data, metadata in version folder
+pub struct PyMcMappings;
+// {
+// blockstate, option numeric, biome data, metadata in version folder
 // }
 
 // ================================================================
@@ -56,7 +56,7 @@ pub struct PyMcMappings; // {
 #[derive(Debug, Clone, Copy)]
 pub struct MappingParseOptions {
     pub identifier_options: IdentifierParseOptions,
-    pub snbt_options: SnbtParseOptions,
+    pub snbt_options:       SnbtParseOptions,
 }
 
 // This is incredibly messy, but whatever.
@@ -72,7 +72,7 @@ pub enum MappingParseError {
     ExtraDefault(PropertyName),
     #[error("the default for property '{property}' was '{invalid_value}', which is not an option")]
     InvalidDefault {
-        property: PropertyName,
+        property:      PropertyName,
         invalid_value: BlockProperty,
     },
     #[error("specification had one of 'snbt' or 'nbt_identifier', but should have both or neither")]
@@ -82,7 +82,7 @@ pub enum MappingParseError {
     #[error["the value for property '{property}' was invalid SNBT: {error}"]]
     InvalidPropertySnbt {
         property: PropertyName,
-        error: SnbtError,
+        error:    SnbtError,
     },
     #[error("a key had invalid SNBT data: {0}")]
     InvalidSnbtKey(SnbtError),
@@ -94,9 +94,14 @@ pub enum MappingParseError {
     IncorrectInput(&'static str),
     #[error("a code function, '{0}', had unexpected outputs specified")]
     IncorrectOutput(&'static str),
-    #[error("expected the name of an NBT container type, like \"compound\" or \"int_array\", but received \"{0}\"")]
+    #[error(
+        "expected the name of an NBT container type, like \"compound\" or \"int_array\", \
+         but received \"{0}\"",
+    )]
     InvalidContainerType(String),
-    #[error("expected the name of an NBT type, like \"int\" or \"byte_array\", but received \"{0}\"")]
+    #[error(
+        "expected the name of an NBT type, like \"int\" or \"byte_array\", but received \"{0}\"",
+    )]
     InvalidNbtType(String),
     #[error("expected a string parsable as an integer index (usize), but received \"{0}\"")]
     InvalidIndex(String),
@@ -116,16 +121,21 @@ impl MappingParseError {
 // ================================================================
 
 pub fn block_property_from_str(
-    property: &str, property_name: &str, opts: MappingParseOptions,
+    property:      &str,
+    property_name: &str,
+    opts:          MappingParseOptions,
 ) -> Result<BlockProperty, MappingParseError> {
-
+    #[rustfmt::skip]
     let tag: NbtTag = snbt::parse_any(property, opts.snbt_options)
-        .map_err(|error| MappingParseError::InvalidPropertySnbt {
-            property: property_name.to_owned(),
-            error,
+        .map_err(|error| {
+            MappingParseError::InvalidPropertySnbt {
+                property: property_name.to_owned(),
+                error,
+            }
         })?;
 
-    tag.try_into().map_err(|tag| MappingParseError::invalid_property(&tag))
+    tag.try_into()
+        .map_err(|tag| MappingParseError::invalid_property(&tag))
 }
 
 #[inline]

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use prismarine_anchor_translation::datatypes::{MINECRAFT_NAMESPACE, GameVersion, VersionName};
+use prismarine_anchor_translation::datatypes::{GameVersion, MINECRAFT_NAMESPACE, VersionName};
 
 use super::{MappingParseError, MappingParseOptions, NamespacedIdentifier};
 
@@ -13,29 +13,29 @@ use super::{MappingParseError, MappingParseOptions, NamespacedIdentifier};
 
 #[derive(Debug, Clone)]
 pub struct VersionMetadata {
-    pub block_format:               BlockFormat,
-    pub block_entity_format:        BlockEntityFormat,
-    pub block_entity_coord_format:  BlockEntityCoordFormat,
-    pub entity_format:              EntityFormat,
-    pub entity_coord_format:        EntityCoordFormat,
-    pub data_version:               Option<u64>,
-    pub version:                    GameVersion,
+    pub block_format:              BlockFormat,
+    pub block_entity_format:       BlockEntityFormat,
+    pub block_entity_coord_format: BlockEntityCoordFormat,
+    pub entity_format:             EntityFormat,
+    pub entity_coord_format:       EntityCoordFormat,
+    pub data_version:              Option<u64>,
+    pub version:                   GameVersion,
 }
 
 #[derive(Debug)]
 pub struct BiomeMap {
-    pub biome_to_number: HashMap<NamespacedIdentifier, Option<u16>>,
-    pub number_to_biome: HashMap<u16, NamespacedIdentifier>,
+    pub biome_to_number:      HashMap<NamespacedIdentifier, Option<u16>>,
+    pub number_to_biome:      HashMap<u16, NamespacedIdentifier>,
     /// Plains if present, else 0
     pub default_biome_number: u16,
-    pub to_universal:    HashMap<NamespacedIdentifier, NamespacedIdentifier>,
-    pub from_universal:  HashMap<NamespacedIdentifier, NamespacedIdentifier>,
+    pub to_universal:         HashMap<NamespacedIdentifier, NamespacedIdentifier>,
+    pub from_universal:       HashMap<NamespacedIdentifier, NamespacedIdentifier>,
 }
 
 #[derive(Debug)]
 pub struct NumericalBlockMap {
-    pub to_number:     HashMap<NamespacedIdentifier, u16>,
-    pub to_identifier: Vec<Option<NamespacedIdentifier>>,
+    pub to_number:            HashMap<NamespacedIdentifier, u16>,
+    pub to_identifier:        Vec<Option<NamespacedIdentifier>>,
     /// Air if present, else 0
     pub default_block_number: u16,
 }
@@ -81,7 +81,7 @@ pub enum EntityFormat {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityCoordFormat {
     #[serde(rename = "Pos-list-float")]
-    PosListFloat
+    PosListFloat,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,18 +100,18 @@ pub enum Platform {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitJson {
-    block_format:               BlockFormat,
-    block_entity_format:        BlockEntityFormat,
-    block_entity_coord_format:  BlockEntityCoordFormat,
-    entity_format:              EntityFormat,
-    entity_coord_format:        EntityCoordFormat,
-    platform:                   Platform,
-    version:                    Vec<u32>,
+    block_format:              BlockFormat,
+    block_entity_format:       BlockEntityFormat,
+    block_entity_coord_format: BlockEntityCoordFormat,
+    entity_format:             EntityFormat,
+    entity_coord_format:       EntityCoordFormat,
+    platform:                  Platform,
+    version:                   Vec<u32>,
     #[serde(rename = "version_max")]
-    _version_max:               Vec<i32>,
-    data_version:               Option<u64>,
+    _version_max:              Vec<i32>,
+    data_version:              Option<u64>,
     #[serde(rename = "data_version_max")]
-    _data_version_max:          Option<u64>,
+    _data_version_max:         Option<u64>,
 }
 
 impl VersionMetadata {
@@ -127,29 +127,29 @@ impl VersionMetadata {
 
         let game_version = match init_json.platform {
             Platform::Universal => GameVersion::Universal,
-            Platform::Bedrock   => GameVersion::Bedrock(version_name),
-            Platform::Java      => GameVersion::Java(version_name),
+            Platform::Bedrock => GameVersion::Bedrock(version_name),
+            Platform::Java => GameVersion::Java(version_name),
         };
 
         Ok(Self {
-            block_format:               init_json.block_format,
-            block_entity_format:        init_json.block_entity_format,
-            block_entity_coord_format:  init_json.block_entity_coord_format,
-            entity_format:              init_json.entity_format,
-            entity_coord_format:        init_json.entity_coord_format,
-            data_version:               init_json.data_version,
-            version:                    game_version,
+            block_format:              init_json.block_format,
+            block_entity_format:       init_json.block_entity_format,
+            block_entity_coord_format: init_json.block_entity_coord_format,
+            entity_format:             init_json.entity_format,
+            entity_coord_format:       init_json.entity_coord_format,
+            data_version:              init_json.data_version,
+            version:                   game_version,
         })
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BiomeMapJson {
-    int_map: HashMap<String, Option<u16>>,
+    int_map:        HashMap<String, Option<u16>>,
     #[serde(rename = "version2universal")]
-    to_universal: HashMap<String, String>,
+    to_universal:   HashMap<String, String>,
     #[serde(rename = "universal2version")]
-    from_universal: HashMap<String, String>
+    from_universal: HashMap<String, String>,
 }
 
 impl BiomeMap {
@@ -158,39 +158,49 @@ impl BiomeMap {
 
         let id_opts = opts.identifier_options;
 
-        let biome_to_number: HashMap<NamespacedIdentifier, Option<u16>> = json.int_map.into_iter()
+        let biome_to_number: HashMap<NamespacedIdentifier, Option<u16>> = json
+            .int_map
+            .into_iter()
+            .map(|(key, value)| Ok((NamespacedIdentifier::parse_string(key, id_opts)?, value)))
+            .collect::<Result<_, MappingParseError>>()?;
+
+        let number_to_biome = biome_to_number
+            .iter()
+            .filter_map(|(key, &value)| Some((value?, key.clone())))
+            .collect();
+
+        let plains = NamespacedIdentifier {
+            namespace: MINECRAFT_NAMESPACE.into(),
+            path:      "plains".into(),
+        };
+
+        let default_biome_number = biome_to_number
+            .get(&plains)
+            .copied()
+            .flatten()
+            .unwrap_or(0);
+
+        let to_universal = json
+            .to_universal
+            .into_iter()
             .map(|(key, value)| {
                 Ok((
                     NamespacedIdentifier::parse_string(key, id_opts)?,
-                    value,
+                    NamespacedIdentifier::parse_string(value, id_opts)?,
                 ))
             })
             .collect::<Result<_, MappingParseError>>()?;
 
-        let number_to_biome = biome_to_number.iter().filter_map(|(key, &value)| {
-            Some((value?, key.clone()))
-        }).collect();
-
-        let plains = NamespacedIdentifier {
-            namespace: MINECRAFT_NAMESPACE.into(),
-            path: "plains".into(),
-        };
-
-        let default_biome_number = biome_to_number.get(&plains).copied().flatten().unwrap_or(0);
-
-        let to_universal = json.to_universal.into_iter().map(|(key, value)| {
-            Ok((
-                NamespacedIdentifier::parse_string(key, id_opts)?,
-                NamespacedIdentifier::parse_string(value, id_opts)?,
-            ))
-        }).collect::<Result<_, MappingParseError>>()?;
-
-        let from_universal = json.from_universal.into_iter().map(|(key, value)| {
-            Ok((
-                NamespacedIdentifier::parse_string(key, id_opts)?,
-                NamespacedIdentifier::parse_string(value, id_opts)?,
-            ))
-        }).collect::<Result<_, MappingParseError>>()?;
+        let from_universal = json
+            .from_universal
+            .into_iter()
+            .map(|(key, value)| {
+                Ok((
+                    NamespacedIdentifier::parse_string(key, id_opts)?,
+                    NamespacedIdentifier::parse_string(value, id_opts)?,
+                ))
+            })
+            .collect::<Result<_, MappingParseError>>()?;
 
         Ok(Self {
             biome_to_number,
@@ -206,14 +216,22 @@ impl NumericalBlockMap {
     pub fn from_json(json: &str, opts: MappingParseOptions) -> Result<Self, MappingParseError> {
         let to_number_map: HashMap<String, u16> = serde_json::from_str(json)?;
 
-        let to_number: HashMap<NamespacedIdentifier, u16> = to_number_map.into_iter()
+        let to_number: HashMap<NamespacedIdentifier, u16> = to_number_map
+            .into_iter()
             .map(|(identifier, num)| {
-                Ok((NamespacedIdentifier::parse_string(identifier, opts.identifier_options)?, num))
+                Ok((
+                    NamespacedIdentifier::parse_string(identifier, opts.identifier_options)?,
+                    num,
+                ))
             })
             .collect::<Result<_, MappingParseError>>()?;
 
         // A value such that the range (0..max_num_plus_one) contains all the identifiers' numbers
-        let max_num_plus_one = to_number.values().max().map(|&m| usize::from(m)+1).unwrap_or(0);
+        let max_num_plus_one = to_number
+            .values()
+            .max()
+            .map(|&m| usize::from(m) + 1)
+            .unwrap_or(0);
 
         let mut to_identifier = vec![None; max_num_plus_one];
         #[expect(
@@ -226,7 +244,7 @@ impl NumericalBlockMap {
 
         let air = NamespacedIdentifier {
             namespace: MINECRAFT_NAMESPACE.into(),
-            path: "air".into(),
+            path:      "air".into(),
         };
         let default_block_number = *to_number.get(&air).unwrap_or(&0);
 
@@ -240,26 +258,36 @@ impl NumericalBlockMap {
 
 impl WaterloggingInfo {
     pub fn from_json(
-        waterloggable_json: &str,
+        waterloggable_json:      &str,
         always_waterlogged_json: &str,
-        opts: MappingParseOptions,
+        opts:                    MappingParseOptions,
     ) -> Result<Self, MappingParseError> {
-
         let waterloggable: Vec<String> = serde_json::from_str(waterloggable_json)?;
         let always_waterlogged: Vec<String> = serde_json::from_str(always_waterlogged_json)?;
 
-        let waterloggable = waterloggable.into_iter()
-            .map(|s| Ok(
-                NamespacedIdentifier::parse_string(s, opts.identifier_options)?
-            ))
+        let waterloggable = waterloggable
+            .into_iter()
+            .map(|s| {
+                Ok(NamespacedIdentifier::parse_string(
+                    s,
+                    opts.identifier_options,
+                )?)
+            })
             .collect::<Result<_, MappingParseError>>()?;
 
-        let always_waterlogged = always_waterlogged.into_iter()
-            .map(|s| Ok(
-                NamespacedIdentifier::parse_string(s, opts.identifier_options)?
-            ))
+        let always_waterlogged = always_waterlogged
+            .into_iter()
+            .map(|s| {
+                Ok(NamespacedIdentifier::parse_string(
+                    s,
+                    opts.identifier_options,
+                )?)
+            })
             .collect::<Result<_, MappingParseError>>()?;
 
-        Ok(Self { waterloggable, always_waterlogged })
+        Ok(Self {
+            waterloggable,
+            always_waterlogged,
+        })
     }
 }

@@ -13,6 +13,7 @@ pub(crate) const INT_ARRAY_NICHE:  &str = "i_nbt_array";
 pub(crate) const LONG_ARRAY_NICHE: &str = "l_nbt_array";
 
 
+#[expect(clippy::too_long_first_doc_paragraph)]
 /// A transparent wrapper around sequential types to allow the NBT serializer to automatically
 /// select an appropriate array type, favoring specialized array types like [`IntArray`] and
 /// [`ByteArray`]. You can construct an array using `Array::from`.
@@ -38,7 +39,9 @@ impl<T> Array<T> {
 impl<T: Serialize + ArrayNiche> Serialize for Array<T> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_newtype_struct(T::NICHE, self.0.as_ser_repr())
     }
 }
@@ -46,7 +49,9 @@ impl<T: Serialize + ArrayNiche> Serialize for Array<T> {
 impl<'de, T: Deserialize<'de> + ArrayNiche> Deserialize<'de> for Array<T> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         struct Visitor<T>(PhantomData<T>);
 
         impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Visitor<T> {
@@ -57,7 +62,9 @@ impl<'de, T: Deserialize<'de> + ArrayNiche> Deserialize<'de> for Array<T> {
             }
 
             fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where D: serde::Deserializer<'de> {
+            where
+                D: serde::Deserializer<'de>,
+            {
                 Ok(Array(Deserialize::deserialize(deserializer)?))
             }
         }
@@ -95,11 +102,12 @@ impl<T> BorrowMut<T> for Array<T> {
 }
 
 impl<T> From<T> for Array<T>
-where T: ArrayNiche
+where
+    T: ArrayNiche,
 {
     #[inline]
     fn from(array: T) -> Self {
-        Array(array)
+        Self(array)
     }
 }
 
@@ -110,8 +118,9 @@ pub trait ArrayNiche {
     fn as_ser_repr(&self) -> &Self::SerRepr;
 }
 
-impl<'a, T> ArrayNiche for &'a T
-where T: ArrayNiche + ?Sized
+impl<T> ArrayNiche for &T
+where
+    T: ArrayNiche + ?Sized,
 {
     type SerRepr = T::SerRepr;
 
@@ -123,8 +132,9 @@ where T: ArrayNiche + ?Sized
     }
 }
 
-impl<'a, T> ArrayNiche for &'a mut T
-where T: ArrayNiche + ?Sized
+impl<T> ArrayNiche for &mut T
+where
+    T: ArrayNiche + ?Sized,
 {
     type SerRepr = T::SerRepr;
 
@@ -278,8 +288,10 @@ pub(crate) const TYPE_HINT_NICHE: &str = "__nbt_array_type_hint";
 impl<'de> Deserialize<'de> for TypeHint {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        Ok(TypeHint {
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self {
             hint: deserializer.deserialize_newtype_struct(TYPE_HINT_NICHE, TypeHintVisitor)?,
         })
     }
@@ -295,164 +307,152 @@ impl<'de> Visitor<'de> for TypeHintVisitor {
     }
 
     #[inline]
-    fn visit_bool<E>(self, _v: bool) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_bool<E: Error>(self, _v: bool) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_i8<E>(self, _v: i8) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_i8<E: Error>(self, _v: i8) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_i16<E>(self, _v: i16) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_i16<E: Error>(self, _v: i16) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_i32<E>(self, _v: i32) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_i32<E: Error>(self, _v: i32) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_i64<E>(self, _v: i64) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_i64<E: Error>(self, _v: i64) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_i128<E>(self, _v: i128) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_i128<E: Error>(self, _v: i128) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_u8<E: Error>(self, v: u8) -> Result<Self::Value, E> {
         Ok(Some(v))
     }
 
     #[inline]
-    fn visit_u16<E>(self, _v: u16) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_u16<E: Error>(self, _v: u16) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_u32<E>(self, _v: u32) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_u32<E: Error>(self, _v: u32) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_u64<E>(self, _v: u64) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_u64<E: Error>(self, _v: u64) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_u128<E>(self, _v: u128) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_u128<E: Error>(self, _v: u128) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_f32<E>(self, _v: f32) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_f32<E: Error>(self, _v: f32) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_f64<E>(self, _v: f64) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_f64<E: Error>(self, _v: f64) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_char<E>(self, _v: char) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_char<E: Error>(self, _v: char) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_str<E>(self, _v: &str) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_str<E: Error>(self, _v: &str) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_borrowed_str<E>(self, _v: &'de str) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_borrowed_str<E: Error>(self, _v: &'de str) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_string<E>(self, _v: String) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_string<E: Error>(self, _v: String) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_bytes<E>(self, _v: &[u8]) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_bytes<E: Error>(self, _v: &[u8]) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_borrowed_bytes<E>(self, _v: &'de [u8]) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_borrowed_bytes<E: Error>(self, _v: &'de [u8]) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_byte_buf<E>(self, _v: Vec<u8>) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_byte_buf<E: Error>(self, _v: Vec<u8>) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_none<E: Error>(self) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
     fn visit_some<D>(self, _deserializer: D) -> Result<Self::Value, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         Ok(None)
     }
 
     #[inline]
-    fn visit_unit<E>(self) -> Result<Self::Value, E>
-    where E: Error {
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
         Ok(None)
     }
 
     #[inline]
     fn visit_newtype_struct<D>(self, _deserializer: D) -> Result<Self::Value, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         Ok(None)
     }
 
     #[inline]
     fn visit_seq<A>(self, _seq: A) -> Result<Self::Value, A::Error>
-    where A: SeqAccess<'de> {
+    where
+        A: SeqAccess<'de>,
+    {
         Ok(None)
     }
 
     #[inline]
     fn visit_map<A>(self, _map: A) -> Result<Self::Value, A::Error>
-    where A: MapAccess<'de> {
+    where
+        A: MapAccess<'de>,
+    {
         Ok(None)
     }
 
     #[inline]
     fn visit_enum<A>(self, _data: A) -> Result<Self::Value, A::Error>
-    where A: EnumAccess<'de> {
+    where
+        A: EnumAccess<'de>,
+    {
         Ok(None)
     }
 }

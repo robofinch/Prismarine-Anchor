@@ -1,4 +1,4 @@
-use std::{fmt, error};
+use std::{error, fmt};
 use std::fmt::{Debug, Display, Formatter};
 
 use thiserror::Error;
@@ -18,10 +18,10 @@ impl NbtReprError {
         Self::Structure(Box::new(error))
     }
 
-    /// Creates a `NbtReprError` from the given error. If the given error is a [`NbtStructureError`],
-    /// then the resulting representation error is of the `Structure` variant. If the error is a
-    /// `NbtReprError` then it is downcasted and returned. All other error types are considered custom
-    /// errors.
+    /// Creates a `NbtReprError` from the given error. If the given error is a
+    /// [`NbtStructureError`], then the resulting representation error is of the `Structure`
+    /// variant. If the error is a `NbtReprError` then it is downcasted and returned. All other
+    /// error types are considered custom errors.
     pub fn from_any<E: Into<anyhow::Error>>(error: E) -> Self {
         let mut error = <E as Into<anyhow::Error>>::into(error);
 
@@ -77,13 +77,13 @@ pub enum NbtStructureError {
     },
     #[error("Index out of range: {index} >= {length}")]
     InvalidIndex {
-        index: usize,
+        index:  usize,
         length: usize,
     },
     #[error("Tag type mismatch: expected {expected} but found {found}")]
     TypeMismatch {
         expected: &'static str,
-        found: &'static str,
+        found:    &'static str,
     },
 }
 

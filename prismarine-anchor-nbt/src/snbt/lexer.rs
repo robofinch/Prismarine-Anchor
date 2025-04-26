@@ -8,7 +8,7 @@ use std::{borrow::Cow, iter::Peekable, str::CharIndices};
 
 use crate::tag::NbtTag;
 use crate::settings::{
-    DepthLimit, ParseNonFinite, ParseTrueFalse, SnbtParseOptions, SnbtVersion
+    DepthLimit, ParseNonFinite, ParseTrueFalse, SnbtParseOptions, SnbtVersion,
 };
 use super::SnbtError;
 
@@ -18,11 +18,11 @@ pub use self::other_utils::{allowed_unquoted, starts_unquoted_number};
 
 
 pub struct Lexer<'a> {
-    raw: &'a str,
-    chars: Peekable<CharIndices<'a>>,
-    index: usize,
+    raw:        &'a str,
+    chars:      Peekable<CharIndices<'a>>,
+    index:      usize,
     peek_stack: Vec<Result<TokenData, SnbtError>>,
-    opts: SnbtParseOptions,
+    opts:       SnbtParseOptions,
 }
 
 impl<'a> Lexer<'a> {
@@ -56,19 +56,13 @@ impl<'a> Lexer<'a> {
         self.index
     }
 
-    pub fn peek(
-        &mut self,
-        expecting_string: bool,
-    ) -> Option<&Result<TokenData, SnbtError>> {
-
+    pub fn peek(&mut self, expecting_string: bool) -> Option<&Result<TokenData, SnbtError>> {
         if self.peek_stack.is_empty() {
-
             if let Some(res) = self.next(expecting_string) {
                 self.peek_stack.push(res);
-
             } else {
                 // We got None from self.next(), end of the input string.
-                return None
+                return None;
             }
         }
 
@@ -78,10 +72,7 @@ impl<'a> Lexer<'a> {
         self.peek_stack.last()
     }
 
-    pub fn next(
-        &mut self,
-        expecting_string: bool,
-    ) -> Option<Result<TokenData, SnbtError>> {
+    pub fn next(&mut self, expecting_string: bool) -> Option<Result<TokenData, SnbtError>> {
         // Manage the peeking function
         if let Some(item) = self.peek_stack.pop() {
             return Some(item);
@@ -125,13 +116,12 @@ impl<'a> Lexer<'a> {
     /// Asserts that the next token is the same type as the provided token.
     pub fn assert_next(
         &mut self,
-        token: &Token,
+        token:            &Token,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
-
         match self.next(expecting_string).transpose()? {
             // We found a token so check the token type
-            Some(td) =>
+            Some(td) => {
                 if mem::discriminant(&td.token) == mem::discriminant(token) {
                     Ok(td)
                 } else {
@@ -140,8 +130,8 @@ impl<'a> Lexer<'a> {
                         Some(&td),
                         token.as_expectation(),
                     ))
-                },
-
+                }
+            }
             // No tokens were left so return an unexpected end of string error
             None => Err(SnbtError::unexpected_eos(token.as_expectation())),
         }
@@ -149,11 +139,7 @@ impl<'a> Lexer<'a> {
 
     /// Collects a multi-character token from the character iterator and parses it
     /// with `parse_token`.
-    fn slurp_token(
-        &mut self,
-        expecting_string: bool,
-    ) -> Result<TokenData, SnbtError> {
-
+    fn slurp_token(&mut self, expecting_string: bool) -> Result<TokenData, SnbtError> {
         let start = self.index;
         // Width of *raw input* in chars. The string passed to parse_token
         // is not necessarily of size char_width, since that has escapes applied,
@@ -168,11 +154,8 @@ impl<'a> Lexer<'a> {
                     (ch, false)
                 } else {
                     return Err(SnbtError::invalid_unquoted_character(
-                        self.raw,
-                        self.index,
-                        char_width,
-                        ch
-                    ))
+                        self.raw, self.index, char_width, ch,
+                    ));
                 }
             }
             None => unreachable!("slurp_token called on an empty token"),
@@ -200,7 +183,7 @@ impl<'a> Lexer<'a> {
             // just before the character returned by self.peek_ch().
             //
             // TLDR: in either case self.index is the end index of the unquoted string
-            (char_width, Cow::Borrowed(&self.raw[start .. self.index]))
+            (char_width, Cow::Borrowed(&self.raw[start..self.index]))
         };
 
         self.parse_token(
@@ -216,9 +199,9 @@ impl<'a> Lexer<'a> {
     // self.raw is passed in separately to avoid borrowing issues
     fn slurp_quoted_symbol<'b>(
         &mut self,
-        raw: &'b str,
-        initial_quote: char,
-        start: usize,
+        raw:            &'b str,
+        initial_quote:  char,
+        start:          usize,
         mut char_width: usize,
     ) -> Result<(usize, Cow<'b, str>), SnbtError> {
         // Sort of silly that clippy doesn't let me put this closer to the place it matters
@@ -237,12 +220,15 @@ impl<'a> Lexer<'a> {
                 return;
             }
 
-            assert!(start < end, "Internal SNBT parsing error: start < end in `flush`");
+            assert!(
+                start < end,
+                "Internal SNBT parsing error: start < end in `flush`",
+            );
 
             if buffer.is_empty() {
-                *buffer = Cow::Borrowed(&raw[start .. end]);
+                *buffer = Cow::Borrowed(&raw[start..end]);
             } else {
-                buffer.to_mut().push_str(&raw[start .. end]);
+                buffer.to_mut().push_str(&raw[start..end]);
             }
         }
 
@@ -251,8 +237,8 @@ impl<'a> Lexer<'a> {
             char_width += 1;
             match self.next_ch() {
                 Some('\\') => {
-                    if let Some((ch, escape_char_len))
-                        = self.parse_escape_sequence(self.index - 1)?
+                    if let Some((ch, escape_char_len)) =
+                        self.parse_escape_sequence(self.index - 1)?
                     {
                         if let Some(ch) = ch {
                             // An escape sequence was parsed normally
@@ -268,13 +254,11 @@ impl<'a> Lexer<'a> {
                             raw_token_buffer.to_mut().push(ch);
                             char_width += escape_char_len;
                             flush_start = self.index;
-
                         } else {
                             // Invalid escape sequence, and should be copied verbatim,
                             // so no need to flush.
                             char_width += escape_char_len;
                         }
-
                     } else {
                         // Invalid escape sequence, and should be ignored.
                         flush(
@@ -302,7 +286,7 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 // Expected the quote to be matched
-                None => return Err(SnbtError::unmatched_quote(raw, start))
+                None => return Err(SnbtError::unmatched_quote(raw, start)),
             }
         }
 
@@ -313,10 +297,10 @@ impl<'a> Lexer<'a> {
     #[expect(clippy::fn_params_excessive_bools, reason = "internal function")]
     fn parse_token(
         &mut self,
-        token_string: Cow<'_, str>,
-        start: usize,
-        char_width: usize,
-        quoted: bool,
+        token_string:     Cow<'_, str>,
+        start:            usize,
+        char_width:       usize,
+        quoted:           bool,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
         if quoted || token_string.is_empty() {
@@ -328,12 +312,18 @@ impl<'a> Lexer<'a> {
                 },
                 start,
                 char_width,
-            ))
+            ));
         }
 
         // Check if the unquoted token is ambiguous
         if let Some(ambiguous) = AmbiguousWord::new(&token_string) {
-            return ambiguous.disambiguate(self.opts, expecting_string, self.raw, start, char_width);
+            return ambiguous.disambiguate(
+                self.opts,
+                expecting_string,
+                self.raw,
+                start,
+                char_width,
+            );
         }
 
         // Check if the token is the bool(..) or uuid(..) operation
@@ -348,7 +338,7 @@ impl<'a> Lexer<'a> {
                 // whether token_string is empty, so it's nonempty here.
                 let ch = token_string.chars().next().unwrap();
                 if starts_unquoted_number(ch) {
-                    return self.parse_updated_numeric(start, char_width, &token_string)
+                    return self.parse_updated_numeric(start, char_width, &token_string);
                 }
             }
             SnbtVersion::Original => {
@@ -392,8 +382,8 @@ pub trait FromLossless<T>: Sized {
 
 #[derive(Debug)]
 pub struct TokenData {
-    pub token: Token,
-    pub index: usize,
+    pub token:      Token,
+    pub index:      usize,
     pub char_width: usize,
 }
 
@@ -432,7 +422,7 @@ impl<T: FromLossless<Token>> FromLossless<TokenData> for T {
             Ok(value) => Ok(value),
             Err((tk, cause)) => Err((
                 TokenData::new(tk, td.index, td.char_width),
-                cause
+                cause,
             )),
         }
     }
@@ -512,7 +502,7 @@ impl_from_exact!(i16, Short);
 impl_from_exact!(i64, Long);
 
 impl FromExact<Token> for i32 {
-    #[expect(clippy::use_self, reason = "clarity")]
+    #[expect(clippy::use_self, reason = "clarity; it's an i32")]
     fn from_exact(tk: Token) -> Result<Self, Token> {
         match tk {
             Token::Int(value) => Ok(value),
@@ -526,7 +516,9 @@ impl FromExact<Token> for i32 {
 }
 
 fn out_of_range(
-    tk: Token, value: i64, expected_type: &'static str
+    tk:            Token,
+    value:         i64,
+    expected_type: &'static str,
 ) -> (Token, Option<NumericParseError>) {
     (
         tk,
@@ -534,32 +526,40 @@ fn out_of_range(
             negative: value < 0,
             num: value.unsigned_abs(),
             expected_type,
-        })
+        }),
     )
 }
 
 impl FromLossless<Token> for i8 {
-    #[expect(clippy::use_self, reason = "clarity")]
+    #[expect(clippy::use_self, reason = "clarity; it's an i8")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value) => Ok(value),
-            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
-            Token::UnsuffixedInt(value) => i8::try_from(value)
-                .map_err(|_| out_of_range(tk, value, "i8")),
+            #[expect(
+                clippy::map_err_ignore,
+                reason = "only possible error is out-of-range i64",
+            )]
+            Token::UnsuffixedInt(value) => {
+                i8::try_from(value).map_err(|_| out_of_range(tk, value, "i8"))
+            }
             _ => Err((tk, None)),
         }
     }
 }
 
 impl FromLossless<Token> for i16 {
-    #[expect(clippy::use_self, reason = "clarity")]
+    #[expect(clippy::use_self, reason = "clarity; it's an i16")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value)  => Ok(i16::from(value)),
             Token::Short(value) => Ok(value),
-            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
-            Token::UnsuffixedInt(value) => i16::try_from(value)
-                .map_err(|_| out_of_range(tk, value, "i16")),
+            #[expect(
+                clippy::map_err_ignore,
+                reason = "only possible error is out-of-range i64",
+            )]
+            Token::UnsuffixedInt(value) => {
+                i16::try_from(value).map_err(|_| out_of_range(tk, value, "i16"))
+            }
             _ => Err((tk, None)),
         }
     }
@@ -572,9 +572,13 @@ impl FromLossless<Token> for i32 {
             Token::Byte(value)  => Ok(i32::from(value)),
             Token::Short(value) => Ok(i32::from(value)),
             Token::Int(value)   => Ok(value),
-            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
-            Token::UnsuffixedInt(value) => i32::try_from(value)
-                .map_err(|_| out_of_range(tk, value, "i32")),
+            #[expect(
+                clippy::map_err_ignore,
+                reason = "only possible error is out-of-range i64",
+            )]
+            Token::UnsuffixedInt(value) => {
+                i32::try_from(value).map_err(|_| out_of_range(tk, value, "i32"))
+            }
             _ => Err((tk, None)),
         }
     }
@@ -628,15 +632,16 @@ impl AmbiguousWord {
 
     fn string_val(self) -> String {
         match self {
-            Self::True => "true",
-            Self::False => "false",
-            Self::InfinityD => "Infinityd",
-            Self::InfinityF => "Infinityf",
+            Self::True         => "true",
+            Self::False        => "false",
+            Self::InfinityD    => "Infinityd",
+            Self::InfinityF    => "Infinityf",
             Self::NegInfinityD => "-Infinityd",
             Self::NegInfinityF => "-Infinityf",
-            Self::NaND => "NaNd",
-            Self::NaNF => "NaNf",
-        }.to_owned()
+            Self::NaND         => "NaNd",
+            Self::NaNF         => "NaNf",
+        }
+        .to_owned()
     }
 
     fn numeric_val(self) -> Token {
@@ -654,41 +659,39 @@ impl AmbiguousWord {
 
     fn disambiguate(
         self,
-        opts: SnbtParseOptions,
+        opts:             SnbtParseOptions,
         expecting_string: bool,
-        input: &str,
-        index: usize,
-        char_width: usize,
+        input:            &str,
+        index:            usize,
+        char_width:       usize,
     ) -> Result<TokenData, SnbtError> {
 
         match self {
-            Self::True | Self::False => {
-                match (opts.true_false, expecting_string) {
-                    (ParseTrueFalse::AsString, _) | (ParseTrueFalse::AsDetected, true) => {
-                        let token = Token::String {
-                            value: self.string_val(),
-                            quoted: false
-                        };
-                        Ok(TokenData::new(token, index, char_width))
-                    }
-                    _ => Ok(TokenData::new(self.numeric_val(), index, char_width)),
+            Self::True | Self::False => match (opts.true_false, expecting_string) {
+                (ParseTrueFalse::AsString, _) | (ParseTrueFalse::AsDetected, true) => {
+                    let token = Token::String {
+                        value:  self.string_val(),
+                        quoted: false,
+                    };
+                    Ok(TokenData::new(token, index, char_width))
                 }
-            }
+                _ => Ok(TokenData::new(self.numeric_val(), index, char_width)),
+            },
+
             _ => match (opts.non_finite, expecting_string) {
                 (ParseNonFinite::Error, _) => {
                     Err(SnbtError::ambiguous_token(input, index, char_width))
                 }
-                (ParseNonFinite::AsDetected, true)
-                    | (ParseNonFinite::AsString, _) => {
-                        Ok(TokenData {
-                            token: Token::String {
-                                value: self.string_val(),
-                                quoted: false
-                            },
-                            index,
-                            char_width,
-                        })
-                    }
+                (ParseNonFinite::AsDetected, true) | (ParseNonFinite::AsString, _) => {
+                    Ok(TokenData {
+                        token: Token::String {
+                            value:  self.string_val(),
+                            quoted: false,
+                        },
+                        index,
+                        char_width,
+                    })
+                }
                 (ParseNonFinite::AsDetected, false) | (ParseNonFinite::AsFloat, _) => {
                     if opts.replace_non_finite {
                         Ok(TokenData {
@@ -706,13 +709,16 @@ impl AmbiguousWord {
                         })
                     } else if matches!(opts.version, SnbtVersion::UpdatedJava) {
                         Err(SnbtError::invalid_number(
-                            input, index, char_width, NumericParseError::NonfiniteFloat
+                            input,
+                            index,
+                            char_width,
+                            NumericParseError::NonfiniteFloat,
                         ))
                     } else {
                         Ok(TokenData::new(self.numeric_val(), index, char_width))
                     }
                 }
-            }
+            },
         }
     }
 }

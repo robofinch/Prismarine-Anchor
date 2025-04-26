@@ -1,7 +1,8 @@
 //! Specialized lexing functions for parsing tokens that require
 //! manipulating strings and characters.
 
-use crate::{settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion}, snbt::SnbtError};
+use crate::snbt::SnbtError;
+use crate::settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion};
 use super::{Lexer, Token, TokenData};
 
 
@@ -96,7 +97,10 @@ impl Lexer<'_> {
     /// and the version supports operations.
     #[inline]
     pub fn try_parse_operations(
-        &mut self, start: usize, char_width: usize, token_string: &str
+        &mut self,
+        start:        usize,
+        char_width:   usize,
+        token_string: &str,
     ) -> Option<Result<TokenData, SnbtError>> {
 
         if matches!(self.snbt_version(), SnbtVersion::UpdatedJava)
@@ -116,8 +120,8 @@ impl Lexer<'_> {
     /// Parse the `bool(..)` operation
     fn parse_bool_func(
         &self,
-        start: usize,
-        char_width: usize,
+        start:        usize,
+        char_width:   usize,
         token_string: &str,
     ) -> Result<TokenData, SnbtError> {
         // Handle nested bool(bool(bool(arg))), just in case,
@@ -128,7 +132,9 @@ impl Lexer<'_> {
         let mut leading_bytes = 0;
 
         while arg.starts_with(BOOL_FUNC) && arg.ends_with(FUNC_SUFFIX) {
-            arg = &arg[BOOL_FUNC.len() .. arg.len() - FUNC_SUFFIX.len()];
+            arg = &arg[
+                BOOL_FUNC.len() .. arg.len() - FUNC_SUFFIX.len()
+            ];
             leading_bytes += BOOL_FUNC.len();
 
             if let Some(whitespace) = arg.find(|c: char| !c.is_whitespace()) {
@@ -146,15 +152,13 @@ impl Lexer<'_> {
                 self.raw,
                 num_index,
                 1, // the character following arg, ')', has length 1
-                "a numeric value"
-            ))
+                "a numeric value",
+            ));
         };
 
         let numeric_tag = match self.snbt_version() {
-            SnbtVersion::UpdatedJava
-                => self.parse_updated_numeric(num_index, num_char_width, arg),
-            SnbtVersion::Original
-                => self.parse_original_numeric(num_index, num_char_width, arg),
+            SnbtVersion::UpdatedJava => self.parse_updated_numeric(num_index, num_char_width, arg),
+            SnbtVersion::Original    => self.parse_original_numeric(num_index, num_char_width, arg),
         }?;
 
         #[expect(clippy::match_same_arms, reason = "clarity")]
@@ -166,23 +170,19 @@ impl Lexer<'_> {
             Token::UnsuffixedInt(n) => n != 0,
             Token::Float(n)         => n != 0.,
             Token::Double(n)        => n != 0.,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         let boolean = if nonzero { 1 } else { 0 };
 
-        Ok(TokenData::new(
-            Token::Byte(boolean),
-            start,
-            char_width
-        ))
+        Ok(TokenData::new(Token::Byte(boolean), start, char_width))
     }
 
     /// Parse the `uuid(..)` operation
     fn parse_uuid_func(
         &mut self,
-        start: usize,
-        char_width: usize,
+        start:        usize,
+        char_width:   usize,
         token_string: &str,
     ) -> Result<TokenData, SnbtError> {
         // The UUID is likely of the form 8-4-4-4-12:
@@ -196,7 +196,8 @@ impl Lexer<'_> {
             UUID_FUNC.len() .. token_string.len() - FUNC_SUFFIX.len()
         ];
 
-        let leading_whitespace = uuid_str_untrimmed.chars()
+        let leading_whitespace = uuid_str_untrimmed
+            .chars()
             .take_while(|c| c.is_whitespace())
             .count();
         let uuid_str = uuid_str_untrimmed.trim();
@@ -205,17 +206,9 @@ impl Lexer<'_> {
             let uuid_index = start + UUID_FUNC.chars().count() + leading_whitespace;
             let uuid_width = uuid_str.chars().count();
             if quoted {
-                SnbtError::invalid_uuid(
-                    self.raw,
-                    uuid_index + 1,
-                    uuid_width - 2
-                )
+                SnbtError::invalid_uuid(self.raw, uuid_index + 1, uuid_width - 2)
             } else {
-                SnbtError::invalid_uuid(
-                    self.raw,
-                    uuid_index,
-                    uuid_width
-                )
+                SnbtError::invalid_uuid(self.raw, uuid_index, uuid_width)
             }
         };
 
@@ -230,7 +223,7 @@ impl Lexer<'_> {
         // We checked the length, the indexing can't panic
         let quoted = matches!(
             (uuid_chars[0], uuid_chars[uuid_chars.len() - 1]),
-            ('\'', '\'') | ('"', '"')
+            ('\'', '\'') | ('"', '"'),
         );
 
         if quoted {
@@ -254,12 +247,12 @@ impl Lexer<'_> {
                 }
 
                 // Split the UUID into its parts
-                let first:       [char; 8] = uuid_chars[ 0 .. 8].try_into().unwrap();
-                let second:      [char; 4] = uuid_chars[ 9 ..13].try_into().unwrap();
-                let third:       [char; 4] = uuid_chars[14 ..18].try_into().unwrap();
-                let fourth:      [char; 4] = uuid_chars[19 ..23].try_into().unwrap();
-                let fifth_start: [char; 4] = uuid_chars[24 ..28].try_into().unwrap();
-                let fifth_end:   [char; 8] = uuid_chars[28 ..36].try_into().unwrap();
+                let first:       [char; 8] = uuid_chars[ 0.. 8].try_into().unwrap();
+                let second:      [char; 4] = uuid_chars[ 9..13].try_into().unwrap();
+                let third:       [char; 4] = uuid_chars[14..18].try_into().unwrap();
+                let fourth:      [char; 4] = uuid_chars[19..23].try_into().unwrap();
+                let fifth_start: [char; 4] = uuid_chars[24..28].try_into().unwrap();
+                let fifth_end:   [char; 8] = uuid_chars[28..36].try_into().unwrap();
 
                 [
                     chars_to_u32(first),
@@ -267,15 +260,14 @@ impl Lexer<'_> {
                     pair_to_u32((fourth, fifth_start)),
                     chars_to_u32(fifth_end),
                 ]
-            },
+            }
             (false, 32) => {
                 // Parse the 32 characters, which should be hex digits, in groups of 8
 
-                [(0..8), (8..16), (16..24), (24..32)].map(|s| {
-                    chars_to_u32(uuid_chars[s].try_into().unwrap())
-                })
-            },
-            _ => return Err(invalid_uuid())
+                [(0..8), (8..16), (16..24), (24..32)]
+                    .map(|s| chars_to_u32(uuid_chars[s].try_into().unwrap()))
+            }
+            _ => return Err(invalid_uuid()),
         };
 
         // This would be shorter if Try were stabilized
@@ -302,17 +294,20 @@ impl Lexer<'_> {
             Token::Int(int_array[0]),
             Token::Semicolon,
             Token::String {
-                value: "I".to_owned(),
-                quoted: false
-            }
+                value:  "I".to_owned(),
+                quoted: false,
+            },
         ];
         let first_token = Token::OpenSquare;
 
         // self.peek_stack should be empty if this function is called,
         // but it can't hurt to future-proof this implementation if that assumption changes.
-        self.peek_stack.splice(0..0, tokens.into_iter().map(|token| {
-            Ok(TokenData::new(token, start, char_width))
-        }));
+        self.peek_stack.splice(
+            0..0,
+            tokens
+                .into_iter()
+                .map(|token| Ok(TokenData::new(token, start, char_width))),
+        );
 
         Ok(TokenData::new(first_token, start, char_width))
     }
@@ -346,30 +341,31 @@ impl Lexer<'_> {
         let escapes = self.opts.enabled_escape_sequences;
         let handle_invalid = self.opts.handle_invalid_escape;
         // Note that the compiler can inline closures, the below is practically just shorthand.
-        let check_supported: _ = |escaped: char, escape_type: EscapeSequence, parsed_width: usize| {
-            if escapes.is_enabled(escape_type) {
-                Ok(Some((Some(escaped), parsed_width)))
-            } else {
-                match handle_invalid {
-                    HandleInvalidEscape::CopyVerbatim => Ok(Some((None, parsed_width))),
-                    HandleInvalidEscape::Ignore => Ok(None),
-                    HandleInvalidEscape::Error => Err(SnbtError::unsupported_escape_sequence(
-                        self.raw,
-                        index,
-                        parsed_width + 1,
-                    )),
+        let check_supported: _ =
+            |escaped: char, escape_type: EscapeSequence, parsed_width: usize| {
+                if escapes.is_enabled(escape_type) {
+                    Ok(Some((Some(escaped), parsed_width)))
+                } else {
+                    match handle_invalid {
+                        HandleInvalidEscape::CopyVerbatim => Ok(Some((None, parsed_width))),
+                        HandleInvalidEscape::Ignore => Ok(None),
+                        HandleInvalidEscape::Error => Err(SnbtError::unsupported_escape_sequence(
+                            self.raw,
+                            index,
+                            parsed_width + 1,
+                        )),
+                    }
                 }
-            }
-        };
+            };
 
         let Some(ch) = self.peek_ch() else {
             self.next_ch();
             return match handle_invalid {
                 HandleInvalidEscape::CopyVerbatim => Ok(Some((None, 0))),
                 HandleInvalidEscape::Ignore => Ok(None),
-                HandleInvalidEscape::Error => Err(SnbtError::unexpected_eos(
-                    "a character escape sequence"
-                )),
+                HandleInvalidEscape::Error => {
+                    Err(SnbtError::unexpected_eos("a character escape sequence"))
+                }
             };
         };
 
@@ -378,8 +374,8 @@ impl Lexer<'_> {
         if matches!(
             ch,
             '\'' | '"' | '\\'
-                | 'b' | 's' | 't' | 'n' | 'f' | 'r'
-                | 'x' | 'u' | 'U' | 'N'
+                 | 'b' | 's' | 't' | 'n' | 'f' | 'r'
+                 | 'x' | 'u' | 'U' | 'N',
         ) {
             self.next_ch();
         }
@@ -403,28 +399,26 @@ impl Lexer<'_> {
                 HandleInvalidEscape::Ignore => Ok(None),
                 HandleInvalidEscape::Error => {
                     self.next_ch();
-                    Err(SnbtError::unknown_escape_sequence(
-                        self.raw,
-                        index,
-                        2
-                    ))
+                    Err(SnbtError::unknown_escape_sequence(self.raw, index, 2))
                 }
-            }
+            },
         }
     }
 
     fn parse_unicode_two(
         &mut self,
-        index: usize
+        index: usize,
     ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
-
-        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeTwo);
+        let enabled = self
+            .opts
+            .enabled_escape_sequences
+            .is_enabled(EscapeSequence::UnicodeTwo);
         let handle_invalid = self.opts.handle_invalid_escape;
 
         if !enabled {
             match handle_invalid {
                 // Below code will throw an error
-                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Error => {}
                 HandleInvalidEscape::Ignore => {
                     self.next_ch();
                     self.next_ch();
@@ -448,12 +442,8 @@ impl Lexer<'_> {
         // The function calls to create errors are cheap and will probably be inlined
         #[expect(clippy::or_fun_call)]
         let chars = [
-            self.next_ch().ok_or(SnbtError::unexpected_eos(
-                "two-character hex unicode value",
-            ))?,
-            self.next_ch().ok_or(SnbtError::unexpected_eos(
-                "two-character hex unicode value",
-            ))?,
+            self.next_ch().ok_or(SnbtError::unexpected_eos("two-character hex unicode value"))?,
+            self.next_ch().ok_or(SnbtError::unexpected_eos("two-character hex unicode value"))?,
         ];
 
         let utf_val = u32::from(chars_to_u8(chars).ok_or_else(|| {
@@ -466,11 +456,7 @@ impl Lexer<'_> {
         })?);
 
         let escaped = char::from_u32(utf_val)
-            .ok_or(SnbtError::unknown_escape_sequence(
-                self.raw,
-                index,
-                4,
-            ))?;
+            .ok_or(SnbtError::unknown_escape_sequence(self.raw, index, 4))?;
 
         if enabled {
             Ok(Some((Some(escaped), 3)))
@@ -485,15 +471,18 @@ impl Lexer<'_> {
 
     fn parse_unicode_four(
         &mut self,
-        index: usize
+        index: usize,
     ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
-        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeFour);
+        let enabled = self
+            .opts
+            .enabled_escape_sequences
+            .is_enabled(EscapeSequence::UnicodeFour);
         let handle_invalid = self.opts.handle_invalid_escape;
 
         if !enabled {
             match handle_invalid {
                 // Below code will throw an error
-                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Error => {}
                 HandleInvalidEscape::Ignore => {
                     for _ in 0..4 {
                         self.next_ch();
@@ -532,11 +521,7 @@ impl Lexer<'_> {
         })?);
 
         let escaped = char::from_u32(utf_val)
-            .ok_or(SnbtError::unknown_escape_sequence(
-                self.raw,
-                index,
-                6,
-            ))?;
+            .ok_or(SnbtError::unknown_escape_sequence(self.raw, index, 6))?;
 
         if enabled {
             Ok(Some((Some(escaped), 5)))
@@ -551,15 +536,18 @@ impl Lexer<'_> {
 
     fn parse_unicode_eight(
         &mut self,
-        index: usize
+        index: usize,
     ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
-        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeEight);
+        let enabled = self
+            .opts
+            .enabled_escape_sequences
+            .is_enabled(EscapeSequence::UnicodeEight);
         let handle_invalid = self.opts.handle_invalid_escape;
 
         if !enabled {
             match handle_invalid {
                 // Below code will throw an error
-                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Error => {}
                 HandleInvalidEscape::Ignore => {
                     for _ in 0..8 {
                         self.next_ch();
@@ -601,11 +589,7 @@ impl Lexer<'_> {
         })?;
 
         let escaped = char::from_u32(utf_val)
-            .ok_or(SnbtError::unknown_escape_sequence(
-                self.raw,
-                index,
-                10,
-            ))?;
+            .ok_or(SnbtError::unknown_escape_sequence(self.raw, index, 10))?;
 
         if enabled {
             Ok(Some((Some(escaped), 9)))
@@ -620,15 +604,18 @@ impl Lexer<'_> {
 
     fn parse_unicode_named(
         &mut self,
-        index: usize
+        index: usize,
     ) -> Result<Option<(Option<char>, usize)>, SnbtError> {
-        let enabled = self.opts.enabled_escape_sequences.is_enabled(EscapeSequence::UnicodeNamed);
+        let enabled = self
+            .opts
+            .enabled_escape_sequences
+            .is_enabled(EscapeSequence::UnicodeNamed);
         let handle_invalid = self.opts.handle_invalid_escape;
 
         if !enabled {
             match handle_invalid {
                 // Below code will throw an error
-                HandleInvalidEscape::Error => {},
+                HandleInvalidEscape::Error => {}
                 HandleInvalidEscape::Ignore => {
                     if let Some(ch) = self.next_ch() {
                         if ch == '{' {
@@ -666,31 +653,29 @@ impl Lexer<'_> {
                     self.raw,
                     index,
                     1,
-                    "an opening curly bracket"
-                ))
+                    "an opening curly bracket",
+                ));
             }
         } else {
             return Err(SnbtError::unexpected_eos(
-                "a named unicode character escape"
-            ))
+                "a named unicode character escape",
+            ));
         }
 
         let mut total_char_width = 3; // '\\', 'N', and '{'
         loop {
             if let Some(ch) = self.next_ch() {
-
                 total_char_width += 1;
 
                 if ch == '}' {
                     break;
                 }
-
             } else {
                 return Err(SnbtError::unmatched_brace(
                     self.raw,
                     // index would be '\\', index+1 is 'N', and index+2 is '{'
-                    index + 2
-                ))
+                    index + 2,
+                ));
             }
         }
 
@@ -703,13 +688,10 @@ impl Lexer<'_> {
 
             // The function calls to create errors are cheap and will probably be inlined
             #[expect(clippy::or_fun_call)]
-            let escaped = unicode_names2::character(
-                &self.raw[name_start..name_end]
-            ).ok_or(SnbtError::unknown_escape_sequence(
-                self.raw,
-                index,
-                total_char_width
-            ))?;
+            let escaped = unicode_names2::character(&self.raw[name_start..name_end])
+                .ok_or(
+                    SnbtError::unknown_escape_sequence(self.raw, index, total_char_width),
+                )?;
 
             if enabled {
                 Ok(Some((Some(escaped), 5)))
@@ -726,7 +708,7 @@ impl Lexer<'_> {
             Err(SnbtError::named_escape_sequence(
                 self.raw,
                 index,
-                total_char_width
+                total_char_width,
             ))
         }
     }

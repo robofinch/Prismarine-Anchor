@@ -20,7 +20,7 @@ pub enum PalettizedStorage<T> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PaletteHeader {
-    pub palette_type: PaletteType,
+    pub palette_type:   PaletteType,
     pub bits_per_index: HeaderBitsPerIndex,
 }
 
@@ -28,7 +28,7 @@ pub struct PaletteHeader {
 pub struct PalettizedSubchunk<T> {
     bits_per_index: PaletteBitsPerIndex,
     packed_indices: Vec<u32>,
-    palette: Vec<T>,
+    palette:        Vec<T>,
 }
 
 /// Either the (nonzero) number of bits per index into a palette,
@@ -75,17 +75,21 @@ pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Option<Vec<u32>
     reader.read_exact(&mut u32s).ok()?;
 
     let mut u32s = u32s.into_iter();
-    Some((0..num_u32s).map(|_| {
-        // We know that u32s has length exactly num_u32s * 4,
-        // so these unwraps succeed.
-        let block = [
-            u32s.next().unwrap(),
-            u32s.next().unwrap(),
-            u32s.next().unwrap(),
-            u32s.next().unwrap(),
-        ];
-        u32::from_le_bytes(block)
-    }).collect())
+    Some(
+        (0..num_u32s)
+            .map(|_| {
+                // We know that u32s has length exactly num_u32s * 4,
+                // so these unwraps succeed.
+                let block = [
+                    u32s.next().unwrap(),
+                    u32s.next().unwrap(),
+                    u32s.next().unwrap(),
+                    u32s.next().unwrap(),
+                ];
+                u32::from_le_bytes(block)
+            })
+            .collect(),
+    )
 }
 
 /// Write many `u32`s to little-endian bytes. Infallible.
@@ -105,8 +109,8 @@ impl<T> PalettizedStorage<T> {
     // TODO: return a Result instead of an Option
     // TODO: have the option to not accept the special cases
     pub fn parse<R, F>(
-        reader: &mut R,
-        bits_per_index: HeaderBitsPerIndex,
+        reader:            &mut R,
+        bits_per_index:    HeaderBitsPerIndex,
         mut parse_palette: F,
     ) -> Option<Self>
     where
@@ -114,7 +118,7 @@ impl<T> PalettizedStorage<T> {
         F: FnMut(&mut R, usize) -> Option<Vec<T>>,
     {
         match bits_per_index {
-            HeaderBitsPerIndex::Empty   => Some(Self::Empty),
+            HeaderBitsPerIndex::Empty => Some(Self::Empty),
             HeaderBitsPerIndex::Uniform => {
                 // There are no indices, and the palette should have length 1
                 let mut palette = parse_palette(reader, 1)?;
@@ -126,7 +130,6 @@ impl<T> PalettizedStorage<T> {
                 }
             }
             HeaderBitsPerIndex::Palettized(bits_per_index) => {
-
                 let packed_indices_len = bits_per_index.num_u32s_for_4096_indices();
 
                 let packed_indices = read_le_u32s(reader, packed_indices_len)?;
@@ -150,7 +153,7 @@ impl<T> PalettizedStorage<T> {
     #[inline]
     pub fn bits_per_index(&self) -> HeaderBitsPerIndex {
         match self {
-            Self::Empty      => HeaderBitsPerIndex::Empty,
+            Self::Empty => HeaderBitsPerIndex::Empty,
             Self::Uniform(_) => HeaderBitsPerIndex::Uniform,
             Self::Palettized(PalettizedSubchunk { bits_per_index, .. }) => {
                 HeaderBitsPerIndex::Palettized(*bits_per_index)
@@ -161,12 +164,13 @@ impl<T> PalettizedStorage<T> {
     // TODO: have the option to error on the special cases
     pub fn extend_serialized<E, F>(
         &self,
-        bytes: &mut Vec<u8>,
-        palette_type: PaletteType,
-        reserve: bool,
+        bytes:                    &mut Vec<u8>,
+        palette_type:             PaletteType,
+        reserve:                  bool,
         mut write_palette_to_vec: F,
     ) -> Result<(), E>
-    where F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
+    where
+        F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
     {
         let header = PaletteHeader {
             palette_type,
@@ -194,8 +198,8 @@ impl<T> PalettizedStorage<T> {
 
                 if reserve {
                     let num_u32s = palettized.packed_indices_len();
-                    let reserve_len = 1 + num_u32s*4 + 4 + palette_len*4;
-                    // If this panics, then the reserve definitely would
+                    let reserve_len = 1 + (num_u32s * 4) + 4 + (palette_len * 4);
+                    // If this panics, then the reserve would definitely panic
                     let reserve_len = usize::try_from(reserve_len)
                         .expect("PalettizedStorage consumed too much memory for the hardware");
                     bytes.reserve(reserve_len);
@@ -215,11 +219,12 @@ impl<T> PalettizedStorage<T> {
     #[inline]
     pub fn to_bytes<E, F>(
         &self,
-        palette_type: PaletteType,
-        reserve: bool,
+        palette_type:         PaletteType,
+        reserve:              bool,
         write_palette_to_vec: F,
     ) -> Result<Vec<u8>, E>
-    where F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
+    where
+        F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
     {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes, palette_type, reserve, write_palette_to_vec)?;
@@ -237,7 +242,10 @@ impl PaletteHeader {
         let palette_type = PaletteType::from(header & 1);
         let bits_per_index = HeaderBitsPerIndex::parse(header >> 1)?;
 
-        Some(Self { palette_type, bits_per_index })
+        Some(Self {
+            palette_type,
+            bits_per_index,
+        })
     }
 }
 
@@ -255,7 +263,8 @@ impl<T> PalettizedSubchunk<T> {
     /// The provided data should be for one subchunk in YZX order (Y increments first).
     /// Intended for use when `T` is `Copy`.
     pub fn new_unpacked_flattened_copy(unpacked_data: [T; 4096]) -> Self
-    where T: Ord + Copy
+    where
+        T: Ord + Copy,
     {
         let mut palette = BTreeSet::new();
 
@@ -326,7 +335,8 @@ impl<T> PalettizedSubchunk<T> {
     /// The provided data should be for one subchunk in YZX order (Y increments first).
     /// If `T` is `Copy`, it is more efficient to use `new_unpacked_flattened_copy`.
     pub fn new_unpacked_flattened(unpacked_data: [T; 4096]) -> Self
-    where T: Ord
+    where
+        T: Ord,
     {
         // Note that we iterate over unpacked_data 3 times instead of 2 times,
         // and create a BTreeSet twice instead of once.
@@ -414,9 +424,8 @@ impl<T> PalettizedSubchunk<T> {
     pub fn new_packed_checked(
         bits_per_index: PaletteBitsPerIndex,
         packed_indices: Vec<u32>,
-        palette: Vec<T>,
+        palette:        Vec<T>,
     ) -> Option<Self> {
-
         if packed_indices.len() != bits_per_index.num_u32s_for_4096_indices() {
             return None;
         }
@@ -439,7 +448,6 @@ impl<T> PalettizedSubchunk<T> {
             let mut last_dword = last_dword;
 
             for _ in 0..bits_per_index.indices_in_last_u32() {
-
                 let index = last_dword & index_mask;
                 if index > max_permissible_index {
                     return None;
@@ -453,7 +461,6 @@ impl<T> PalettizedSubchunk<T> {
             let mut dword = dword;
 
             for _ in 0..indices_per_u32 {
-
                 let index = dword & index_mask;
                 if index > max_permissible_index {
                     return None;
@@ -464,7 +471,11 @@ impl<T> PalettizedSubchunk<T> {
         }
 
         // All the checks are done.
-        Some(Self::new_packed_unchecked(bits_per_index, packed_indices, palette))
+        Some(Self::new_packed_unchecked(
+            bits_per_index,
+            packed_indices,
+            palette,
+        ))
     }
 
     /// Creates a new `PalettizedSubchunk` struct which stores the data of a subchunk
@@ -481,7 +492,7 @@ impl<T> PalettizedSubchunk<T> {
     pub fn new_packed_unchecked(
         bits_per_index: PaletteBitsPerIndex,
         packed_indices: Vec<u32>,
-        palette: Vec<T>,
+        palette:        Vec<T>,
     ) -> Self {
         Self {
             bits_per_index,
@@ -526,7 +537,8 @@ impl<T> PalettizedSubchunk<T> {
     /// Compute the subchunk data which is stored in a condensed way in this struct.
     /// The output data is in YZX order (Y increments first).
     pub fn unpacked_flattened(&self) -> [T; 4096]
-    where T: Clone
+    where
+        T: Clone,
     {
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
         let index_mask = (1_u32 << u8::from(self.bits_per_index)) - 1;
@@ -562,12 +574,17 @@ impl<T> PalettizedSubchunk<T> {
     /// where Y is the innermost index, Z is the middle index, and X is the outermost index.
     /// In other words, the correct indexing order should be `unpacked_data[X][Z][Y]`.
     pub fn new_unpacked(unpacked_data: [[[T; 16]; 16]; 16]) -> Self
-    where T: Ord
+    where
+        T: Ord,
     {
-        let unpacked: Vec<_> = unpacked_data.into_iter().flatten().flatten().collect();
+        let unpacked: Vec<_> = unpacked_data // [[[T; 16]; 16]; 16]
+            .into_iter() // IntoIter<[[T; 16]; 16], 16>
+            .flatten()   // impl Iterator<Item = [T; 16]>
+            .flatten()   // impl Iterator<Item = T>
+            .collect();
         let unpacked: [_; 4096] = match unpacked.try_into() {
             Ok(unpacked) => unpacked,
-            Err(_) => unreachable!("16*16*16 == 4096, so the iterator is of the correct length")
+            Err(_) => unreachable!("16*16*16 == 4096, so the iterator is of the correct length"),
         };
         Self::new_unpacked_flattened(unpacked)
     }
@@ -577,14 +594,19 @@ impl<T> PalettizedSubchunk<T> {
     /// and X is the outermost index.
     /// In other words, the correct indexing order should be `self.unpacked()[X][Z][Y]`.
     pub fn unpacked(&self) -> [[[T; 16]; 16]; 16]
-    where T: Clone
+    where
+        T: Clone,
     {
         let unpacked: [_; 4096] = self.unpacked_flattened();
         let mut unpacked = unpacked.into_iter();
-        array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| {
-            // This doesn't panic since 4096 == 16^3
-            unpacked.next().unwrap()
-        })))
+        array::from_fn(|_| {
+            array::from_fn(|_| {
+                array::from_fn(|_| {
+                    // This doesn't panic since 4096 == 16^3
+                    unpacked.next().unwrap()
+                })
+            })
+        })
     }
 }
 
@@ -635,7 +657,6 @@ impl PaletteBitsPerIndex {
     ///
     /// Returns `None` precisely if the `palette_len` is `0`, or greater than `2^16`.
     pub fn new_from_usize(palette_len: usize) -> Option<Self> {
-
         if palette_len <= 1 {
             return None;
         }
@@ -680,7 +701,7 @@ impl PaletteBitsPerIndex {
             6  => Self::Six,
             8  => Self::Eight,
             16 => Self::Sixteen,
-            _ => return None,
+            _  => return None,
         })
     }
 
@@ -705,7 +726,11 @@ impl PaletteBitsPerIndex {
     /// `self.indices_per_u32() * u8::from(self) + self.padding_bits() == 32`.
     #[inline]
     pub fn padding_bits(self) -> u8 {
-        if [3, 5, 6].contains(&u8::from(self)) { 2 } else { 0 }
+        if [3, 5, 6].contains(&u8::from(self)) {
+            2
+        } else {
+            0
+        }
     }
 
     /// For some bit widths, the number of indices per u32 does not evenly divide 4096,
@@ -728,14 +753,14 @@ impl From<PaletteBitsPerIndex> for u8 {
     #[inline]
     fn from(value: PaletteBitsPerIndex) -> Self {
         match value {
-            PaletteBitsPerIndex::One      => 1,
-            PaletteBitsPerIndex::Two      => 2,
-            PaletteBitsPerIndex::Three    => 3,
-            PaletteBitsPerIndex::Four     => 4,
-            PaletteBitsPerIndex::Five     => 5,
-            PaletteBitsPerIndex::Six      => 6,
-            PaletteBitsPerIndex::Eight    => 8,
-            PaletteBitsPerIndex::Sixteen  => 16,
+            PaletteBitsPerIndex::One     => 1,
+            PaletteBitsPerIndex::Two     => 2,
+            PaletteBitsPerIndex::Three   => 3,
+            PaletteBitsPerIndex::Four    => 4,
+            PaletteBitsPerIndex::Five    => 5,
+            PaletteBitsPerIndex::Six     => 6,
+            PaletteBitsPerIndex::Eight   => 8,
+            PaletteBitsPerIndex::Sixteen => 16,
         }
     }
 }

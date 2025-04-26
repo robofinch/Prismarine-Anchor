@@ -194,7 +194,10 @@ impl DBKey {
         Self::parse_recognized_key(&raw_key).unwrap_or(Self::RawKey(raw_key))
     }
 
-    #[expect(clippy::too_many_lines, reason = "best to contain where raw keys are handled")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "best to contain where raw keys are handled",
+    )]
     pub fn parse_recognized_key(raw_key: &[u8]) -> Option<Self> {
         // Try some common prefixes first
         if (raw_key.len() == 12 || raw_key.len() == 16) && raw_key.starts_with(b"digp") {
@@ -215,15 +218,13 @@ impl DBKey {
             && !raw_key.starts_with(b"map")
             && !raw_key.starts_with(b"player_")
         {
-
             // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents)
             // should never be allowed as tags here, to avoid a collision.
             let tag = raw_key[raw_key.len() - 1];
             if ((43 <= tag && tag <= 65) && tag != 47) || tag == 118 || tag == 119 {
-
-                if let Ok(dimensioned_pos) = DimensionedChunkPos::try_from(
-                    &raw_key[..raw_key.len() - 1]
-                ) {
+                if let Ok(dimensioned_pos) =
+                    DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 1])
+                {
                     return Some(match tag {
                         43  => Self::Data3D                 (dimensioned_pos),
                         44  => Self::Version                (dimensioned_pos),
@@ -259,9 +260,9 @@ impl DBKey {
             // Subchunk keys are slightly different from the others
 
             if raw_key[raw_key.len() - 2] == 47 {
-                if let Ok(dimensioned_pos) = DimensionedChunkPos::try_from(
-                    &raw_key[..raw_key.len() - 2]
-                ) {
+                if let Ok(dimensioned_pos) =
+                    DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 2])
+                {
                     return Some(Self::SubchunkBlocks(
                         dimensioned_pos,
                         raw_key[raw_key.len() - 1] as i8,
@@ -281,8 +282,7 @@ impl DBKey {
                 && ["DWELLERS", "INFO", "PLAYERS", "POI"].contains(&parts[parts.len() - 1])
             {
                 // Villages
-                if let Some(uuid) =  UUID::new(parts[parts.len() - 2]) {
-
+                if let Some(uuid) = UUID::new(parts[parts.len() - 2]) {
                     let dimension = if parts.len() == 4 {
                         // Dimension included
                         NamedDimension::from_bedrock_name(parts[1])
@@ -312,7 +312,7 @@ impl DBKey {
                 if let Ok(identifier) = NamespacedIdentifier::parse_string(
                     parts[1].to_owned(),
                     IdentifierParseOptions {
-                        default_namespace: None,
+                        default_namespace:          None,
                         java_character_constraints: false,
                     },
                 ) {
@@ -325,7 +325,7 @@ impl DBKey {
                     return Some(Self::Player(uuid));
 
                 } else if let Ok(id) = i64::from_str_radix(parts[1], 10) {
-                    return Some(Self::LegacyPlayer(id))
+                    return Some(Self::LegacyPlayer(id));
                 }
 
             } else if parts.len() == 3 && parts[0] == "player" && parts[1] == "server" {
@@ -378,15 +378,18 @@ impl DBKey {
 
     /// Extend the provided `Vec` with the raw key bytes of a `DBKey`,
     /// using the provided serialization settings.
-    #[expect(clippy::too_many_lines, reason = "best to contain where raw keys are handled")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "best to contain where raw keys are handled",
+    )]
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>, opts: KeyToBytesOptions) {
 
         fn extend_village(
-            bytes: &mut Vec<u8>,
-            dimension: &NamedDimension,
-            uuid: &UUID,
+            bytes:                &mut Vec<u8>,
+            dimension:            &NamedDimension,
+            uuid:                 &UUID,
             write_overworld_name: bool,
-            variant: &'static [u8],
+            variant:              &'static [u8],
         ) {
             if write_overworld_name || dimension != &NamedDimension::OVERWORLD {
 
@@ -442,37 +445,37 @@ impl DBKey {
                 d_pos.extend_serialized(bytes, opts.write_overworld_id);
                 bytes.push(47);
                 bytes.push(subchunk as u8);
-                return
+                return;
             }
             &Self::ActorDigest(dimensioned_pos) => {
                 bytes.reserve(16);
                 bytes.extend(b"digp");
                 dimensioned_pos.extend_serialized(bytes, opts.write_overworld_id);
-                return
+                return;
             }
             &Self::Actor(actor_id) => {
                 bytes.reserve(19);
                 bytes.extend(b"actorprefix");
                 bytes.extend(actor_id.to_bytes());
-                return
+                return;
             }
             &Self::LevelChunkMetaDataDictionary => {
                 bytes.extend(b"LevelChunkMetaDataDictionary");
-                return
+                return;
             }
             &Self::AutonomousEntities => {
                 bytes.extend(b"AutonomousEntities");
-                return
+                return;
             }
             &Self::LocalPlayer => {
                 bytes.extend(b"~local_player");
-                return
+                return;
             }
             &Self::Player(uuid) => {
                 bytes.reserve(b"player_".len() + 36);
                 bytes.extend(b"player_");
                 uuid.extend_serialized(bytes);
-                return
+                return;
             }
             &Self::LegacyPlayer(id) => {
                 let id_str = format!("{id}");
@@ -480,38 +483,38 @@ impl DBKey {
                 bytes.reserve(b"player_".len() + id_str.len());
                 bytes.extend(b"player_");
                 bytes.extend(id_str.as_bytes());
-                return
+                return;
             }
             &Self::PlayerServer(uuid) => {
                 bytes.reserve(b"player_server_".len() + 36);
                 bytes.extend(b"player_server_");
                 uuid.extend_serialized(bytes);
-                return
+                return;
             }
             Self::VillageDwellers(dimension, uuid) => {
                 extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"DWELLERS");
-                return
+                return;
             }
             Self::VillageInfo(dimension, uuid) => {
                 extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"INFO");
-                return
+                return;
             }
             Self::VillagePOI(dimension, uuid) => {
                 extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"POI");
-                return
+                return;
             }
             Self::VillagePlayers(dimension, uuid) => {
                 extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"PLAYERS");
-                return
+                return;
             }
             &Self::Map(map_id) => {
                 bytes.extend(b"map_");
                 bytes.extend(format!("{map_id}").as_bytes());
-                return
+                return;
             }
             &Self::Portals => {
                 bytes.extend(b"portals");
-                return
+                return;
             }
             Self::StructureTemplate(identifier) => {
                 let identifier_len = identifier.namespace.len() + identifier.path.len() + 1;
@@ -521,41 +524,41 @@ impl DBKey {
                 bytes.extend(identifier.namespace.as_bytes());
                 bytes.push(b':');
                 bytes.extend(identifier.path.as_bytes());
-                return
+                return;
             }
             &Self::TickingArea(uuid) => {
                 bytes.reserve(b"tickingarea_".len() + 36);
                 bytes.extend(b"tickingarea_");
                 uuid.extend_serialized(bytes);
-                return
+                return;
             }
             &Self::Scoreboard => {
                 bytes.extend(b"scoreboard");
-                return
+                return;
             }
             &Self::WanderingTraderScheduler => {
                 bytes.extend(b"schedulerWT");
-                return
+                return;
             }
             &Self::BiomeData => {
                 bytes.extend(b"BiomeData");
-                return
+                return;
             }
             &Self::MobEvents => {
                 bytes.extend(b"mobevents");
-                return
+                return;
             }
             &Self::Overworld => {
                 bytes.extend(VanillaDimension::Overworld.to_bedrock_name().as_bytes());
-                return
+                return;
             }
             &Self::Nether => {
                 bytes.extend(VanillaDimension::Nether.to_bedrock_name().as_bytes());
-                return
+                return;
             }
             &Self::TheEnd => {
                 bytes.extend(VanillaDimension::End.to_bedrock_name().as_bytes());
-                return
+                return;
             }
             &Self::PositionTrackingDB(id) => {
                 let id = format!("{id:08x}");
@@ -563,19 +566,19 @@ impl DBKey {
                 bytes.reserve(b"PosTrackDB-0x".len() + id.len());
                 bytes.extend(b"PosTrackDB-0x");
                 bytes.extend(id.as_bytes());
-                return
+                return;
             }
             &Self::PositionTrackingLastId => {
                 bytes.extend(b"PositionTrackDB-LastId");
-                return
+                return;
             }
             &Self::FlatWorldLayers => {
                 bytes.extend(b"game_flatworldlayers");
-                return
+                return;
             }
             Self::RawKey(raw_key) => {
                 bytes.extend(raw_key);
-                return
+                return;
             }
         };
 

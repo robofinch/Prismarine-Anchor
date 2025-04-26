@@ -2,30 +2,26 @@ use serde::ser;
 use serde::serde_if_integer128;
 use serde::{Serialize, Serializer};
 use serde::ser::{
-    SerializeMap,
-    SerializeSeq,
-    SerializeStruct,
-    SerializeStructVariant,
-    SerializeTuple,
-    SerializeTupleStruct,
-    SerializeTupleVariant,
+    SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
+    SerializeTupleStruct, SerializeTupleVariant,
 };
 
 
 /// This struct serves as a transparent wrapper around other sealed types to allow for blanket
 /// implementations of `Serialize`.
+#[derive(Debug)]
 pub struct Ser<T>(T);
 
 pub trait DefaultSerializer: Sized {
     type Ok;
     type Error: ser::Error;
-    type SerializeSeq:              SerializeSeq            <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeTuple:            SerializeTuple          <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeTupleStruct:      SerializeTupleStruct    <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeTupleVariant:     SerializeTupleVariant   <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeMap:              SerializeMap            <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeStruct:           SerializeStruct         <Ok = Self::Ok, Error = Self::Error>;
-    type SerializeStructVariant:    SerializeStructVariant  <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeSeq:           SerializeSeq           <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeTuple:         SerializeTuple         <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeTupleStruct:   SerializeTupleStruct   <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeTupleVariant:  SerializeTupleVariant  <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeMap:           SerializeMap           <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeStruct:        SerializeStruct        <Ok = Self::Ok, Error = Self::Error>;
+    type SerializeStructVariant: SerializeStructVariant <Ok = Self::Ok, Error = Self::Error>;
 
     fn unimplemented(self, ty: &'static str) -> Self::Error;
 
@@ -105,8 +101,10 @@ pub trait DefaultSerializer: Sized {
         Err(self.unimplemented("Option"))
     }
 
-    fn serialize_some<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
-    where T: Serialize {
+    fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         Err(self.unimplemented("Option"))
     }
 
@@ -120,33 +118,33 @@ pub trait DefaultSerializer: Sized {
 
     fn serialize_unit_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        _variant: &'static str,
+        _variant:       &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         Err(self.unimplemented("unit variant"))
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
-        _name: &'static str,
+        _name:  &'static str,
         _value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         Err(self.unimplemented("newtype struct"))
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        _variant: &'static str,
-        _value: &T,
+        _variant:       &'static str,
+        _value:         &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         Err(self.unimplemented("newtype variant"))
     }
@@ -162,17 +160,17 @@ pub trait DefaultSerializer: Sized {
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
-        _len: usize,
+        _len:  usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         Err(self.unimplemented("tuple struct"))
     }
 
     fn serialize_tuple_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        _variant: &'static str,
-        _len: usize,
+        _variant:       &'static str,
+        _len:           usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         Err(self.unimplemented("tuple variant"))
     }
@@ -184,17 +182,17 @@ pub trait DefaultSerializer: Sized {
     fn serialize_struct(
         self,
         _name: &'static str,
-        _len: usize,
+        _len:  usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         Err(self.unimplemented("struct"))
     }
 
     fn serialize_struct_variant(
         self,
-        _name: &'static str,
+        _name:          &'static str,
         _variant_index: u32,
-        _variant: &'static str,
-        _len: usize,
+        _variant:       &'static str,
+        _len:           usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         Err(self.unimplemented("struct variant"))
     }
@@ -306,8 +304,10 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     }
 
     #[inline(always)]
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
-    where T: Serialize {
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: Serialize + ?Sized,
+    {
         self.0.serialize_some(value)
     }
 
@@ -324,38 +324,37 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     #[inline(always)]
     fn serialize_unit_variant(
         self,
-        name: &'static str,
+        name:          &'static str,
         variant_index: u32,
-        variant: &'static str,
+        variant:       &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         self.0.serialize_unit_variant(name, variant_index, variant)
     }
 
     #[inline(always)]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
-        name: &'static str,
+        name:  &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.0.serialize_newtype_struct(name, value)
     }
 
     #[inline(always)]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
-        name: &'static str,
+        name:          &'static str,
         variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        variant:       &'static str,
+        value:         &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
-        self.0
-            .serialize_newtype_variant(name, variant_index, variant, value)
+        self.0.serialize_newtype_variant(name, variant_index, variant, value)
     }
 
     #[inline(always)]
@@ -372,7 +371,7 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     fn serialize_tuple_struct(
         self,
         name: &'static str,
-        len: usize,
+        len:  usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.0.serialize_tuple_struct(name, len)
     }
@@ -380,10 +379,10 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     #[inline(always)]
     fn serialize_tuple_variant(
         self,
-        name: &'static str,
+        name:          &'static str,
         variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        variant:       &'static str,
+        len:           usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         self.0
             .serialize_tuple_variant(name, variant_index, variant, len)
@@ -398,7 +397,7 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     fn serialize_struct(
         self,
         name: &'static str,
-        len: usize,
+        len:  usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         self.0.serialize_struct(name, len)
     }
@@ -406,13 +405,12 @@ impl<S: DefaultSerializer> Serializer for Ser<S> {
     #[inline(always)]
     fn serialize_struct_variant(
         self,
-        name: &'static str,
+        name:          &'static str,
         variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        variant:       &'static str,
+        len:           usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.0
-            .serialize_struct_variant(name, variant_index, variant, len)
+        self.0.serialize_struct_variant(name, variant_index, variant, len)
     }
 
     #[inline(always)]

@@ -51,7 +51,10 @@ impl ZipEnv {
             io::copy(&mut Cursor::new(file), &mut writer).map_err(ZipError::Io)?;
         }
 
-        writer.finish().map(|c| c.into_inner()).map_err(ZipEnvError::Zip)
+        writer
+            .finish()
+            .map(|c| c.into_inner())
+            .map_err(ZipEnvError::Zip)
     }
 
     pub fn try_into_archive(self) -> Result<ZipArchive<impl Read>, ZipEnvError> {
@@ -70,7 +73,9 @@ impl ZipEnv {
             io::copy(&mut Cursor::new(file), &mut writer).map_err(ZipError::Io)?;
         }
 
-        writer.finish_into_readable().map_err(ZipEnvError::Zip)
+        writer
+            .finish_into_readable()
+            .map_err(ZipEnvError::Zip)
     }
 }
 
@@ -78,14 +83,15 @@ impl<R: Read + Seek> TryFrom<ZipArchive<R>> for ZipEnv {
     type Error = ZipEnvError;
 
     fn try_from(mut archive: ZipArchive<R>) -> Result<Self, ZipEnvError> {
-
         let fs = MemFS::new();
 
         for idx in 0..archive.len() {
             let mut file = archive.by_index(idx)?;
-            let name = file.enclosed_name().ok_or(
-                ZipError::InvalidArchive(Cow::Borrowed("Invalid file path and/or name"))
-            )?;
+            let name = file
+                .enclosed_name()
+                .ok_or(ZipError::InvalidArchive(Cow::Borrowed(
+                    "Invalid file path and/or name",
+                )))?;
             let mut writer = fs.open_w(&name, false, true)?;
 
             io::copy(&mut file, writer.as_mut()).map_err(ZipError::Io)?;
@@ -294,7 +300,7 @@ impl RandomAccess for MemFile {
 }
 
 struct MemFSEntry {
-    f: MemFile,
+    f:      MemFile,
     locked: bool,
 }
 
@@ -327,7 +333,7 @@ impl MemFS {
                 }
                 let f = MemFile::new();
                 v.insert(MemFSEntry {
-                    f: f.clone(),
+                    f:      f.clone(),
                     locked: false,
                 });
                 Ok(f)
@@ -335,7 +341,10 @@ impl MemFS {
         }
     }
     /// Open a file for writing.
-    #[expect(clippy::fn_params_excessive_bools, reason = "originated from rusty-leveldb's code")]
+    #[expect(
+        clippy::fn_params_excessive_bools,
+        reason = "originated from rusty-leveldb's code",
+    )]
     fn open_w(&self, p: &Path, append: bool, truncate: bool) -> StatusResult<Box<dyn Write>> {
         let f = self.open(p, true)?;
         if truncate {
@@ -422,7 +431,7 @@ impl MemFS {
             Entry::Vacant(v) => {
                 let f = MemFile::new();
                 v.insert(MemFSEntry {
-                    f: f.clone(),
+                    f:      f.clone(),
                     locked: true,
                 });
                 Ok(FileLock {

@@ -1,3 +1,10 @@
+all:	clippy check
+
+clippy:
+	cargo clippy --no-default-features
+	cargo clippy
+	cargo clippy --all-features
+
 # NBT features:
 # preserve_order      = [ "dep:indexmap" ]
 # comparable          = []

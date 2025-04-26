@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::MappingParseError;
 
@@ -48,18 +48,20 @@ impl From<CodeFunction> for &'static str {
         match function {
             CodeFunction::BannerPattern2u => "banner_pattern_2u",
             CodeFunction::BannerPatternFu => "banner_pattern_fu",
-            CodeFunction::BedrockChestConnectionOtherLeft
-                => "bedrock_chest_connection_other_left",
-            CodeFunction::BedrockChestConnectionOtherLeftUpdated
-                => "bedrock_chest_connection_other_left_120",
-            CodeFunction::BedrockChestConnectionOtherRight
-                => "bedrock_chest_connection_other_right",
-            CodeFunction::BedrockChestConnectionOtherRightUpdated
-                => "bedrock_chest_connection_other_right_120",
-            CodeFunction::BedrockChestConnectionSelf
-                => "bedrock_chest_connection_self",
-            CodeFunction::BedrockChestConnectionSelfUpdated
-                => "bedrock_chest_connection_self_120",
+            CodeFunction::BedrockChestConnectionOtherLeft => {
+                "bedrock_chest_connection_other_left"
+            }
+            CodeFunction::BedrockChestConnectionOtherLeftUpdated => {
+                "bedrock_chest_connection_other_left_120"
+            }
+            CodeFunction::BedrockChestConnectionOtherRight => {
+                "bedrock_chest_connection_other_right"
+            }
+            CodeFunction::BedrockChestConnectionOtherRightUpdated => {
+                "bedrock_chest_connection_other_right_120"
+            }
+            CodeFunction::BedrockChestConnectionSelf        => "bedrock_chest_connection_self",
+            CodeFunction::BedrockChestConnectionSelfUpdated => "bedrock_chest_connection_self_120",
             CodeFunction::BedrockChestFu          => "bedrock_chest_fu",
             CodeFunction::BedrockCmdCustomName2u  => "bedrock_cmd_custom_name_2u",
             CodeFunction::BedrockCmdCustomNameFu  => "bedrock_cmd_custom_name_fu",
@@ -77,58 +79,53 @@ impl From<CodeFunction> for &'static str {
 impl CodeFunction {
     pub fn input_type(self) -> CodeFunctionInput {
         match self {
-            Self::BannerPattern2u
-                | Self::BannerPatternFu
-                | Self::BedrockCmdCustomName2u
-                | Self::BedrockCmdCustomNameFu
-                | Self::BedrockSign2u
-                | Self::BedrockSign2uUpdated
-                | Self::BedrockSignFu
-                | Self::BedrockSignFuUpdated
-                | Self::BedrockSkullRotation2u
-                => CodeFunctionInput::Nbt,
+            Self::BannerPattern2u          | Self::BannerPatternFu
+            | Self::BedrockCmdCustomName2u | Self::BedrockCmdCustomNameFu
+            | Self::BedrockSign2u          | Self::BedrockSign2uUpdated
+            | Self::BedrockSignFu          | Self::BedrockSignFuUpdated
+            | Self::BedrockSkullRotation2u => {
+                CodeFunctionInput::Nbt
+            }
             Self::BedrockChestConnectionOtherLeft
-                | Self::BedrockChestConnectionOtherLeftUpdated
-                | Self::BedrockChestConnectionOtherRight
-                | Self::BedrockChestConnectionOtherRightUpdated
-                | Self::BedrockChestConnectionSelf
-                | Self::BedrockChestConnectionSelfUpdated
-                => CodeFunctionInput::NbtPropertiesPosition,
-            Self::BedrockChestFu
-                => CodeFunctionInput::PropertiesPosition,
-            Self::BedrockMovingBlockPos2u
-                | Self::BedrockMovingBlockPosFu
-                => CodeFunctionInput::NbtPosition,
+            | Self::BedrockChestConnectionOtherLeftUpdated
+            | Self::BedrockChestConnectionOtherRight
+            | Self::BedrockChestConnectionOtherRightUpdated
+            | Self::BedrockChestConnectionSelf
+            | Self::BedrockChestConnectionSelfUpdated => {
+                CodeFunctionInput::NbtPropertiesPosition
+            }
+            Self::BedrockChestFu => {
+                CodeFunctionInput::PropertiesPosition
+            }
+            Self::BedrockMovingBlockPos2u | Self::BedrockMovingBlockPosFu => {
+                CodeFunctionInput::NbtPosition
+            }
         }
     }
 
     pub fn output_type(self) -> CodeFunctionOutput {
         match self {
-            Self::BannerPattern2u
-                | Self::BannerPatternFu
-                | Self::BedrockChestFu
-                | Self::BedrockCmdCustomName2u
-                | Self::BedrockCmdCustomNameFu
-                | Self::BedrockMovingBlockPos2u
-                | Self::BedrockMovingBlockPosFu
-                | Self::BedrockSign2u
-                | Self::BedrockSign2uUpdated
-                | Self::BedrockSignFu
-                | Self::BedrockSignFuUpdated
-                => CodeFunctionOutput::NewNbt,
+            Self::BannerPattern2u           | Self::BannerPatternFu
+            | Self::BedrockCmdCustomName2u  | Self::BedrockCmdCustomNameFu
+            | Self::BedrockMovingBlockPos2u | Self::BedrockMovingBlockPosFu
+            | Self::BedrockSign2u           | Self::BedrockSign2uUpdated
+            | Self::BedrockSignFu           | Self::BedrockSignFuUpdated
+            | Self::BedrockChestFu => {
+                CodeFunctionOutput::NewNbt
+            }
             Self::BedrockChestConnectionOtherLeft
-                | Self::BedrockChestConnectionOtherLeftUpdated
-                | Self::BedrockChestConnectionOtherRight
-                | Self::BedrockChestConnectionOtherRightUpdated
-                | Self::BedrockChestConnectionSelf
-                | Self::BedrockChestConnectionSelfUpdated
-                | Self::BedrockSkullRotation2u
-                => CodeFunctionOutput::NewProperties,
+            | Self::BedrockChestConnectionOtherLeftUpdated
+            | Self::BedrockChestConnectionOtherRight
+            | Self::BedrockChestConnectionOtherRightUpdated
+            | Self::BedrockChestConnectionSelf
+            | Self::BedrockChestConnectionSelfUpdated
+            | Self::BedrockSkullRotation2u => {
+                CodeFunctionOutput::NewProperties
+            }
         }
     }
 
     pub fn parse(json: &str) -> Result<Self, MappingParseError> {
-
         #[derive(Serialize, Deserialize)]
         struct CodeFunctionJson {
             function: CodeFunction,
@@ -142,23 +139,33 @@ impl CodeFunction {
         let correct_output = code_function.function.output_type().to_vec();
 
         if correct_input.len() != code_function.input.len() {
-            return Err(MappingParseError::IncorrectInput(code_function.function.into()));
+            return Err(MappingParseError::IncorrectInput(
+                code_function.function.into(),
+            ));
         } else {
             let inputs = correct_input.into_iter().zip(code_function.input);
             for (correct_input, given_input) in inputs {
                 if correct_input != given_input {
-                    return Err(MappingParseError::IncorrectInput(code_function.function.into()));
+                    return Err(MappingParseError::IncorrectInput(
+                        code_function.function.into(),
+                    ));
                 }
             }
         }
 
         if correct_output.len() != code_function.output.len() {
-            return Err(MappingParseError::IncorrectOutput(code_function.function.into()));
+            return Err(MappingParseError::IncorrectOutput(
+                code_function.function.into(),
+            ));
         } else {
-            let outputs = correct_output.into_iter().zip(code_function.output);
+            let outputs = correct_output
+                .into_iter()
+                .zip(code_function.output);
             for (correct_output, given_output) in outputs {
                 if correct_output != given_output {
-                    return Err(MappingParseError::IncorrectOutput(code_function.function.into()));
+                    return Err(MappingParseError::IncorrectOutput(
+                        code_function.function.into(),
+                    ));
                 }
             }
         }

@@ -1,6 +1,9 @@
 //! Module for parsing SNBT into NBT data
 
-#[expect(unreachable_pub, reason = "I know that almost nothing here is publicly reachable")]
+#[expect(
+    unreachable_pub,
+    reason = "I know that almost nothing here is publicly reachable",
+)]
 // See the `pub use` and `pub(crate) use` below for exceptions
 mod lexer;
 
@@ -16,12 +19,11 @@ use crate::{
 use self::lexer::{FromExact, FromLossless, Lexer, Token, TokenData};
 
 
-pub use self::lexer::{allowed_unquoted, NumericParseError, starts_unquoted_number};
 pub(crate) use self::lexer::is_ambiguous;
+pub use self::lexer::{NumericParseError, allowed_unquoted, starts_unquoted_number};
 
 
 // TODO: should add module-wide documentation about the specification and implementation.
-
 
 
 // ================================
@@ -33,7 +35,7 @@ pub(crate) use self::lexer::is_ambiguous;
 // having unpredictable effects.
 #[derive(Debug, Clone)]
 pub struct VerifiedSnbt {
-    snbt: String,
+    snbt:          String,
     parse_options: SnbtParseOptions,
 }
 
@@ -42,7 +44,7 @@ impl VerifiedSnbt {
     pub fn new(snbt: String, opts: SnbtParseOptions) -> Result<Self, SnbtError> {
         parse_any(&snbt, opts).map(|_| Self {
             snbt,
-            parse_options: opts
+            parse_options: opts,
         })
     }
 
@@ -61,75 +63,67 @@ impl VerifiedSnbt {
 /// Parses the given string into an NBT tag.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_any<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-    opts: SnbtParseOptions,
-) -> Result<NbtTag, SnbtError> {
-    parse_any_and_size(
-        string_nbt,
-        opts,
-    ).map(|(tag, _)| tag)
+pub fn parse_any<T>(string_nbt: &T, opts: SnbtParseOptions) -> Result<NbtTag, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_any_and_size(string_nbt, opts)
+        .map(|(tag, _)| tag)
 }
 
 /// Parses the given string into an NBT tag, using the original SNBT version.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_any_original<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-) -> Result<NbtTag, SnbtError> {
-    parse_any_and_size(
-        string_nbt,
-        SnbtParseOptions::default_original(),
-    ).map(|(tag, _)| tag)
+pub fn parse_any_original<T>(string_nbt: &T) -> Result<NbtTag, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_any_and_size(string_nbt, SnbtParseOptions::default_original())
+        .map(|(tag, _)| tag)
 }
 
 /// Parses the given string into an NBT tag, using the newer SNBT version.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_any_updated<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-) -> Result<NbtTag, SnbtError> {
-    parse_any_and_size(
-        string_nbt,
-        SnbtParseOptions::default_updated(),
-    ).map(|(tag, _)| tag)
+pub fn parse_any_updated<T>(string_nbt: &T) -> Result<NbtTag, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_any_and_size(string_nbt, SnbtParseOptions::default_updated())
+        .map(|(tag, _)| tag)
 }
 
 /// Parses the given string into a compound NBT tag.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_compound<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-    opts: SnbtParseOptions,
-) -> Result<NbtCompound, SnbtError> {
-    parse_compound_and_size(
-        string_nbt,
-        opts,
-    ).map(|(tag, _)| tag)
+pub fn parse_compound<T>(string_nbt: &T, opts: SnbtParseOptions) -> Result<NbtCompound, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_compound_and_size(string_nbt, opts)
+        .map(|(tag, _)| tag)
 }
 
 /// Parses the given string into a compound NBT tag, using the newer SNBT version.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_compound_updated<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-) -> Result<NbtCompound, SnbtError> {
-    parse_compound_and_size(
-        string_nbt,
-        SnbtParseOptions::default_updated(),
-    ).map(|(tag, _)| tag)
+pub fn parse_compound_updated<T>(string_nbt: &T) -> Result<NbtCompound, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_compound_and_size(string_nbt, SnbtParseOptions::default_updated())
+        .map(|(tag, _)| tag)
 }
 
 /// Parses the given string into a compound NBT tag, using the original SNBT version.
 /// See [`SnbtVersion`] for some specifics of the standard and this implementation.
 #[inline]
-pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
-    string_nbt: &T,
-) -> Result<NbtCompound, SnbtError> {
-    parse_compound_and_size(
-        string_nbt,
-        SnbtParseOptions::default_original(),
-    ).map(|(tag, _)| tag)
+pub fn parse_compound_original<T>(string_nbt: &T) -> Result<NbtCompound, SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
+    parse_compound_and_size(string_nbt, SnbtParseOptions::default_original())
+        .map(|(tag, _)| tag)
 }
 
 // ================================
@@ -138,10 +132,13 @@ pub fn parse_compound_original<T: AsRef<str> + ?Sized>(
 
 /// Parses the given string into a tag just like [`parse_any`],
 /// but also returns the number of parsed characters.
-pub fn parse_any_and_size<T: AsRef<str> + ?Sized>(
+pub fn parse_any_and_size<T>(
     string_nbt: &T,
-    opts: SnbtParseOptions,
-) -> Result<(NbtTag, usize), SnbtError> {
+    opts:       SnbtParseOptions,
+) -> Result<(NbtTag, usize), SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
     let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
     let tag = parse_next_value(&mut tokens, false, 0)?;
 
@@ -150,10 +147,13 @@ pub fn parse_any_and_size<T: AsRef<str> + ?Sized>(
 
 /// Parses the given string just like [`parse_compound`],
 /// but also returns the number of parsed characters.
-pub fn parse_compound_and_size<T: AsRef<str> + ?Sized>(
+pub fn parse_compound_and_size<T>(
     string_nbt: &T,
-    opts: SnbtParseOptions,
-) -> Result<(NbtCompound, usize), SnbtError> {
+    opts:       SnbtParseOptions,
+) -> Result<(NbtCompound, usize), SnbtError>
+where
+    T: AsRef<str> + ?Sized,
+{
     let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
     let open_curly = tokens.assert_next(&Token::OpenCurly, false)?;
     parse_compound_tag(&mut tokens, &open_curly, 0)
@@ -161,9 +161,9 @@ pub fn parse_compound_and_size<T: AsRef<str> + ?Sized>(
 
 // Parses the next value in the token stream
 fn parse_next_value(
-    tokens: &mut Lexer<'_>,
+    tokens:           &mut Lexer<'_>,
     expecting_string: bool,
-    current_depth: u32,
+    current_depth:    u32,
 ) -> Result<NbtTag, SnbtError> {
     let token = tokens.next(expecting_string).transpose()?;
     parse_value(tokens, token, current_depth)
@@ -171,11 +171,10 @@ fn parse_next_value(
 
 /// Parses a token into a value
 fn parse_value(
-    tokens: &mut Lexer<'_>,
-    token: Option<TokenData>,
+    tokens:        &mut Lexer<'_>,
+    token:         Option<TokenData>,
     current_depth: u32,
 ) -> Result<NbtTag, SnbtError> {
-
     if let Some(td) = token {
         match td {
             // Open curly brace indicates a compound tag is present
@@ -191,13 +190,10 @@ fn parse_value(
             } => parse_list(tokens, &td, current_depth),
 
             // Could be a value token or delimiter token
-            _ => {
-                td.into_tag().map_err(|td| {
-                    SnbtError::unexpected_token(tokens.raw(), Some(&td), "value")
-                })
-            }
+            _ => td
+                .into_tag()
+                .map_err(|td| SnbtError::unexpected_token(tokens.raw(), Some(&td), "value")),
         }
-
     } else {
         // We expected a value but ran out of data
         Err(SnbtError::unexpected_eos("value"))
@@ -206,11 +202,10 @@ fn parse_value(
 
 // Parses a list, which can be either a generic tag list or vector of primitives
 fn parse_list(
-    tokens: &mut Lexer<'_>,
-    open_square: &TokenData,
+    tokens:        &mut Lexer<'_>,
+    open_square:   &TokenData,
     current_depth: u32,
 ) -> Result<NbtTag, SnbtError> {
-
     match tokens.next(false).transpose()? {
         // Empty list ('[]') with no type specifier is treated as an empty NBT tag list
         Some(TokenData {
@@ -230,7 +225,8 @@ fn parse_list(
             index,
             char_width,
         }) => {
-            // Peek at the next token to see if it's a semicolon, which would indicate a primitive vector
+            // Peek at the next token to see if it's a semicolon,
+            // which would indicate a primitive vector
             match tokens.peek(false) {
                 // Parse as a primitive vector
                 Some(Ok(TokenData {
@@ -268,7 +264,7 @@ fn parse_list(
                         Err(SnbtError::exceeded_depth_limit(
                             tokens.raw(),
                             index,
-                            tokens.depth_limit()
+                            tokens.depth_limit(),
                         ))
                     } else {
                         // Parse as a tag list (token errors are delegated to this function)
@@ -287,7 +283,7 @@ fn parse_list(
                     return Err(SnbtError::exceeded_depth_limit(
                         tokens.raw(),
                         td.index,
-                        tokens.depth_limit()
+                        tokens.depth_limit(),
                     ));
                 }
             }
@@ -299,7 +295,7 @@ fn parse_list(
 }
 
 fn parse_prim_list<T>(
-    tokens: &mut Lexer<'_>,
+    tokens:      &mut Lexer<'_>,
     open_square: &TokenData,
 ) -> Result<NbtTag, SnbtError>
 where
@@ -337,47 +333,47 @@ where
                     Some(_) => {
                         match tokens.snbt_version() {
                             // The numeric array can accept data of the same size or smaller
-                            SnbtVersion::UpdatedJava => {
-                                match T::from_lossless(td) {
-                                    Ok(value) => list.push(value),
-                                    Err((td, Some(numeric_err))) =>
-                                        return Err(SnbtError::invalid_number(
-                                            tokens.raw(),
-                                            td.index,
-                                            td.char_width,
-                                            numeric_err,
-                                        )),
-                                    Err((td, None)) =>
-                                        return Err(SnbtError::non_homogenous_numeric_list(
-                                            tokens.raw(),
-                                            td.index,
-                                            td.char_width,
-                                        )),
+                            SnbtVersion::UpdatedJava => match T::from_lossless(td) {
+                                Ok(value) => list.push(value),
+                                Err((td, Some(numeric_err))) => {
+                                    return Err(SnbtError::invalid_number(
+                                        tokens.raw(),
+                                        td.index,
+                                        td.char_width,
+                                        numeric_err,
+                                    ));
                                 }
-                            }
+                                Err((td, None)) => {
+                                    return Err(SnbtError::non_homogenous_numeric_list(
+                                        tokens.raw(),
+                                        td.index,
+                                        td.char_width,
+                                    ));
+                                }
+                            },
                             // The numeric array can accept data only of the same size
-                            SnbtVersion::Original => {
-                                match T::from_exact(td) {
-                                    Ok(value) => list.push(value),
-                                    Err(td) =>
-                                        return Err(SnbtError::non_homogenous_numeric_list(
-                                            tokens.raw(),
-                                            td.index,
-                                            td.char_width,
-                                        )),
+                            SnbtVersion::Original => match T::from_exact(td) {
+                                Ok(value) => list.push(value),
+                                Err(td) => {
+                                    return Err(SnbtError::non_homogenous_numeric_list(
+                                        tokens.raw(),
+                                        td.index,
+                                        td.char_width,
+                                    ));
                                 }
-                            }
+                            },
                         }
 
                         comma = None;
                     }
 
-                    None =>
+                    None => {
                         return Err(SnbtError::unexpected_token(
                             tokens.raw(),
                             Some(&td),
                             Token::Comma.as_expectation(),
-                        )),
+                        ));
+                    }
                 }
             }
 
@@ -388,7 +384,7 @@ where
 
 // Depth limit should be checked before entering this function
 fn parse_tag_list(
-    tokens: &mut Lexer<'_>,
+    tokens:        &mut Lexer<'_>,
     first_element: NbtTag,
     current_depth: u32,
 ) -> Result<NbtList, SnbtError> {
@@ -396,7 +392,7 @@ fn parse_tag_list(
     let mut list = NbtList::new();
     let mut descrim = mem::discriminant(&first_element);
     let expecting_strings = matches!(&first_element, &NbtTag::String(_));
-    let mut list_holds_compounds = matches!(&first_element, &NbtTag::Compound{..});
+    let mut list_holds_compounds = matches!(&first_element, &NbtTag::Compound { .. });
     list.push(first_element);
 
     loop {
@@ -415,13 +411,15 @@ fn parse_tag_list(
                 let (index, char_width) = match tokens.peek(expecting_strings) {
                     // The comma could be a trailing comma at the end of the list
                     Some(&Ok(TokenData {
-                        index, token: Token::ClosedSquare, ..
+                        index,
+                        token: Token::ClosedSquare,
+                        ..
                     })) => match tokens.snbt_version() {
                         SnbtVersion::UpdatedJava => return Ok(list),
-                        SnbtVersion::Original => return Err(
-                            SnbtError::trailing_comma(tokens.raw(), index)
-                        ),
-                    }
+                        SnbtVersion::Original => {
+                            return Err(SnbtError::trailing_comma(tokens.raw(), index));
+                        }
+                    },
                     Some(&Ok(TokenData {
                         index, char_width, ..
                     })) => (index, char_width),
@@ -431,7 +429,6 @@ fn parse_tag_list(
 
                 if mem::discriminant(&element) == descrim {
                     list.push(element);
-
                 } else {
                     match tokens.snbt_version() {
                         SnbtVersion::UpdatedJava => {
@@ -440,7 +437,7 @@ fn parse_tag_list(
 
                             #[inline]
                             fn to_compound(tag: NbtTag) -> NbtTag {
-                                if let NbtTag::Compound{..} = tag {
+                                if let NbtTag::Compound { .. } = tag {
                                     tag
                                 } else {
                                     let mut compound = NbtCompound::with_capacity(1);
@@ -460,30 +457,34 @@ fn parse_tag_list(
                             }
 
                             list.push(compounded_element);
-                        },
+                        }
 
-                        SnbtVersion::Original =>
+                        SnbtVersion::Original => {
                             return Err(SnbtError::non_homogenous_tag_list(
-                                tokens.raw(), index, char_width,
-                            ))
+                                tokens.raw(),
+                                index,
+                                char_width,
+                            ));
+                        }
                     };
                 }
             }
 
             // Some invalid token
-            td =>
+            td => {
                 return Err(SnbtError::unexpected_token(
                     tokens.raw(),
                     td.as_ref(),
                     "',' or ']'",
-                )),
+                ));
+            }
         }
     }
 }
 
 fn parse_compound_tag(
-    tokens: &mut Lexer<'_>,
-    open_curly: &TokenData,
+    tokens:        &mut Lexer<'_>,
+    open_curly:    &TokenData,
     current_depth: u32,
 ) -> Result<(NbtCompound, usize), SnbtError> {
     let mut compound = NbtCompound::new();
@@ -502,8 +503,10 @@ fn parse_compound_tag(
                         // First loop iteration or no comma
                         Some(0) | None => return Ok((compound, tokens.index())),
                         // Later iteration with a trailing comma
-                        Some(index) => if matches!(tokens.snbt_version(), SnbtVersion::Original) {
-                            return Err(SnbtError::trailing_comma(tokens.raw(), index));
+                        Some(index) => {
+                            if matches!(tokens.snbt_version(), SnbtVersion::Original) {
+                                return Err(SnbtError::trailing_comma(tokens.raw(), index));
+                            }
                         }
                     }
                 }
@@ -523,8 +526,8 @@ fn parse_compound_tag(
                                 return Err(SnbtError::exceeded_depth_limit(
                                     tokens.raw(),
                                     index,
-                                    tokens.depth_limit()
-                                ))
+                                    tokens.depth_limit(),
+                                ));
                             }
 
                             tokens.assert_next(&Token::Colon, false)?;
@@ -537,13 +540,14 @@ fn parse_compound_tag(
 
                         // There was not a comma before this string
                         // so therefore the token is unexpected
-                        None =>
+                        None => {
                             return Err(SnbtError::unexpected_token_at(
                                 tokens.raw(),
                                 index,
                                 char_width,
                                 Token::Comma.as_expectation(),
-                            )),
+                            ));
+                        }
                     }
                 }
 
@@ -556,27 +560,28 @@ fn parse_compound_tag(
                     None => comma = Some(index),
                     // This comma came before any valid element, or after another comma;
                     // this is not valid in either version.
-                    Some(_) =>
+                    Some(_) => {
                         return Err(SnbtError::unexpected_token_at(
                             tokens.raw(),
                             index,
                             1,
                             "compound key or '}'",
-                        )),
-                }
+                        ));
+                    }
+                },
 
                 // Catch-all for unexpected tokens
-                td =>
+                td => {
                     return Err(SnbtError::unexpected_token(
                         tokens.raw(),
                         Some(&td),
                         "compound key, '}', or ','",
-                    )),
+                    ));
+                }
             }
-
         } else {
             // End of input / unmatched brace
-            return Err(SnbtError::unmatched_brace(tokens.raw(), open_curly.index))
+            return Err(SnbtError::unmatched_brace(tokens.raw(), open_curly.index));
         }
     }
 }
@@ -588,13 +593,13 @@ pub enum SnbtError {
     /// The limit on recursive nesting depth of NBT lists and compounds was exceeded.
     #[error(
         "exceeded depth limit {} for nested compound and list tags at column {} near '{}'",
-        limit.0, index, segment
+        limit.0, index, segment,
     )]
     ExceededDepthLimit {
         segment: String,
-        index: usize,
+        index:   usize,
         /// The limit which was exceeded.
-        limit: DepthLimit
+        limit:   DepthLimit,
     },
     /// The end of the string (EOS) was encountered before it was expected.
     #[error("reached end of input but expected {expected}")]
@@ -605,99 +610,69 @@ pub enum SnbtError {
     /// An unexpected token was encountered.
     #[error("unexpected token at column {index} near '{segment}', expected {expected}")]
     UnexpectedToken {
-        segment: String,
-        index: usize,
+        segment:  String,
+        index:    usize,
         /// The expected token or sequence of tokens.
         expected: &'static str,
     },
     /// An escape sequence supported in some SNBT version, but not the one selected.
     #[error(
-        "escape sequence only supported in a different SNBT version at column {index}: '{segment}'"
+        "escape sequence only supported in a different SNBT version at column {index}: '{segment}'",
     )]
-    UnsupportedEscapeSequence {
-        segment: String,
-        index: usize,
-    },
+    UnsupportedEscapeSequence { segment: String, index: usize },
     /// A named escape sequence was encountered, but named escape sequence support wasn't enabled.
     #[error(
         "named sequence support is not enabled; could not parse escape sequence '{}' at column {}",
-        segment, index
+        segment, index,
     )]
-    NamedEscapeSequence {
-        segment: String,
-        index: usize,
-    },
+    NamedEscapeSequence { segment: String, index: usize },
     /// An unknown or invalid escape sequence.
     #[error("unknown escape sequence at column {index}: '{segment}'")]
-    UnknownEscapeSequence {
-        segment: String,
-        index: usize,
-    },
+    UnknownEscapeSequence { segment: String, index: usize },
     /// A non-alphanumeric character other than `_`, `-`, `.`, or `+`
     /// appeared in an unquoted string.
     #[error("character '{ch}' disallowed in unquoted strings at column {index} near '{segment}'")]
     InvalidUnquotedCharacter {
         segment: String,
-        index: usize,
+        index:   usize,
         /// The encountered character which should not appear in unquoted strings.
-        ch: char
+        ch:      char,
     },
     /// An invalid number.
     #[error(
         "numeric literal at column {} was invalid because {}. Literal began with '{}'",
-        index, cause, segment
+        index, cause, segment,
     )]
     InvalidNumber {
         segment: String,
-        index: usize,
-        cause: NumericParseError,
+        index:   usize,
+        cause:   NumericParseError,
     },
     /// An invalid string representation of a UUID.
     #[error("invalid string representation of a UUID at column {index}: '{segment}'")]
-    InvalidUUID {
-        segment: String,
-        index: usize,
-    },
+    InvalidUUID { segment: String, index: usize },
     /// An unquoted token which could be numeric or a string,
     /// which was prohibited in parsing options.
     #[error("ambiguous token '{segment}' at column {index}")]
-    AmbiguousToken {
-        segment: String,
-        index: usize,
-    },
+    AmbiguousToken { segment: String, index: usize },
     /// A trailing comma was encountered in a list or compound when it shouldn't have been.
     #[error("forbidden trailing comma at column {index}: '{segment}'")]
-    TrailingComma {
-        segment: String,
-        index: usize,
-    },
+    TrailingComma { segment: String, index: usize },
     /// An unmatched single or double quote was encountered.
     #[error("unmatched quote at column {index} near '{segment}'")]
-    UnmatchedQuote {
-        segment: String,
-        index: usize,
-    },
+    UnmatchedQuote { segment: String, index: usize },
     /// An unmatched curly bracket, square bracket, or parenthesis was encountered.
     #[error("unmatched brace at column {index} near '{segment}'")]
-    UnmatchedBrace {
-        segment: String,
-        index: usize,
-    },
+    UnmatchedBrace { segment: String, index: usize },
     /// A non-homogenous array of numbers was encountered.
     #[error("non-homogenous typed array of numbers at column {index} near '{segment}'")]
-    NonHomogenousNumericList {
-        segment: String,
-        index: usize,
-    },
+    NonHomogenousNumericList { segment: String, index: usize },
     /// A non-homogenous array of NBT tags was encountered.
     #[error(
         "non-homogenous tag list (only supported in new SNBT version) at column {} near '{}'",
-        index, segment
+        index, segment,
     )]
-    NonHomogenousTagList {
-        segment: String,
-        index: usize,
-    },
+    NonHomogenousTagList { segment: String, index: usize },
 }
 
 impl SnbtError {
@@ -715,18 +690,18 @@ impl SnbtError {
 
     fn unexpected_token(input: &str, token: Option<&TokenData>, expected: &'static str) -> Self {
         match token {
-            Some(token) => Self::unexpected_token_at(
-                input, token.index, token.char_width, expected
-            ),
+            Some(token) => {
+                Self::unexpected_token_at(input, token.index, token.char_width, expected)
+            }
             None => Self::unexpected_eos(expected),
         }
     }
 
     fn unexpected_token_at(
-        input: &str,
-        index: usize,
+        input:      &str,
+        index:      usize,
         char_width: usize,
-        expected: &'static str,
+        expected:   &'static str,
     ) -> Self {
         Self::UnexpectedToken {
             segment: Self::segment(input, index, char_width, 15, 0),
@@ -766,7 +741,10 @@ impl SnbtError {
     }
 
     fn invalid_number(
-        input: &str, index: usize, char_width: usize, cause: NumericParseError
+        input:      &str,
+        index:      usize,
+        char_width: usize,
+        cause:      NumericParseError,
     ) -> Self {
         Self::InvalidNumber {
             segment: Self::segment(input, index, char_width, 0, 0),
@@ -825,25 +803,28 @@ impl SnbtError {
     }
 
     fn segment(
-        input: &str,
-        index: usize,
+        input:      &str,
+        index:      usize,
         char_width: usize,
-        before: usize,
-        after: usize,
+        before:     usize,
+        after:      usize,
     ) -> String {
-        let start = input[.. index]
-                .char_indices()
-                .rev()
-                .nth(before.saturating_sub(1))
-                .map(|(index, _)| index)
-                .unwrap_or(0);
-        let end = (index + input[index ..]
-                .char_indices()
-                .nth(char_width.min(20) + after)
-                .map(|(index, _)| index)
-                .unwrap_or(input.len())
-            ).min(input.len());
+        let start = input[..index]
+            .char_indices()
+            .rev()
+            .nth(before.saturating_sub(1))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
 
-        input[start .. end].to_owned()
+        let end_len = input[index..]
+            .char_indices()
+            .nth(char_width.min(20) + after)
+            .map(|(index, _)| index)
+            .unwrap_or(input.len());
+
+        let end = (index + end_len)
+            .min(input.len());
+
+        input[start..end].to_owned()
     }
 }

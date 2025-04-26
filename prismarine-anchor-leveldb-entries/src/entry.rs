@@ -12,10 +12,10 @@ use prismarine_anchor_leveldb_values::{
     subchunk_blocks::SubchunkBlocks,
 };
 
+// Crazy luck with the alignment
 use crate::{
-    key::DBKey,
-    EntryParseResult, EntryToBytesOptions, EntryBytes, EntryToBytesError,
-    ValueToBytesError, ValueToBytesOptions, ValueParseResult,
+    EntryBytes, EntryParseResult, EntryToBytesError, EntryToBytesOptions,
+    key::DBKey, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
 };
 
 /// The entries in a world's `LevelDB` database used by Minecraft Bedrock,
@@ -43,11 +43,10 @@ pub enum DBEntry {
     SubchunkBlocks(DimensionedChunkPos, i8, SubchunkBlocks),
     // LegacyTerrain(DimensionedChunkPos),
     // LegacyExtraBlockData(DimensionedChunkPos),
-
-    BlockEntities(DimensionedChunkPos,  ConcatenatedNbtCompounds),
+    BlockEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
     LegacyEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
-    PendingTicks(DimensionedChunkPos,   ConcatenatedNbtCompounds),
-    RandomTicks(DimensionedChunkPos,    ConcatenatedNbtCompounds),
+    PendingTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
+    RandomTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
 
     // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
@@ -122,11 +121,11 @@ pub enum DBEntry {
     // idcounts
 
     RawEntry {
-        key: Vec<u8>,
+        key:   Vec<u8>,
         value: Vec<u8>,
     },
     RawValue {
-        key: DBKey,
+        key:   DBKey,
         value: Vec<u8>,
     },
 }
@@ -142,21 +141,18 @@ impl DBEntry {
             EntryParseResult::UnrecognizedValue(parsed_key) => Self::RawValue {
                 key:   parsed_key,
                 value: value.to_owned(),
-            }
+            },
         }
     }
 
     pub fn parse_entry_vec(key: Vec<u8>, value: Vec<u8>) -> Self {
         match Self::parse_recognized_entry(&key, &value) {
             EntryParseResult::Parsed(entry) => entry,
-            EntryParseResult::UnrecognizedKey => Self::RawEntry {
-                key,
-                value,
-            },
+            EntryParseResult::UnrecognizedKey => Self::RawEntry { key, value },
             EntryParseResult::UnrecognizedValue(parsed_key) => Self::RawValue {
                 key: parsed_key,
                 value,
-            }
+            },
         }
     }
 
@@ -172,7 +168,7 @@ impl DBEntry {
             ValueParseResult::Parsed(parsed) => parsed,
             ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
                 key,
-                value: value.to_vec()
+                value: value.to_vec(),
             },
         }
     }
@@ -180,10 +176,7 @@ impl DBEntry {
     pub fn parse_value_vec(key: DBKey, value: Vec<u8>) -> Self {
         match Self::parse_recognized_value(key, &value) {
             ValueParseResult::Parsed(parsed) => parsed,
-            ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
-                key,
-                value,
-            },
+            ValueParseResult::UnrecognizedValue(key) => Self::RawValue { key, value },
         }
     }
 
@@ -238,25 +231,25 @@ impl DBEntry {
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
-            },
+            }
             DBKey::LegacyEntities(chunk_pos) => {
                 // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return V::Parsed(Self::LegacyEntities(chunk_pos, compounds));
                 }
-            },
+            }
             DBKey::PendingTicks(chunk_pos) => {
                 // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return V::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
-            },
+            }
             DBKey::RandomTicks(chunk_pos) => {
                 // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
-            },
+            }
             DBKey::MetaDataHash(chunk_pos) => {
                 if let Ok(bytes) = <[u8; 8]>::try_from(value) {
                     return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
@@ -305,17 +298,14 @@ impl DBEntry {
             Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(*chunk_pos),
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(*chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(*chunk_pos),
-            Self::SubchunkBlocks(chunk_pos, y_index, ..)
-                => DBKey::SubchunkBlocks(*chunk_pos, *y_index),
+            Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(*c_pos, *y),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
-            Self::CavesAndCliffsBlending(chunk_pos, ..)
-                => DBKey::CavesAndCliffsBlending(*chunk_pos),
-            Self::BlendingBiomeHeight(chunk_pos, ..)
-                => DBKey::BlendingBiomeHeight(*chunk_pos),
+            Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
+            Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
@@ -331,107 +321,105 @@ impl DBEntry {
             Self::Data3D(chunk_pos, ..)             => DBKey::Data3D(chunk_pos),
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(chunk_pos),
-            Self::SubchunkBlocks(chunk_pos, y_index, ..)
-                => DBKey::SubchunkBlocks(chunk_pos, y_index),
+            Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(c_pos, y),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(chunk_pos),
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
-            Self::CavesAndCliffsBlending(chunk_pos, ..)
-                => DBKey::CavesAndCliffsBlending(chunk_pos),
-            Self::BlendingBiomeHeight(chunk_pos, ..)
-                => DBKey::BlendingBiomeHeight(chunk_pos),
+            Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
+            Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
-            Self::RawEntry { key, .. }              => DBKey::RawKey(key),
-            Self::RawValue { key, .. }              => key,
+            Self::RawEntry { key, .. } => DBKey::RawKey(key),
+            Self::RawValue { key, .. } => key,
         }
     }
 
     /// If `error_on_excessive_length` is true and this is a `LevelChunkMetaDataDictionary`
     /// entry whose number of values is too large to fit in a u32, then an error is returned.
-    pub fn to_value_bytes(
-        &self,
-        opts: ValueToBytesOptions,
-    ) -> Result<Vec<u8>, ValueToBytesError> {
-
+    pub fn to_value_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, ValueToBytesError> {
         #[expect(clippy::match_same_arms, reason = "clarity")]
         Ok(match self {
-            Self::Version(.., version)                => vec![u8::from(*version)],
-            Self::LegacyVersion(.., version)          => vec![u8::from(*version)],
-            Self::ActorDigestVersion(.., version)     => vec![u8::from(*version)],
-            Self::Data3D(.., data)                    => data.to_bytes(),
-            Self::Data2D(.., data)                    => data.to_bytes(),
-            Self::LegacyData2D(.., data)              => data.to_bytes(),
-            Self::SubchunkBlocks(.., blocks)          => blocks.to_bytes()?,
-            Self::BlockEntities(.., compounds)        => compounds.to_bytes(true)?,
-            Self::LegacyEntities(.., compounds)       => compounds.to_bytes(true)?,
-            Self::PendingTicks(.., compounds)         => compounds.to_bytes(true)?,
-            Self::RandomTicks(.., compounds)          => compounds.to_bytes(true)?,
-            Self::MetaDataHash(.., hash)              => hash.to_le_bytes().to_vec(),
-            Self::CavesAndCliffsBlending(.., raw)     => raw.clone(),
-            Self::BlendingBiomeHeight(.., raw)        => raw.clone(),
-            Self::BlendingData(.., blending_data)     => blending_data.to_bytes(),
-            Self::LevelChunkMetaDataDictionary(dict)  => {
+            Self::Version(.., version)                  => vec![u8::from(*version)],
+            Self::LegacyVersion(.., version)            => vec![u8::from(*version)],
+            Self::ActorDigestVersion(.., version)       => vec![u8::from(*version)],
+            Self::Data3D(.., data)                      => data.to_bytes(),
+            Self::Data2D(.., data)                      => data.to_bytes(),
+            Self::LegacyData2D(.., data)                => data.to_bytes(),
+            Self::SubchunkBlocks(.., blocks)            => blocks.to_bytes()?,
+            Self::BlockEntities(.., compounds)          => compounds.to_bytes(true)?,
+            Self::LegacyEntities(.., compounds)         => compounds.to_bytes(true)?,
+            Self::PendingTicks(.., compounds)           => compounds.to_bytes(true)?,
+            Self::RandomTicks(.., compounds)            => compounds.to_bytes(true)?,
+            Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
+            Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
+            Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
+            Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
+            Self::LevelChunkMetaDataDictionary(dict) => {
                 dict.to_bytes(opts.error_on_excessive_length)?
             }
-            Self::RawEntry { value, .. }              => value.clone(),
-            Self::RawValue { value, .. }              => value.clone(),
+            Self::RawEntry { value, .. } => value.clone(),
+            Self::RawValue { value, .. } => value.clone(),
         })
     }
 
-    pub fn to_bytes(
-        &self,
-        opts: EntryToBytesOptions,
-    ) -> Result<EntryBytes, EntryToBytesError> {
-
+    pub fn to_bytes(&self, opts: EntryToBytesOptions) -> Result<EntryBytes, EntryToBytesError> {
         let key = self.to_key().to_bytes(opts.into());
 
         match self.to_value_bytes(opts.into()) {
-            Ok(value) => Ok(EntryBytes { key, value }),
-            Err(err)  => Err(EntryToBytesError { key, value_error: err })
+            Ok(value) => Ok(EntryBytes {
+                key,
+                value,
+            }),
+            Err(value_error) => Err(EntryToBytesError {
+                key,
+                value_error,
+            }),
         }
     }
 
-    pub fn into_bytes(
-        self,
-        opts: EntryToBytesOptions,
-    ) -> Result<EntryBytes, EntryToBytesError> {
-
+    pub fn into_bytes(self, opts: EntryToBytesOptions) -> Result<EntryBytes, EntryToBytesError> {
         match self {
             Self::RawEntry { key, value } => Ok(EntryBytes { key, value }),
             Self::RawValue { key, value } => {
                 let key_bytes = key.to_bytes(opts.into());
 
-                Ok(EntryBytes { key: key_bytes, value })
+                Ok(EntryBytes {
+                    key: key_bytes,
+                    value,
+                })
             }
             Self::CavesAndCliffsBlending(chunk_pos, raw) => {
                 let key = DBKey::CavesAndCliffsBlending(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
 
-                Ok(EntryBytes { key: key_bytes, value: raw })
+                Ok(EntryBytes {
+                    key:   key_bytes,
+                    value: raw,
+                })
             }
             Self::BlendingBiomeHeight(chunk_pos, raw) => {
                 let key = DBKey::BlendingBiomeHeight(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
 
-                Ok(EntryBytes { key: key_bytes, value: raw })
+                Ok(EntryBytes {
+                    key:   key_bytes,
+                    value: raw,
+                })
             }
             // TODO: maybe some other entries could also be more memory efficient, too.
             _ => {
                 let value_bytes = self.to_value_bytes(opts.into());
-                let key_bytes = self
-                    .into_key()
-                    .to_bytes(opts.into());
+                let key_bytes = self.into_key().to_bytes(opts.into());
 
                 match value_bytes {
                     Ok(value) => Ok(EntryBytes {
                         key: key_bytes,
                         value,
                     }),
-                    Err(err)  => Err(EntryToBytesError {
-                        key: key_bytes,
+                    Err(err) => Err(EntryToBytesError {
+                        key:         key_bytes,
                         value_error: err,
                     }),
                 }

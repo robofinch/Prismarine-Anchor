@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
-use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{read_compound, write_compound, NbtIoError};
+use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
+use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
 
 use crate::all_read;
 
@@ -33,7 +33,7 @@ impl ConcatenatedNbtCompounds {
 
     pub fn extend_serialized(
         &self,
-        bytes: &mut Vec<u8>,
+        bytes:                 &mut Vec<u8>,
         allow_invalid_strings: bool,
     ) -> Result<(), NbtIoError> {
         let mut writer = Cursor::new(bytes);

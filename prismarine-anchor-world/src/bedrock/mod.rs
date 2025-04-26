@@ -9,18 +9,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rusty_leveldb::{env::Env, DB as LevelDB, Status};
+use rusty_leveldb::{DB as LevelDB, env::Env, Status};
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_entries::{
-    DBEntry, DBKey, EntryBytes,
-    EntryToBytesOptions, KeyToBytesOptions, ValueToBytesError,
+    DBEntry, DBKey,
+    EntryBytes, EntryToBytesOptions,
+    KeyToBytesOptions, ValueToBytesError,
 };
 use prismarine_anchor_nbt::io as nbt_io;
-use prismarine_anchor_nbt::{settings::IoOptions, NbtCompound};
-use prismarine_anchor_nbt::io::{write_compound, NbtIoError};
+use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
+use prismarine_anchor_nbt::io::{NbtIoError, write_compound};
 
-use self::leveldb::{new_leveldb, DBCompressor};
+use self::leveldb::{DBCompressor, new_leveldb};
 
 
 // other possible things to do in the future:
@@ -34,11 +35,11 @@ use self::leveldb::{new_leveldb, DBCompressor};
 
 /// Data associated with one Bedrock world's folder (or .mcworld file)
 pub struct BedrockWorldFiles {
-    level_dat: LevelDatFile,
+    level_dat:  LevelDatFile,
     level_name: String,
-    db: LevelDB,
-    env: Rc<Box<dyn Env>>,
-    root_path: PathBuf,
+    db:         LevelDB,
+    env:        Rc<Box<dyn Env>>,
+    root_path:  PathBuf,
 }
 
 impl BedrockWorldFiles {
@@ -59,10 +60,9 @@ impl BedrockWorldFiles {
     /// `level.dat`, `levelname.txt`, and the LevelDB database
     /// should not be edited by anything else.
     pub fn open_world_from_path(
-        env: Box<dyn Env>,
+        env:       Box<dyn Env>,
         root_path: &Path,
     ) -> Result<Self, BedrockWorldFileError> {
-
         let env_ref = env.as_ref();
 
         fn add_status_context(err: Status) -> BedrockWorldFileError {
@@ -72,7 +72,9 @@ impl BedrockWorldFiles {
             BedrockWorldFileError::Io(Cow::Borrowed("trying to open a Bedrock world"), err)
         }
 
-        let mut list = env.children(root_path).map_err(add_status_context)?;
+        let mut list = env
+            .children(root_path)
+            .map_err(add_status_context)?;
 
         // Find the common directory of all children of the root path
         let mut nested_root_path = PathBuf::new();
@@ -129,7 +131,8 @@ impl BedrockWorldFiles {
 
     /// Write the in-memory `level.dat` information to this world's `Env`.
     pub fn save_level_dat(&self) -> Result<(), BedrockWorldFileError> {
-        self.level_dat.write_to_env(self.env.as_ref().as_ref(), &self.root_path)
+        self.level_dat
+            .write_to_env(self.env.as_ref().as_ref(), &self.root_path)
     }
 
     /// Read the in-memory `levelname.txt` information.
@@ -144,7 +147,7 @@ impl BedrockWorldFiles {
 
     /// Write the in-memory `levelname.txt` information to this world's `Env`.
     pub fn save_level_name(&self) -> Result<(), BedrockWorldFileError> {
-
+        //
         fn add_status_context(err: Status) -> BedrockWorldFileError {
             BedrockWorldFileError::StatusCode(Cow::Borrowed("writing to levelname.txt"), err)
         }
@@ -157,7 +160,8 @@ impl BedrockWorldFiles {
         let mut file = write_to_path(env, &self.root_path, "levelname.txt")
             .map_err(add_status_context)?;
 
-        file.write_all(self.level_name.as_bytes()).map_err(add_io_context)?;
+        file.write_all(self.level_name.as_bytes())
+            .map_err(add_io_context)?;
 
         Ok(())
     }
@@ -170,17 +174,19 @@ impl BedrockWorldFiles {
     /// Read the entry in the LevelDB with the provided key and serialization options,
     /// and parse it into a `DBEntry` if present.
     pub fn get(&mut self, key: DBKey, opts: KeyToBytesOptions) -> Option<DBEntry> {
-
-        self.db.get(&key.to_bytes(opts))
+        self.db
+            .get(&key.to_bytes(opts))
             .map(|value| DBEntry::parse_value_vec(key, value))
     }
 
     /// Write the provided entry into the LevelDB using the provided serialization options.
     pub fn put(
-        &mut self, entry: DBEntry, opts: EntryToBytesOptions,
+        &mut self,
+        entry: DBEntry,
+        opts:  EntryToBytesOptions,
     ) -> Result<(), BedrockWorldFileError> {
-
-        let EntryBytes { key, value } = entry.into_bytes(opts)
+        let EntryBytes { key, value } = entry
+            .into_bytes(opts)
             .map_err(|err| err.value_error)?;
 
         self.db.put(&key, &value).map_err(|err| {
@@ -193,11 +199,17 @@ impl BedrockWorldFiles {
 
     /// Read the world's icon from this world's `Env`.
     pub fn world_icon(&self) -> Result<Box<dyn Read>, BedrockWorldFileError> {
-        open_from_path(self.env.as_ref().as_ref(), &self.root_path, "world_icon.jpeg")
-            .map_err(|err| BedrockWorldFileError::StatusCode(
+        open_from_path(
+            self.env.as_ref().as_ref(),
+            &self.root_path,
+            "world_icon.jpeg",
+        )
+        .map_err(|err| {
+            BedrockWorldFileError::StatusCode(
                 Cow::Borrowed("opening a world's icon image"),
                 err,
-            ))
+            )
+        })
     }
 }
 
@@ -211,16 +223,13 @@ impl Debug for BedrockWorldFiles {
 #[derive(Debug)]
 pub struct LevelDatFile {
     pub version: i32,
-    pub nbt: NbtCompound,
+    pub nbt:     NbtCompound,
 }
 
 impl LevelDatFile {
     /// Read the `level.dat` file for a world whose folder is located at `root_path`
     /// inside the provided `Env`.
-    pub fn parse_from_env(
-        env: &dyn Env,
-        root_path: &Path,
-    ) -> Result<Self, BedrockWorldFileError> {
+    pub fn parse_from_env(env: &dyn Env, root_path: &Path) -> Result<Self, BedrockWorldFileError> {
 
         fn add_status_context(err: Status) -> BedrockWorldFileError {
             BedrockWorldFileError::StatusCode(Cow::Borrowed("trying to read level.dat"), err)
@@ -232,15 +241,12 @@ impl LevelDatFile {
         let mut file = open_from_path(env, root_path, "level.dat")
             .map_err(add_status_context)?;
 
-        let (version, _) = nbt_io::read_bedrock_header(
-                &mut file,
-                IoOptions::bedrock_uncompressed(),
-            ).map_err(add_nbt_context)?;
+        let opts = IoOptions::bedrock_uncompressed();
 
-        let (compound, _) = nbt_io::read_compound(
-                &mut file,
-                IoOptions::bedrock_uncompressed(),
-            ).map_err(add_nbt_context)?;
+        let (version,  _) = nbt_io::read_bedrock_header(&mut file, opts)
+            .map_err(add_nbt_context)?;
+        let (compound, _) = nbt_io::read_compound(&mut file, opts)
+            .map_err(add_nbt_context)?;
 
         Ok(Self {
             version,
@@ -252,7 +258,7 @@ impl LevelDatFile {
     /// inside the provided `Env`.
     pub fn write_to_env(
         &self,
-        env: &dyn Env,
+        env:       &dyn Env,
         root_path: &Path,
     ) -> Result<(), BedrockWorldFileError> {
 
@@ -271,25 +277,35 @@ impl LevelDatFile {
 
         let mut nbt_buffer = Cursor::new(Vec::new());
 
-        write_compound(&mut nbt_buffer, IoOptions::bedrock_uncompressed(), None, &self.nbt)
-            .map_err(add_nbt_context)?;
+        write_compound(
+            &mut nbt_buffer,
+            IoOptions::bedrock_uncompressed(),
+            None,
+            &self.nbt,
+        )
+        .map_err(add_nbt_context)?;
 
         let nbt_buffer = nbt_buffer.into_inner();
 
         // Try to limit any issues with errors mid-write by writing to level.dat_new
         // and then renaming it to level.dat
-        let mut file = env.open_writable_file(&new_dat_path).map_err(add_status_context)?;
+        let mut file = env
+            .open_writable_file(&new_dat_path)
+            .map_err(add_status_context)?;
 
         nbt_io::write_bedrock_header(
-                &mut file,
-                IoOptions::bedrock_uncompressed(),
-                self.version,
-                nbt_buffer.len(),
-            ).map_err(add_nbt_context)?;
+            &mut file,
+            IoOptions::bedrock_uncompressed(),
+            self.version,
+            nbt_buffer.len(),
+        )
+        .map_err(add_nbt_context)?;
 
-        file.write_all(nbt_buffer.as_slice()).map_err(add_io_context)?;
+        file.write_all(nbt_buffer.as_slice())
+            .map_err(add_io_context)?;
 
-        env.rename(&new_dat_path, &dat_path).map_err(add_status_context)?;
+        env.rename(&new_dat_path, &dat_path)
+            .map_err(add_status_context)?;
 
         Ok(())
     }
@@ -311,14 +327,18 @@ pub enum BedrockWorldFileError {
 
 #[inline]
 fn open_from_path<P: AsRef<Path>>(
-    env: &dyn Env, root_path: &Path, rel_path: P,
+    env:       &dyn Env,
+    root_path: &Path,
+    rel_path:  P,
 ) -> Result<Box<dyn Read>, Status> {
     env.open_sequential_file(&root_path.join(rel_path))
 }
 
 #[inline]
 fn write_to_path<P: AsRef<Path>>(
-    env: &dyn Env, root_path: &Path, rel_path: P,
+    env:       &dyn Env,
+    root_path: &Path,
+    rel_path:  P,
 ) -> Result<Box<dyn Write>, Status> {
     env.open_writable_file(&root_path.join(rel_path))
 }

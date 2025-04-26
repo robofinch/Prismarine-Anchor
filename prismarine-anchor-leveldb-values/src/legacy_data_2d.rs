@@ -1,7 +1,7 @@
 use std::array;
 
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
-use zerocopy::{IntoBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 
 /// Not written since 1.0.0
@@ -55,9 +55,9 @@ impl LegacyData2D {
         let biome_ids = transmute!(biome_ids);
 
         let biome_colors: [[[u8; 4]; 16]; 16] = transmute!(biomes);
-        let biome_colors = biome_colors.map(|inner_arr|
+        let biome_colors = biome_colors.map(|inner_arr| {
             inner_arr.map(|[_, red, green, blue]| LegacyBiomeColor { red, green, blue })
-        );
+        });
 
         Some(Self {
             heightmap,
@@ -75,7 +75,7 @@ impl LegacyData2D {
         let biome_colors: [LegacyBiomeColor; 256] = transmute!(self.biome_colors);
 
         let biomes: [[u8; 4]; 256] = array::from_fn(|idx| {
-            let id    = biome_ids[idx];
+            let id = biome_ids[idx];
             let color = biome_colors[idx];
             [id, color.red, color.green, color.blue]
         });
@@ -89,7 +89,7 @@ impl LegacyData2D {
 
 #[derive(IntoBytes, FromBytes, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LegacyBiomeColor {
-    pub red: u8,
+    pub red:   u8,
     pub green: u8,
-    pub blue: u8,
+    pub blue:  u8,
 }

@@ -1,0 +1,32 @@
+# NOTE:
+# The code *is not* formatted by rustfmt, it's mostly manually formatted.
+
+edition = "2021"
+unstable_features = true
+
+ignore = ["prismarine-anchor-editor"]
+
+wrap_comments = true
+comment_width = 100
+format_code_in_doc_comments = true
+format_strings = true
+
+# use_small_heuristics = "Max"
+chain_width = 50
+# fn_call_width = 70
+# struct_lit_width = 20
+# struct_variant_width = 35
+
+blank_lines_upper_bound = 2
+enum_discrim_align_threshold = 20
+struct_field_align_threshold = 20
+
+imports_granularity = "Module"
+group_imports = "Preserve"
+
+format_macro_matchers = true
+skip_macro_invocations = []
+
+hex_literal_case = "Upper"
+use_field_init_shorthand = true
+use_try_shorthand = true

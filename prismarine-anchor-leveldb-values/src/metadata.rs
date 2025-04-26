@@ -8,7 +8,7 @@ use xxhash_rust::xxh64;
 
 use prismarine_anchor_nbt::{NbtCompound, NbtTag};
 use prismarine_anchor_nbt::{
-    io::{read_compound, write_compound, NbtIoError},
+    io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
 
@@ -51,7 +51,6 @@ impl LevelChunkMetaDataDictionary {
     }
 
     pub fn parse(value: &[u8]) -> Result<Self, MetaDataParseError> {
-
         if value.len() < 4 {
             return Err(MetaDataParseError::NoHeader);
         }
@@ -70,10 +69,7 @@ impl LevelChunkMetaDataDictionary {
             let hash = u64::from_le_bytes(hash);
 
             // MetaData stored as an NBT is the value
-            let (nbt, _) = read_compound(
-                &mut reader,
-                IoOptions::bedrock_uncompressed(),
-            )?;
+            let (nbt, _) = read_compound(&mut reader, IoOptions::bedrock_uncompressed())?;
             let metadata = MetaData::from(nbt);
 
             // Check that the hash is correct
@@ -83,15 +79,14 @@ impl LevelChunkMetaDataDictionary {
                 return Err(MetaDataParseError::IncorrectHash {
                     computed: computed_hash,
                     received: hash,
-                })
+                });
             }
 
             // println!("Checking for duplicate...");
             // Reject if there's a duplicate hash
-            let None = map.insert(hash, metadata) else {
-                return Err(MetaDataParseError::DuplicateHash(hash))
-            };
-
+            if map.insert(hash, metadata).is_some() {
+                return Err(MetaDataParseError::DuplicateHash(hash));
+            }
         }
 
         // println!("Checking for excess...");
@@ -105,12 +100,11 @@ impl LevelChunkMetaDataDictionary {
 
     fn len(&self, error_on_excessive_length: bool) -> Result<(u32, usize), MetaDataWriteError> {
         if size_of::<usize>() >= size_of::<u32>() {
-
             let len = match u32::try_from(self.0.len()) {
                 Ok(len) => len,
                 Err(_) => {
                     if error_on_excessive_length {
-                        return Err(MetaDataWriteError::DictionaryLength)
+                        return Err(MetaDataWriteError::DictionaryLength);
                     } else {
                         u32::MAX
                     }
@@ -125,15 +119,22 @@ impl LevelChunkMetaDataDictionary {
         }
     }
 
-    pub fn to_bytes(&self, error_on_excessive_length: bool) -> Result<Vec<u8>, MetaDataWriteError> {
+    pub fn to_bytes(
+        &self,
+        error_on_excessive_length: bool,
+    ) -> Result<Vec<u8>, MetaDataWriteError> {
         let (len, len_usize) = self.len(error_on_excessive_length)?;
 
         let mut writer = Cursor::new(Vec::new());
-        writer.write_all(&len.to_le_bytes()).expect("Cursor IO doesn't fail");
+        writer
+            .write_all(&len.to_le_bytes())
+            .expect("Cursor IO doesn't fail");
 
         for (hash, nbt) in self.0.iter().take(len_usize) {
             let nbt = nbt.clone().into();
-            writer.write_all(&hash.to_le_bytes()).expect("Cursor IO doesn't fail");
+            writer
+                .write_all(&hash.to_le_bytes())
+                .expect("Cursor IO doesn't fail");
 
             // Could only fail on invalid NBT.
             write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
@@ -142,15 +143,22 @@ impl LevelChunkMetaDataDictionary {
         Ok(writer.into_inner())
     }
 
-    pub fn into_bytes(self, error_on_excessive_length: bool) -> Result<Vec<u8>, MetaDataWriteError> {
+    pub fn into_bytes(
+        self,
+        error_on_excessive_length: bool,
+    ) -> Result<Vec<u8>, MetaDataWriteError> {
         let (len, len_usize) = self.len(error_on_excessive_length)?;
 
         let mut writer = Cursor::new(Vec::new());
-        writer.write_all(&len.to_le_bytes()).expect("Cursor IO doesn't fail");
+        writer
+            .write_all(&len.to_le_bytes())
+            .expect("Cursor IO doesn't fail");
 
         for (hash, nbt) in self.0.into_iter().take(len_usize) {
             let nbt = nbt.into();
-            writer.write_all(&hash.to_le_bytes()).expect("Cursor IO doesn't fail");
+            writer
+                .write_all(&hash.to_le_bytes())
+                .expect("Cursor IO doesn't fail");
 
             // Could only fail on invalid NBT.
             write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
@@ -201,7 +209,10 @@ impl MetaData {
 }
 
 impl From<NbtCompound> for MetaData {
-    #[expect(clippy::too_many_lines, reason = "it's well-organized into helper macros")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "it's well-organized into helper macros",
+    )]
     fn from(mut value: NbtCompound) -> Self {
 
         let mut unrecognized: BTreeMap<String, NbtTag> = BTreeMap::new();
@@ -232,69 +243,64 @@ impl From<NbtCompound> for MetaData {
                         );
                         None
                     }
-                    None => None
+                    None => None,
                 }
             };
         }
 
         macro_rules! try_from_take_meta {
             ($meta:ident, $tag:ident) => {
-                take_meta!($meta, $tag)
-                    .and_then(|tag_inner| match $meta::try_from(tag_inner) {
-                        Ok(meta) => Some(meta),
-                        Err(_) => {
-                            unrecognized.insert(
-                                <&str>::from(MetaDataType::$meta).to_owned(),
-                                NbtTag::$tag(tag_inner),
-                            );
-                            None
-                        }
-                    })
+                take_meta!($meta, $tag).and_then(|tag_inner| match $meta::try_from(tag_inner) {
+                    Ok(meta) => Some(meta),
+                    Err(_) => {
+                        unrecognized.insert(
+                            <&str>::from(MetaDataType::$meta).to_owned(),
+                            NbtTag::$tag(tag_inner),
+                        );
+                        None
+                    }
+                })
             };
         }
 
         macro_rules! take_short_flag {
-            ($meta:ident) => {
-                {
-                    let flag = take_meta!($meta, Short);
-                    if let Some(flag) = flag {
-                        if flag == 0 {
-                            Some(false)
-                        } else if flag == 1 {
-                            Some(true)
-                        } else {
-                            unrecognized.insert(
-                                <&str>::from(MetaDataType::$meta).to_owned(),
-                                NbtTag::Short(flag),
-                            );
-                            None
-                        }
+            ($meta:ident) => {{
+                let flag = take_meta!($meta, Short);
+                if let Some(flag) = flag {
+                    if flag == 0 {
+                        Some(false)
+                    } else if flag == 1 {
+                        Some(true)
                     } else {
+                        unrecognized.insert(
+                            <&str>::from(MetaDataType::$meta).to_owned(),
+                            NbtTag::Short(flag),
+                        );
                         None
                     }
+                } else {
+                    None
                 }
-            };
+            }};
         }
 
         macro_rules! take_range {
-            ($meta:ident) => {
-                {
-                    let range = take_meta!($meta, Compound);
-                    if let Some(compound) = range {
-                        if let Some((min, max)) = parse_range(&compound) {
-                            Some(min..max)
-                        } else {
-                            unrecognized.insert(
-                                <&str>::from(MetaDataType::$meta).to_owned(),
-                                NbtTag::Compound(compound),
-                            );
-                            None
-                        }
+            ($meta:ident) => {{
+                let range = take_meta!($meta, Compound);
+                if let Some(compound) = range {
+                    if let Some((min, max)) = parse_range(&compound) {
+                        Some(min..max)
                     } else {
+                        unrecognized.insert(
+                            <&str>::from(MetaDataType::$meta).to_owned(),
+                            NbtTag::Compound(compound),
+                        );
                         None
                     }
+                } else {
+                    None
                 }
-            };
+            }};
         }
 
         let last_saved_base_game_version        = take_meta!(LastSavedBaseGameVersion, String);
@@ -340,7 +346,7 @@ impl From<MetaData> for NbtCompound {
         let mut compound = value.unrecognized;
 
         macro_rules! add_meta {
-            ($val:expr, $meta:ident, $tag:ident) => {
+            ($val:expr, $meta:ident, $tag:ident $(,)?) => {
                 if let Some(tag_inner) = $val {
                     compound.insert(
                         <&str>::from(MetaDataType::$meta).to_owned(),
@@ -392,7 +398,7 @@ impl From<MetaData> for NbtCompound {
         add_meta!(value.biome_base_game_version, BiomeBaseGameVersion, String);
         add_meta!(
             value.dimension_name.map(|dimension| dimension.as_bedrock_name().to_owned()),
-            DimensionName, String
+            DimensionName, String,
         );
         add_meta!(value.generation_seed.map(|seed| seed as i64), GenerationSeed, Long);
         add_meta_from!(value.generator_type, GeneratorType, Int);
@@ -516,10 +522,7 @@ pub enum MetaDataParseError {
         "a metadata entry with hash key {} was received, but its hash was computed as {}",
         received, computed,
     )]
-    IncorrectHash {
-        computed: u64,
-        received: u64,
-    },
+    IncorrectHash { computed: u64, received: u64 },
     #[error(transparent)]
     HashError(#[from] MetaDataHashError),
     #[error("NBT error while parsing metadata dictionary: {0}")]
@@ -539,5 +542,5 @@ pub enum MetaDataWriteError {
 #[derive(Error, Debug)]
 pub enum MetaDataHashError {
     #[error("error while writing metadata to NBT to compute its xxhash64 hash: {0}")]
-    NbtError(#[from] NbtIoError)
+    NbtError(#[from] NbtIoError),
 }

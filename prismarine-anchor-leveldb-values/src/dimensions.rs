@@ -155,7 +155,7 @@ impl VanillaDimension {
             0  => Some(Self::Overworld),
             -1 => Some(Self::Nether),
             1  => Some(Self::End),
-            _ => None,
+            _  => None,
         }
     }
 

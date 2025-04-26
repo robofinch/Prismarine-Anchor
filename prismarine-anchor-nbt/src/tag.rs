@@ -2,20 +2,16 @@
 pub mod comparable;
 
 
+use std::borrow::{Borrow, BorrowMut, Cow};
 use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
-use std::{
-    borrow::{Borrow, BorrowMut, Cow},
-    fmt::{Debug, Display, Formatter},
-    ops::{Deref, DerefMut, Index, IndexMut},
-};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
+use crate::repr::{NbtReprError, NbtStructureError};
+use crate::settings::{EscapeSequence, SnbtParseOptions, SnbtWriteOptions, WriteNonFinite};
+use crate::snbt::{SnbtError, allowed_unquoted, is_ambiguous, starts_unquoted_number};
 use crate::{raw, snbt};
-use crate::{
-    repr::{NbtReprError, NbtStructureError},
-    settings::{EscapeSequence, SnbtParseOptions, SnbtWriteOptions, WriteNonFinite},
-    snbt::{allowed_unquoted, is_ambiguous, SnbtError, starts_unquoted_number},
-};
 
 
 /// The hash map type utilized in this crate.
@@ -113,10 +109,10 @@ impl NbtTag {
     #[inline]
     pub fn type_specifier(&self) -> Option<&'static str> {
         match self {
-            Self::Short(_)    => Some("S"),
-            Self::Float(_)    => Some("F"),
-            Self::Double(_)   => Some("D"),
-            Self::IntArray(_) => Some("I"),
+            Self::Short(_)                     => Some("S"),
+            Self::Float(_)                     => Some("F"),
+            Self::Double(_)                    => Some("D"),
+            Self::IntArray(_)                  => Some("I"),
             Self::Byte(_) | Self::ByteArray(_) => Some("B"),
             Self::Long(_) | Self::LongArray(_) => Some("L"),
             // Note that in particular, `Self::Int` has no type specifier.
@@ -259,7 +255,7 @@ impl NbtTag {
         // If any of the characters aren't allowed to be unquoted, then the string must
         // be quoted
         for ch in string.chars() {
-            if !allowed_unquoted(ch)  {
+            if !allowed_unquoted(ch) {
                 return true;
             }
         }
@@ -295,21 +291,29 @@ impl NbtTag {
                 _ if ch == surrounding || ch == '\\' => snbt_string.push('\\'),
 
                 // Escapes to these characters aren't applied unless directly enabled
-                '\n' => if escapes.is_enabled(EscapeSequence::N) {
-                    snbt_string.push_str("\\n");
-                    continue;
+                '\n' => {
+                    if escapes.is_enabled(EscapeSequence::N) {
+                        snbt_string.push_str("\\n");
+                        continue;
+                    }
                 }
-                '\r' => if escapes.is_enabled(EscapeSequence::R) {
-                    snbt_string.push_str("\\r");
-                    continue;
+                '\r' => {
+                    if escapes.is_enabled(EscapeSequence::R) {
+                        snbt_string.push_str("\\r");
+                        continue;
+                    }
                 }
-                ' ' => if escapes.is_enabled(EscapeSequence::S) {
-                    snbt_string.push_str("\\s");
-                    continue;
+                ' ' => {
+                    if escapes.is_enabled(EscapeSequence::S) {
+                        snbt_string.push_str("\\s");
+                        continue;
+                    }
                 }
-                '\t' => if escapes.is_enabled(EscapeSequence::T) {
-                    snbt_string.push_str("\\t");
-                    continue;
+                '\t' => {
+                    if escapes.is_enabled(EscapeSequence::T) {
+                        snbt_string.push_str("\\t");
+                        continue;
+                    }
                 }
 
                 // Note the slight difference in syntax; these characters could be escaped
@@ -323,22 +327,24 @@ impl NbtTag {
                     continue;
                 }
 
-                _ => if !ch.is_ascii_graphic() {
-                    let num = format!("{:x}", ch as u32);
-                    // Note that each hex digit has a length of 1 byte
-                    snbt_string.push_str(match num.len() {
-                        1 => "\\x0",
-                        2 => "\\x",
-                        3 => "\\u0",
-                        4 => "\\u",
-                        5 => "\\U000",
-                        6 => "\\U00",
-                        7 => "\\U0",
-                        // 0 and strictly greater than 8 are impossible,
-                        // but might as well throw them in this case.
-                        _ => "\\U",
-                    });
-                    snbt_string.push_str(&num);
+                _ => {
+                    if !ch.is_ascii_graphic() {
+                        let num = format!("{:x}", ch as u32);
+                        // Note that each hex digit has a length of 1 byte
+                        snbt_string.push_str(match num.len() {
+                            1 => "\\x0",
+                            2 => "\\x",
+                            3 => "\\u0",
+                            4 => "\\u",
+                            5 => "\\U000",
+                            6 => "\\U00",
+                            7 => "\\U0",
+                            // 0 and strictly greater than 8 are impossible,
+                            // but might as well throw them in this case.
+                            _ => "\\U",
+                        });
+                        snbt_string.push_str(&num);
+                    }
                 }
             }
             snbt_string.push(ch);
@@ -363,20 +369,19 @@ impl NbtTag {
     // TODO: fix too_many_lines lint, and break parts of this into separate functions
     fn recursively_format_snbt(
         &self,
-        indent: &mut String,
-        f: &mut Formatter<'_>,
+        indent:        &mut String,
+        f:             &mut Formatter<'_>,
         current_depth: u32,
-        opts: SnbtWriteOptions,
+        opts:          SnbtWriteOptions,
     ) -> fmt::Result {
-
         // impl Display is fine, since this is an internal function and we don't
         // end up needing turbofish
         // #[expect(clippy::impl_trait_in_params, reason = "internal function")]
         fn write_list(
-            list: &[impl Display],
+            list:   &[impl Display],
             indent: &mut String,
-            ts: &str,
-            f: &mut Formatter<'_>,
+            ts:     &str,
+            f:      &mut Formatter<'_>,
         ) -> fmt::Result {
             if list.is_empty() {
                 return write!(f, "[{ts};]");
@@ -417,7 +422,11 @@ impl NbtTag {
         // end up needing turbofish
         // #[expect(clippy::impl_trait_in_params, reason = "internal function")]
         #[inline]
-        fn write(value: &impl Display, ts: Option<&str>, f: &mut Formatter<'_>) -> fmt::Result {
+        fn write(
+            value: &impl Display,
+            ts:    Option<&str>,
+            f:     &mut Formatter<'_>,
+        ) -> fmt::Result {
             match ts {
                 Some(ts) => {
                     Display::fmt(value, f)?;
@@ -439,11 +448,7 @@ impl NbtTag {
                     let float = if value.is_finite() {
                         value
                     } else if value.is_infinite() {
-                        if *value > 0. {
-                            &f32::MAX
-                        } else {
-                            &f32::MIN
-                        }
+                        if *value > 0. { &f32::MAX } else { &f32::MIN }
                     } else {
                         &f32::NAN
                     };
@@ -465,17 +470,13 @@ impl NbtTag {
                         write(&string, ts, f)
                     }
                 }
-            }
+            },
             Self::Double(value) => match opts.non_finite {
                 WriteNonFinite::PrintFloats => {
                     let float = if value.is_finite() {
                         value
                     } else if value.is_infinite() {
-                        if *value > 0. {
-                            &f64::MAX
-                        } else {
-                            &f64::MIN
-                        }
+                        if *value > 0. { &f64::MAX } else { &f64::MIN }
                     } else {
                         &f64::NAN
                     };
@@ -497,11 +498,11 @@ impl NbtTag {
                         write(&string, ts, f)
                     }
                 }
-            }
+            },
             // TODO: doesn't there need to be a type suffix on each element in write_list,
             // not just the header (at least in the older version?)
-            Self::ByteArray(value) => write_list(value, indent, ts.unwrap(), f),
-            Self::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
+            Self::ByteArray(value)  => write_list(value, indent, ts.unwrap(), f),
+            Self::String(value)     => write!(f, "{}", Self::string_to_snbt(value, opts)),
             Self::ByteString(value) => {
                 if let Ok(string) = String::from_utf8(value.clone()) {
                     write!(f, "{}", Self::string_to_snbt(&string, opts))
@@ -513,42 +514,46 @@ impl NbtTag {
                     write_list(value, indent, "ByteString", f)
                 }
             }
-            Self::List(value) => if current_depth >= opts.depth_limit.0 {
-                // Converting to a string should be infallible; we can't simply error out.
-                // Instead, unfortunately, we must just print something that
-                // hopefully indicates the issue.
+            Self::List(value) => {
+                if current_depth >= opts.depth_limit.0 {
+                    // Converting to a string should be infallible; we can't simply error out.
+                    // Instead, unfortunately, we must just print something that
+                    // hopefully indicates the issue.
 
-                // Note that depths 0 ..= depth_limit.0 are the valid depths.
-                // if depth == depth_limit.limit, then this is the last depth level
-                // we are allowed to write anything to. If the next tag would recurse,
-                // we need to stop here.
-                // (We use >= above instead of == just in case, but > should never occur.)
+                    // Note that depths 0 ..= depth_limit.0 are the valid depths.
+                    // if depth == depth_limit.limit, then this is the last depth level
+                    // we are allowed to write anything to. If the next tag would recurse,
+                    // we need to stop here.
+                    // (We use >= above instead of == just in case, but > should never occur.)
 
-                write!(f, "{}", Self::string_to_snbt(
-                    &format!(
+                    let err_msg_str = format!(
                         "Depth limit of {} reached; could not add List tag",
-                        opts.depth_limit.0
-                    ),
-                    opts,
-                ))
-            } else {
-                // Note that List and Compound increment current_depth for their child members,
-                // so incrementing it here would be a logic error.
-                // Conceptually, current_depth is the depth of that list tag,
-                // and that list tag *is* the current NbtTag, more or less.
-                value.recursively_format_snbt(indent, f, current_depth, opts)
-            },
-            Self::Compound(value) => if current_depth >= opts.depth_limit.0 {
-                write!(f, "{}", Self::string_to_snbt(
-                    &format!(
+                        opts.depth_limit.0,
+                    );
+                    let err_msg_tag = Self::string_to_snbt(&err_msg_str, opts);
+
+                    write!(f, "{err_msg_tag}")
+                } else {
+                    // Note that List and Compound increment current_depth for their child members,
+                    // so incrementing it here would be a logic error.
+                    // Conceptually, current_depth is the depth of that list tag,
+                    // and that list tag *is* the current NbtTag, more or less.
+                    value.recursively_format_snbt(indent, f, current_depth, opts)
+                }
+            }
+            Self::Compound(value) => {
+                if current_depth >= opts.depth_limit.0 {
+                    let err_msg_str = format!(
                         "Depth limit of {} reached; could not add Compound tag",
-                        opts.depth_limit.0
-                    ),
-                    opts,
-                ))
-            } else {
-                value.recursively_format_snbt(indent, f, current_depth, opts)
-            },
+                        opts.depth_limit.0,
+                    );
+                    let err_msg_tag = Self::string_to_snbt(&err_msg_str, opts);
+
+                    write!(f, "{err_msg_tag}")
+                } else {
+                    value.recursively_format_snbt(indent, f, current_depth, opts)
+                }
+            }
             Self::IntArray(value)  => write_list(value, indent, ts.unwrap(), f),
             Self::LongArray(value) => write_list(value, indent, ts.unwrap(), f),
         }
@@ -557,7 +562,7 @@ impl NbtTag {
 
 // Implement the from trait for all the tag's internal types
 macro_rules! tag_from {
-    ($($type:ty, $tag:ident);*) => {
+    ($($type:ty, $tag:ident);* $(;)?) => {
         $(
             impl From<$type> for NbtTag {
                 #[inline]
@@ -570,18 +575,18 @@ macro_rules! tag_from {
 }
 
 tag_from!(
-    i8, Byte;
+    i8,  Byte;
     i16, Short;
     i32, Int;
     i64, Long;
     f32, Float;
     f64, Double;
-    Vec<i8>, ByteArray;
-    String, String;
-    NbtList, List;
+    Vec<i8>,     ByteArray;
+    String,      String;
+    NbtList,     List;
     NbtCompound, Compound;
-    Vec<i32>, IntArray;
-    Vec<i64>, LongArray
+    Vec<i32>,    IntArray;
+    Vec<i64>,    LongArray;
 );
 
 impl From<&str> for NbtTag {
@@ -620,7 +625,7 @@ impl From<Vec<u8>> for NbtTag {
 }
 
 macro_rules! prim_from_tag {
-    ($($type:ty, $tag:ident);*) => {
+    ($($type:ty, $tag:ident);* $(;)?) => {
         $(
             impl TryFrom<&NbtTag> for $type {
                 type Error = NbtStructureError;
@@ -639,12 +644,12 @@ macro_rules! prim_from_tag {
 }
 
 prim_from_tag!(
-    i8, Byte;
+    i8,  Byte;
     i16, Short;
     i32, Int;
     i64, Long;
     f32, Float;
-    f64, Double
+    f64, Double;
 );
 
 impl TryFrom<&NbtTag> for bool {
@@ -652,10 +657,10 @@ impl TryFrom<&NbtTag> for bool {
 
     fn try_from(tag: &NbtTag) -> Result<Self, Self::Error> {
         match *tag {
-            NbtTag::Byte(value) => Ok(value != 0),
+            NbtTag::Byte(value)  => Ok(value != 0),
             NbtTag::Short(value) => Ok(value != 0),
-            NbtTag::Int(value) => Ok(value != 0),
-            NbtTag::Long(value) => Ok(value != 0),
+            NbtTag::Int(value)   => Ok(value != 0),
+            NbtTag::Long(value)  => Ok(value != 0),
             _ => Err(NbtStructureError::type_mismatch(
                 "Byte, Short, Int, or Long",
                 tag.tag_name(),
@@ -678,7 +683,7 @@ impl TryFrom<&NbtTag> for u8 {
 }
 
 macro_rules! ref_from_tag {
-    ($($type:ty, $tag:ident);*) => {
+    ($($type:ty, $tag:ident);* $(;)?) => {
         $(
             impl<'a> TryFrom<&'a NbtTag> for &'a $type {
                 type Error = NbtStructureError;
@@ -710,22 +715,22 @@ macro_rules! ref_from_tag {
 }
 
 ref_from_tag!(
-    i8, Byte;
+    i8,  Byte;
     i16, Short;
     i32, Int;
     i64, Long;
     f32, Float;
     f64, Double;
-    Vec<i8>, ByteArray;
-    [i8], ByteArray;
-    String, String;
-    str, String;
-    NbtList, List;
+    Vec<i8>,     ByteArray;
+    [i8],        ByteArray;
+    String,      String;
+    str,         String;
+    NbtList,     List;
     NbtCompound, Compound;
-    Vec<i32>, IntArray;
-    [i32], IntArray;
-    Vec<i64>, LongArray;
-    [i64], LongArray
+    Vec<i32>,    IntArray;
+    [i32],       IntArray;
+    Vec<i64>,    LongArray;
+    [i64],       LongArray;
 );
 
 impl<'a> TryFrom<&'a NbtTag> for &'a u8 {
@@ -758,7 +763,7 @@ impl<'a> TryFrom<&'a NbtTag> for &'a [u8] {
 }
 
 macro_rules! from_tag {
-    ($($type:ty, $tag:ident);*) => {
+    ($($type:ty, $tag:ident);* $(;)?) => {
         $(
             impl TryFrom<NbtTag> for $type {
                 type Error = NbtStructureError;
@@ -777,18 +782,18 @@ macro_rules! from_tag {
 }
 
 from_tag!(
-    i8, Byte;
+    i8,  Byte;
     i16, Short;
     i32, Int;
     i64, Long;
     f32, Float;
     f64, Double;
-    Vec<i8>, ByteArray;
-    String, String;
-    NbtList, List;
+    Vec<i8>,     ByteArray;
+    String,      String;
+    NbtList,     List;
     NbtCompound, Compound;
-    Vec<i32>, IntArray;
-    Vec<i64>, LongArray
+    Vec<i32>,    IntArray;
+    Vec<i64>,    LongArray;
 );
 
 impl TryFrom<NbtTag> for Vec<u8> {
@@ -851,7 +856,11 @@ impl NbtList {
         T: Clone + Into<NbtTag> + 'a,
         L: IntoIterator<Item = &'a T>,
     {
-        Self(list.into_iter().map(|x| x.clone().into()).collect())
+        Self(
+            list.into_iter()
+                .map(|x| x.clone().into())
+                .collect(),
+        )
     }
 
     /// Iterates over this tag list, converting each tag reference into the specified type.
@@ -862,8 +871,9 @@ impl NbtList {
         self.0.iter().map(|tag| T::try_from(tag))
     }
 
-    /// Iterates over mutable references to the tags in this list, converting each tag reference into
-    /// the specified type. See [`iter_map`](crate::tag::NbtList::iter_map) for usage details.
+    /// Iterates over mutable references to the tags in this list, converting each tag reference
+    /// into the specified type. See [`iter_map`](crate::tag::NbtList::iter_map) for usage
+    /// details.
     #[inline]
     pub fn iter_mut_map<'a, T: TryFrom<&'a mut NbtTag>>(
         &'a mut self,
@@ -894,7 +904,7 @@ impl NbtList {
     /// [`to_snbt`]: crate::tag::NbtTag::to_snbt
     #[cfg(feature = "configurable_depth")]
     pub fn to_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:?}", ListWithOptions::new(&self, opts))
+        format!("{:?}", ListWithOptions::new(self, opts))
     }
 
     /// Converts this tag list into a valid SNBT string with extra spacing for readability.
@@ -903,7 +913,7 @@ impl NbtList {
     /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
     #[cfg(feature = "configurable_depth")]
     pub fn to_pretty_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:#?}", ListWithOptions::new(&self, opts))
+        format!("{:#?}", ListWithOptions::new(self, opts))
     }
 
     /// Returns the length of this list.
@@ -1000,10 +1010,10 @@ impl NbtList {
     #[expect(clippy::write_with_newline)]
     fn recursively_format_snbt(
         &self,
-        indent: &mut String,
-        f: &mut Formatter<'_>,
+        indent:        &mut String,
+        f:             &mut Formatter<'_>,
         current_depth: u32,
-        opts: SnbtWriteOptions,
+        opts:          SnbtWriteOptions,
     ) -> fmt::Result {
         if self.is_empty() {
             return write!(f, "[]");
@@ -1024,7 +1034,7 @@ impl NbtList {
 
             // Conceptually, current_depth is the depth of this List itself;
             // its elements are one recursive tag deeper.
-            element.recursively_format_snbt(indent, f, current_depth+1, opts)?;
+            element.recursively_format_snbt(indent, f, current_depth + 1, opts)?;
 
             if index != last_index {
                 if f.alternate() {
@@ -1215,7 +1225,8 @@ impl NbtCompound {
         }
     }
 
-    /// Clones the data in the given map and converts it into an [`NbtCompound`](crate::tag::NbtCompound).
+    /// Clones the data in the given map and converts it into an
+    /// [`NbtCompound`](crate::tag::NbtCompound).
     #[inline]
     pub fn clone_from<'a, K, V, M>(map: &'a M) -> Self
     where
@@ -1230,9 +1241,9 @@ impl NbtCompound {
         )
     }
 
-    /// Iterates over this tag compound, converting each tag reference into the specified type. Each key is
-    /// paired with the result of the attempted conversion into the specified type. The iterator will not
-    /// terminate even if some conversions fail.
+    /// Iterates over this tag compound, converting each tag reference into the specified type. Each
+    /// key is paired with the result of the attempted conversion into the specified type. The
+    /// iterator will not terminate even if some conversions fail.
     #[inline]
     pub fn iter_map<'a, T: TryFrom<&'a NbtTag>>(
         &'a self,
@@ -1242,8 +1253,8 @@ impl NbtCompound {
             .map(|(key, tag)| (key.as_str(), T::try_from(tag)))
     }
 
-    /// Iterates over this tag compound, converting each mutable tag reference into the specified type. See
-    /// [`iter_map`](crate::tag::NbtCompound::iter_map) for details.
+    /// Iterates over this tag compound, converting each mutable tag reference into the specified
+    /// type. See [`iter_map`](crate::tag::NbtCompound::iter_map) for details.
     #[inline]
     pub fn iter_mut_map<'a, T: TryFrom<&'a mut NbtTag>>(
         &'a mut self,
@@ -1275,7 +1286,7 @@ impl NbtCompound {
     /// [`to_snbt`]: crate::tag::NbtTag::to_snbt
     #[cfg(feature = "configurable_depth")]
     pub fn to_snbt_with_limit(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:?}", CompoundWithOptions::new(&self, opts))
+        format!("{:?}", CompoundWithOptions::new(self, opts))
     }
 
     /// Converts this tag compound into a valid SNBT string with extra spacing for readability.
@@ -1284,7 +1295,7 @@ impl NbtCompound {
     /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
     #[cfg(feature = "configurable_depth")]
     pub fn to_pretty_snbt_with_options(&self, opts: SnbtWriteOptions) -> String {
-        format!("{:#?}", CompoundWithOptions::new(&self, opts))
+        format!("{:#?}", CompoundWithOptions::new(self, opts))
     }
 
     /// Returns the number of tags in this compound.
@@ -1433,12 +1444,11 @@ impl NbtCompound {
     #[expect(clippy::write_with_newline)]
     fn recursively_format_snbt(
         &self,
-        indent: &mut String,
-        f: &mut Formatter<'_>,
+        indent:        &mut String,
+        f:             &mut Formatter<'_>,
         current_depth: u32,
-        opts: SnbtWriteOptions,
+        opts:          SnbtWriteOptions,
     ) -> fmt::Result {
-
         if self.is_empty() {
             return write!(f, "{{}}");
         }
@@ -1462,7 +1472,7 @@ impl NbtCompound {
 
             // Conceptually, current_depth is the depth of this Compound itself;
             // its elements are one recursive tag deeper.
-            value.recursively_format_snbt(indent, f, current_depth+1, opts)?;
+            value.recursively_format_snbt(indent, f, current_depth + 1, opts)?;
 
             if index != last_index {
                 if f.alternate() {
@@ -1547,7 +1557,7 @@ impl Extend<(String, NbtTag)> for NbtCompound {
 }
 
 macro_rules! display_and_debug {
-    ($tag:ty, $name: ident) => {
+    ($tag:ty, $name:ident) => {
         impl Display for $tag {
             #[inline]
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1563,8 +1573,8 @@ macro_rules! display_and_debug {
         }
 
         pub struct $name<'a> {
-            tag: &'a $tag,
-            opts: SnbtWriteOptions
+            tag:  &'a $tag,
+            opts: SnbtWriteOptions,
         }
 
         impl<'a> $name<'a> {
@@ -1589,40 +1599,43 @@ macro_rules! display_and_debug {
     };
 }
 
-display_and_debug!(NbtTag, TagWithOptions);
-display_and_debug!(NbtList, ListWithOptions);
+display_and_debug!(NbtTag,      TagWithOptions);
+display_and_debug!(NbtList,     ListWithOptions);
 display_and_debug!(NbtCompound, CompoundWithOptions);
 
 
 #[cfg(feature = "serde")]
 mod serde_impl {
-    use super::*;
-    use crate::serde::{Array, TypeHint};
-    use serde::{
-        de::{self, MapAccess, Visitor},
-        Deserialize,
-        Deserializer,
-        Serialize,
-        Serializer,
+    use serde::de;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::de::{MapAccess, Visitor};
+
+    use crate::{
+        raw::{BYTE_ARRAY_ID, INT_ARRAY_ID, LIST_ID, LONG_ARRAY_ID},
+        serde::{Array, TypeHint},
     };
+    use super::*;
+
 
     impl Serialize for NbtTag {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             match self {
-                &NbtTag::Byte(value)       => serializer.serialize_i8(value),
-                &NbtTag::Short(value)      => serializer.serialize_i16(value),
-                &NbtTag::Int(value)        => serializer.serialize_i32(value),
-                &NbtTag::Long(value)       => serializer.serialize_i64(value),
-                &NbtTag::Float(value)      => serializer.serialize_f32(value),
-                &NbtTag::Double(value)     => serializer.serialize_f64(value),
-                NbtTag::ByteArray(array)   => Array::from(array).serialize(serializer),
-                NbtTag::ByteString(array)  => Array::from(array).serialize(serializer),
-                NbtTag::String(value)      => serializer.serialize_str(value),
-                NbtTag::List(list)         => list.serialize(serializer),
-                NbtTag::Compound(compound) => compound.serialize(serializer),
-                NbtTag::IntArray(array)    => Array::from(array).serialize(serializer),
-                NbtTag::LongArray(array)   => Array::from(array).serialize(serializer),
+                &Self::Byte(value)       => serializer.serialize_i8(value),
+                &Self::Short(value)      => serializer.serialize_i16(value),
+                &Self::Int(value)        => serializer.serialize_i32(value),
+                &Self::Long(value)       => serializer.serialize_i64(value),
+                &Self::Float(value)      => serializer.serialize_f32(value),
+                &Self::Double(value)     => serializer.serialize_f64(value),
+                Self::ByteArray(array)   => Array::from(array).serialize(serializer),
+                Self::ByteString(array)  => Array::from(array).serialize(serializer),
+                Self::String(value)      => serializer.serialize_str(value),
+                Self::List(list)         => list.serialize(serializer),
+                Self::Compound(compound) => compound.serialize(serializer),
+                Self::IntArray(array)    => Array::from(array).serialize(serializer),
+                Self::LongArray(array)   => Array::from(array).serialize(serializer),
             }
         }
     }
@@ -1630,7 +1643,9 @@ mod serde_impl {
     impl<'de> Deserialize<'de> for NbtTag {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
+        where
+            D: Deserializer<'de>,
+        {
             deserializer.deserialize_any(NbtTagVisitor)
         }
     }
@@ -1645,92 +1660,72 @@ mod serde_impl {
         }
 
         #[inline]
-        fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
             Ok(NbtTag::Byte(if v { 1 } else { 0 }))
         }
 
         #[inline]
-        fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_i8<E: de::Error>(self, v: i8) -> Result<Self::Value, E> {
             Ok(NbtTag::Byte(v))
         }
 
         #[inline]
-        fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_u8<E: de::Error>(self, v: u8) -> Result<Self::Value, E> {
             Ok(NbtTag::Byte(v as i8))
         }
 
         #[inline]
-        fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_i16<E: de::Error>(self, v: i16) -> Result<Self::Value, E> {
             Ok(NbtTag::Short(v))
         }
 
         #[inline]
-        fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_i32<E: de::Error>(self, v: i32) -> Result<Self::Value, E> {
             Ok(NbtTag::Int(v))
         }
 
         #[inline]
-        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
             Ok(NbtTag::Long(v))
         }
 
         #[inline]
-        fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_f32<E: de::Error>(self, v: f32) -> Result<Self::Value, E> {
             Ok(NbtTag::Float(v))
         }
 
         #[inline]
-        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
             Ok(NbtTag::Double(v))
         }
 
         #[inline]
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
             self.visit_byte_buf(v.to_owned())
         }
 
         #[inline]
-        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Self::Value, E> {
             Ok(NbtTag::ByteArray(raw::cast_byte_buf_to_signed(v)))
         }
 
         #[inline]
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
             Ok(NbtTag::String(v.to_owned()))
         }
 
         #[inline]
-        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-        where E: de::Error {
+        fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
             Ok(NbtTag::String(v))
         }
 
         fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where A: MapAccess<'de> {
+        where
+            A: MapAccess<'de>,
+        {
             let mut dest = match map.size_hint() {
-                Some(hint) => {
-                    #[cfg(not(feature = "comparable"))]
-                    {
-                        Map::with_capacity(hint)
-                    }
-                    #[cfg(feature = "comparable")]
-                    {
-                        let _ = hint;
-                        Map::new()
-                    }
-                }
-                None => Map::new(),
+                Some(hint) => Map::with_capacity(hint),
+                None       => Map::new(),
             };
             while let Some((key, tag)) = map.next_entry::<String, NbtTag>()? {
                 dest.insert(key, tag);
@@ -1739,7 +1734,9 @@ mod serde_impl {
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where A: de::SeqAccess<'de> {
+        where
+            A: de::SeqAccess<'de>,
+        {
             enum ArbitraryList {
                 Byte(Vec<i8>),
                 Int(Vec<i32>),
@@ -1751,11 +1748,11 @@ mod serde_impl {
             impl ArbitraryList {
                 fn into_tag(self) -> NbtTag {
                     match self {
-                        ArbitraryList::Byte(list) => NbtTag::ByteArray(list),
-                        ArbitraryList::Int(list) => NbtTag::IntArray(list),
-                        ArbitraryList::Long(list) => NbtTag::LongArray(list),
-                        ArbitraryList::Tag(list) => NbtTag::List(NbtList(list)),
-                        ArbitraryList::Indeterminate => NbtTag::List(NbtList::new()),
+                        Self::Byte(list)    => NbtTag::ByteArray(list),
+                        Self::Int(list)     => NbtTag::IntArray(list),
+                        Self::Long(list)    => NbtTag::LongArray(list),
+                        Self::Tag(list)     => NbtTag::List(NbtList(list)),
+                        Self::Indeterminate => NbtTag::List(NbtList::new()),
                     }
                 }
             }
@@ -1777,41 +1774,60 @@ mod serde_impl {
             while let Some(tag) = seq.next_element::<NbtTag>()? {
                 match (tag, &mut list) {
                     (NbtTag::Byte(value), ArbitraryList::Byte(list)) => list.push(value),
-                    (NbtTag::Int(value), ArbitraryList::Int(list)) => list.push(value),
+                    (NbtTag::Int(value),  ArbitraryList::Int(list))  => list.push(value),
                     (NbtTag::Long(value), ArbitraryList::Long(list)) => list.push(value),
-                    (tag, ArbitraryList::Tag(list)) => list.push(tag),
+                    (tag,                 ArbitraryList::Tag(list))  => list.push(tag),
                     (tag, list @ ArbitraryList::Indeterminate) => {
                         let size = seq.size_hint();
                         match tag {
-                            NbtTag::Byte(value) =>
-                                *list = ArbitraryList::Byte(init_vec(value, size)),
-                            NbtTag::Int(value) => *list = ArbitraryList::Int(init_vec(value, size)),
-                            NbtTag::Long(value) =>
-                                *list = ArbitraryList::Long(init_vec(value, size)),
-                            tag => *list = ArbitraryList::Tag(init_vec(tag, size)),
+                            NbtTag::Byte(value) => {
+                                *list = ArbitraryList::Byte(init_vec(value, size));
+                            }
+                            NbtTag::Int(value) => {
+                                *list = ArbitraryList::Int(init_vec(value, size));
+                            }
+                            NbtTag::Long(value) => {
+                                *list = ArbitraryList::Long(init_vec(value, size));
+                            }
+                            tag => {
+                                *list = ArbitraryList::Tag(init_vec(tag, size));
+                            }
                         }
                     }
-                    _ =>
+                    _ => {
                         return Err(de::Error::custom(
                             "tag type mismatch when deserializing array",
-                        )),
+                        ));
+                    }
                 }
             }
 
             match seq.next_element::<TypeHint>() {
                 Ok(Some(TypeHint { hint: Some(tag_id) })) => match (list, tag_id) {
-                    (ArbitraryList::Byte(list), 0x9) => Ok(NbtTag::List(NbtList(
-                        list.into_iter().map(Into::into).collect(),
-                    ))),
-                    (ArbitraryList::Int(list), 0x9) => Ok(NbtTag::List(NbtList(
-                        list.into_iter().map(Into::into).collect(),
-                    ))),
-                    (ArbitraryList::Long(list), 0x9) => Ok(NbtTag::List(NbtList(
-                        list.into_iter().map(Into::into).collect(),
-                    ))),
-                    (ArbitraryList::Indeterminate, 0x7) => Ok(NbtTag::ByteArray(Vec::new())),
-                    (ArbitraryList::Indeterminate, 0xB) => Ok(NbtTag::IntArray(Vec::new())),
-                    (ArbitraryList::Indeterminate, 0xC) => Ok(NbtTag::LongArray(Vec::new())),
+                    (ArbitraryList::Byte(list), LIST_ID) => {
+                        Ok(NbtTag::List(NbtList(
+                            list.into_iter().map(Into::into).collect(),
+                        )))
+                    }
+                    (ArbitraryList::Int(list), LIST_ID) => {
+                        Ok(NbtTag::List(NbtList(
+                            list.into_iter().map(Into::into).collect(),
+                        )))
+                    }
+                    (ArbitraryList::Long(list), LIST_ID) => {
+                        Ok(NbtTag::List(NbtList(
+                            list.into_iter().map(Into::into).collect(),
+                        )))
+                    }
+                    (ArbitraryList::Indeterminate, BYTE_ARRAY_ID) => {
+                        Ok(NbtTag::ByteArray(Vec::new()))
+                    }
+                    (ArbitraryList::Indeterminate, INT_ARRAY_ID)  => {
+                        Ok(NbtTag::IntArray(Vec::new()))
+                    }
+                    (ArbitraryList::Indeterminate, LONG_ARRAY_ID) => {
+                        Ok(NbtTag::LongArray(Vec::new()))
+                    }
                     (list, _) => Ok(list.into_tag()),
                 },
                 _ => Ok(list.into_tag()),
@@ -1822,7 +1838,9 @@ mod serde_impl {
     impl Serialize for NbtList {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             self.0.serialize(serializer)
         }
     }
@@ -1830,15 +1848,19 @@ mod serde_impl {
     impl<'de> Deserialize<'de> for NbtList {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
-            Ok(NbtList(Deserialize::deserialize(deserializer)?))
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(Self(Deserialize::deserialize(deserializer)?))
         }
     }
 
     impl Serialize for NbtCompound {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             self.0.serialize(serializer)
         }
     }
@@ -1846,8 +1868,10 @@ mod serde_impl {
     impl<'de> Deserialize<'de> for NbtCompound {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
-            Ok(NbtCompound(Deserialize::deserialize(deserializer)?))
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(Self(Deserialize::deserialize(deserializer)?))
         }
     }
 }

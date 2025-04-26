@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use prismarine_anchor_nbt::snbt::VerifiedSnbt;
 use prismarine_anchor_translation::datatypes::BlockProperty;
 
 use super::{
-   block_property_from_str, MappingParseError, MappingParseOptions,
-    NamespacedIdentifier, PropertyName, PropertyNameBoxed, PropertyNameStr, Snbt,
+    block_property_from_str,
+    MappingParseError, MappingParseOptions, NamespacedIdentifier,
+    PropertyName, PropertyNameBoxed, PropertyNameStr,
+    Snbt,
 };
 
 
@@ -15,7 +17,7 @@ use super::{
 #[derive(Debug)]
 pub struct SpecificationFile {
     properties_and_defaults: HashMap<PropertyNameBoxed, (Vec<BlockProperty>, usize)>,
-    snbt: Option<(NamespacedIdentifier, VerifiedSnbt)>,
+    snbt:                    Option<(NamespacedIdentifier, VerifiedSnbt)>,
 }
 
 impl SpecificationFile {
@@ -37,9 +39,7 @@ impl SpecificationFile {
 
     /// Deserialize a Specification JSON file into a more workable Rust version.
     #[inline]
-    pub fn from_json(
-        json: &str, opts: MappingParseOptions,
-    ) -> Result<Self, MappingParseError> {
+    pub fn from_json(json: &str, opts: MappingParseOptions) -> Result<Self, MappingParseError> {
         parse_specification_file(serde_json::from_str(json)?, opts)
     }
 }
@@ -47,63 +47,77 @@ impl SpecificationFile {
 /// A not-yet-validated specification file
 #[derive(Serialize, Deserialize)]
 struct SpecificationJson {
-    properties: Option<HashMap<PropertyName, Vec<String>>>,
-    defaults: Option<HashMap<PropertyName, String>>,
+    properties:     Option<HashMap<PropertyName, Vec<String>>>,
+    defaults:       Option<HashMap<PropertyName, String>>,
     nbt_identifier: Option<Vec<String>>,
-    snbt: Option<Snbt>,
+    snbt:           Option<Snbt>,
 }
 
 fn parse_specification_file(
-    json: SpecificationJson, opts: MappingParseOptions,
+    json: SpecificationJson,
+    opts: MappingParseOptions,
 ) -> Result<SpecificationFile, MappingParseError> {
-
     let properties = json.properties.unwrap_or_default();
     let defaults = json.defaults.unwrap_or_default();
 
     let mut properties: HashMap<PropertyNameBoxed, (Vec<BlockProperty>, usize)> = properties
-        .into_iter().map(|(property, values)| {
-
-            let snbt_values = values.into_iter().map(|value| {
-                block_property_from_str(&value, &property, opts)
-            }).collect::<Result<Vec<BlockProperty>, MappingParseError>>()?;
+        .into_iter()
+        .map(|(property, values)| {
+            let snbt_values = values
+                .into_iter()
+                .map(|value| block_property_from_str(&value, &property, opts))
+                .collect::<Result<Vec<BlockProperty>, MappingParseError>>()?;
 
             Ok((property.into_boxed_str(), (snbt_values, 0)))
-        }).collect::<Result<_,MappingParseError>>()?;
+        })
+        .collect::<Result<_, MappingParseError>>()?;
 
     let mut defaults: HashMap<PropertyName, BlockProperty> = defaults
-        .into_iter().map(|(property, value)| {
+        .into_iter()
+        .map(|(property, value)| {
             let property_value = block_property_from_str(&value, &property, opts)?;
             Ok((property, property_value))
-        }).collect::<Result<_, MappingParseError>>()?;
+        })
+        .collect::<Result<_, MappingParseError>>()?;
 
-    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "order could only impact what error is thrown",
+    )]
     for key in properties.keys() {
         if !defaults.contains_key(&**key) {
             return Err(MappingParseError::MissingDefault(key.to_string()));
         }
     }
 
-    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "order could only impact what error is thrown",
+    )]
     for key in defaults.keys() {
         if !properties.contains_key(&**key) {
             return Err(MappingParseError::ExtraDefault(key.clone()));
         }
     }
 
-    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "order could only impact what error is thrown",
+    )]
     for (property, (values, index)) in &mut properties {
-        let default_value = defaults.remove(&**property)
+        let default_value = defaults
+            .remove(&**property)
             .expect("Every property was confirmed to have a default");
-        let default_index = values.iter().position(|x| {
-            *x == default_value
-        });
+        let default_index = values.iter().position(|x| *x == default_value);
 
         match default_index {
             Some(default_index) => *index = default_index,
-            None => return Err(MappingParseError::InvalidDefault {
-                property: property.to_string(),
-                invalid_value: default_value,
-            })
+            None => {
+                return Err(MappingParseError::InvalidDefault {
+                    property:      property.to_string(),
+                    invalid_value: default_value,
+                });
+            }
         }
     }
 
@@ -125,11 +139,11 @@ fn parse_specification_file(
                     namespace: identifier.next().unwrap().into_boxed_str(),
                     path:      identifier.next().unwrap().into_boxed_str(),
                 },
-                snbt
+                snbt,
             ))
         }
         (None, None) => None,
-        _ => return Err(MappingParseError::SnbtXorIdentifier)
+        _ => return Err(MappingParseError::SnbtXorIdentifier),
     };
 
     Ok(SpecificationFile {

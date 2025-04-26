@@ -81,6 +81,7 @@ pub mod position_tracking;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
 
+
 /// Compare a reader's position to the total length of data that was expected to be read,
 /// to check if everything was read.
 #[cfg(any(
@@ -91,7 +92,6 @@ pub mod flat_world_layers;
 ))]
 #[inline]
 fn all_read(read_position: u64, total_len: usize) -> bool {
-
     // The as casts don't overflow because we check the size.
     if size_of::<usize>() <= size_of::<u64>() {
         let total_len = total_len as u64;
@@ -208,24 +208,20 @@ fn print_debug(value: &[u8]) {
     while nums.peek().is_some() {
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric()
-                    || ch == '.' || ch == '-' || ch == '_'
-                {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
                     nums.next();
                     print!("{ch}");
                 } else {
                     break;
                 }
             } else {
-                break
+                break;
             }
         }
         print!("[");
         while let Some(&&num) = nums.peek() {
             if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric()
-                    || ch == '.' || ch == '-' || ch == '_'
-                {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
                     break;
                 }
             }
