@@ -389,7 +389,7 @@ pub struct TokenData {
 
 impl TokenData {
     #[inline]
-    fn new(token: Token, index: usize, char_width: usize) -> Self {
+    pub fn new(token: Token, index: usize, char_width: usize) -> Self {
         Self {
             token,
             index,
@@ -397,6 +397,7 @@ impl TokenData {
         }
     }
 
+    #[inline]
     pub fn into_tag(self) -> Result<NbtTag, Self> {
         match self.token.into_tag() {
             Ok(tag) => Ok(tag),
@@ -406,6 +407,7 @@ impl TokenData {
 }
 
 impl<T: FromExact<Token>> FromExact<TokenData> for T {
+    #[inline]
     fn from_exact(td: TokenData) -> Result<Self, TokenData> {
         match T::from_exact(td.token) {
             Ok(value) => Ok(value),
@@ -583,7 +585,7 @@ impl FromLossless<Token> for i64 {
     }
 }
 
-pub(crate) fn is_ambiguous(string: &str) -> bool {
+pub fn is_ambiguous(string: &str) -> bool {
     AmbiguousWord::new(string).is_some()
 }
 

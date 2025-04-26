@@ -11,6 +11,7 @@ use super::{MappingParseError, MappingParseOptions, NamespacedIdentifier};
 //  Final data structures
 // ================================================================
 
+#[derive(Debug, Clone)]
 pub struct VersionMetadata {
     pub block_format:               BlockFormat,
     pub block_entity_format:        BlockEntityFormat,
@@ -21,6 +22,7 @@ pub struct VersionMetadata {
     pub version:                    GameVersion,
 }
 
+#[derive(Debug)]
 pub struct BiomeMap {
     pub biome_to_number: HashMap<NamespacedIdentifier, Option<u16>>,
     pub number_to_biome: HashMap<u16, NamespacedIdentifier>,
@@ -30,6 +32,7 @@ pub struct BiomeMap {
     pub from_universal:  HashMap<NamespacedIdentifier, NamespacedIdentifier>,
 }
 
+#[derive(Debug)]
 pub struct NumericalBlockMap {
     pub to_number:     HashMap<NamespacedIdentifier, u16>,
     pub to_identifier: Vec<Option<NamespacedIdentifier>>,
@@ -37,6 +40,7 @@ pub struct NumericalBlockMap {
     pub default_block_number: u16,
 }
 
+#[derive(Debug)]
 pub struct WaterloggingInfo {
     pub waterloggable:      HashSet<NamespacedIdentifier>,
     pub always_waterlogged: HashSet<NamespacedIdentifier>,
@@ -212,6 +216,10 @@ impl NumericalBlockMap {
         let max_num_plus_one = to_number.values().max().map(|&m| usize::from(m)+1).unwrap_or(0);
 
         let mut to_identifier = vec![None; max_num_plus_one];
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "values should be distinct, so order has no effect",
+        )]
         for (key, value) in &to_number {
             to_identifier[usize::from(*value)] = Some(key.clone());
         }

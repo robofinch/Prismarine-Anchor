@@ -4,6 +4,8 @@ mod repr; // Used by tag module
 pub mod snbt;
 
 pub mod io;
+
+#[expect(unreachable_pub, reason = "I know that nothing here is publicly reachable")]
 mod raw;
 
 pub mod settings;

@@ -75,7 +75,7 @@ impl From<CodeFunction> for &'static str {
 }
 
 impl CodeFunction {
-    pub fn input_type(&self) -> CodeFunctionInput {
+    pub fn input_type(self) -> CodeFunctionInput {
         match self {
             Self::BannerPattern2u
                 | Self::BannerPatternFu
@@ -102,7 +102,7 @@ impl CodeFunction {
         }
     }
 
-    pub fn output_type(&self) -> CodeFunctionOutput {
+    pub fn output_type(self) -> CodeFunctionOutput {
         match self {
             Self::BannerPattern2u
                 | Self::BannerPatternFu
@@ -126,9 +126,7 @@ impl CodeFunction {
                 => CodeFunctionOutput::NewProperties,
         }
     }
-}
 
-impl CodeFunction {
     pub fn parse(json: &str) -> Result<Self, MappingParseError> {
 
         #[derive(Serialize, Deserialize)]

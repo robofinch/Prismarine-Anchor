@@ -24,9 +24,10 @@ use prismarine_anchor_translation::datatypes::{
 };
 
 // make unused warnings go away for now
+// TODO: do something about them for real
 pub use self::mappings::MappingFile;
 pub use self::specifications::SpecificationFile;
-pub use self::headers::{VersionMetadata, BiomeMap, NumericalBlockMap, WaterloggingInfo};
+pub use self::headers::{VersionMetadata, BiomeMap, NumericalBlockMap, Platform, WaterloggingInfo};
 
 
 /// Useful for annotating types more precisely.
@@ -43,9 +44,10 @@ pub type PropertyNameStr<'a> = &'a str;
 pub type PropertyNameBoxed = Box<str>;
 
 
-pub struct PyMcMappings {
+#[derive(Debug)]
+pub struct PyMcMappings; // {
     // blockstate, option numeric, biome data, metadata in version folder
-}
+// }
 
 // ================================================================
 //  Options and Error

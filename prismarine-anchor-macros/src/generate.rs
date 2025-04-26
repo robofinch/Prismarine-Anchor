@@ -5,7 +5,7 @@ use quote::ToTokens;
 use super::TranslatorTypes;
 
 
-pub fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStream {
+pub(crate) fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStream {
     let source_error = &types.error;
     let source_block_metadata = &types.block;
     let source_translator = SourceTranslator { types };

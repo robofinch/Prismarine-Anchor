@@ -1410,6 +1410,14 @@ impl NbtCompound {
         self.0.insert(name.into(), value.into());
     }
 
+    pub fn iter(&self) -> <&Map<NbtTag> as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+
+    pub fn iter_mut(&mut self) -> <&mut Map<NbtTag> as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+
     /// Parses an NBT compound from SNBT
     #[inline]
     pub fn from_snbt(input: &str, opts: SnbtParseOptions) -> Result<Self, SnbtError> {
@@ -1477,16 +1485,6 @@ impl Default for NbtCompound {
     #[inline]
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl NbtCompound {
-    pub fn iter(&self) -> <&Map<NbtTag> as IntoIterator>::IntoIter {
-       self.into_iter()
-    }
-
-    pub fn iter_mut(&mut self) -> <&mut Map<NbtTag> as IntoIterator>::IntoIter {
-        self.into_iter()
     }
 }
 

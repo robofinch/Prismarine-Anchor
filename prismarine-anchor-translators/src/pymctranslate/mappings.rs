@@ -100,7 +100,7 @@ pub enum MappingFunction {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum MappingFunctionType {
     NewBlock,

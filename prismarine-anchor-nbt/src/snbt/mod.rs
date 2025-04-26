@@ -1,5 +1,7 @@
 //! Module for parsing SNBT into NBT data
 
+#[expect(unreachable_pub, reason = "I know that almost nothing here is publicly reachable")]
+// See the `pub use` and `pub(crate) use` below for exceptions
 mod lexer;
 
 

@@ -8,6 +8,8 @@ use prismarine_anchor_translation::{datatypes::GameVersion, translator::Translat
 type InternalTranslator = dyn Translator<anyhow::Error, BlockMetadata, (), ()>;
 
 
+// TODO: give it some Debug implementation
+#[expect(missing_debug_implementations)]
 pub struct Translators {
     translators: HashMap<(GameVersion, GameVersion), Box<InternalTranslator>>,
 }

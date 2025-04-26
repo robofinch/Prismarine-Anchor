@@ -76,18 +76,21 @@ fn parse_specification_file(
             Ok((property, property_value))
         }).collect::<Result<_, MappingParseError>>()?;
 
+    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
     for key in properties.keys() {
         if !defaults.contains_key(&**key) {
             return Err(MappingParseError::MissingDefault(key.to_string()));
         }
     }
 
+    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
     for key in defaults.keys() {
         if !properties.contains_key(&**key) {
             return Err(MappingParseError::ExtraDefault(key.clone()));
         }
     }
 
+    #[expect(clippy::iter_over_hash_type, reason = "order could only impact what error is thrown")]
     for (property, (values, index)) in &mut properties {
         let default_value = defaults.remove(&**property)
             .expect("Every property was confirmed to have a default");

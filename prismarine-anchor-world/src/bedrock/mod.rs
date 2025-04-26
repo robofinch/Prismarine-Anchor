@@ -208,6 +208,7 @@ impl Debug for BedrockWorldFiles {
 }
 
 /// Partially parsed `level.dat` file
+#[derive(Debug)]
 pub struct LevelDatFile {
     pub version: i32,
     pub nbt: NbtCompound,

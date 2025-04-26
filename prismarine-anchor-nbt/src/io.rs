@@ -168,7 +168,7 @@ fn read_tag_body_const<const TAG_ID: u8>(
         0x6 => NbtTag::Double (raw::read_f64(reader, opts)?),
         0x7 => {
             let len = raw::read_i32_as_usize(reader, opts)?;
-            let mut array = vec![0u8; len];
+            let mut array = vec![0_u8; len];
 
             reader.read_exact(&mut array)?;
 

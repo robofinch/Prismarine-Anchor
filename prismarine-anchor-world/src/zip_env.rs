@@ -21,6 +21,7 @@ use zip::{result::ZipError, write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 
 /// `ZipEnv` supports writing or reading an in-memory virtual file system to or from a ZIP archive.
+#[expect(missing_debug_implementations, reason = "contains too much data")]
 pub struct ZipEnv(MemFS);
 
 impl Default for ZipEnv {
@@ -37,6 +38,10 @@ impl ZipEnv {
     pub fn try_into_bytes(self) -> Result<Vec<u8>, ZipEnvError> {
         let mut writer: _ = ZipWriter::new(Cursor::new(Vec::new()));
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "unavoidable, and any order should work for zip",
+        )]
         for (key, entry) in self.0.store.lock().unwrap().iter() {
             let file = &entry.f.0.lock().unwrap().0;
             let is_large = u32::try_from(file.len()).is_err();
@@ -52,6 +57,10 @@ impl ZipEnv {
     pub fn try_into_archive(self) -> Result<ZipArchive<impl Read>, ZipEnvError> {
         let mut writer: _ = ZipWriter::new(Cursor::new(Vec::new()));
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "unavoidable, and any order should work for zip",
+        )]
         for (key, entry) in self.0.store.lock().unwrap().iter() {
             let file = &entry.f.0.lock().unwrap().0;
             let is_large = u32::try_from(file.len()).is_err();
@@ -155,6 +164,7 @@ impl Env for ZipEnv {
     fn sleep_for(&self, _micros: u32) {
         #[cfg(not(target_arch = "wasm32"))]
         {
+            #[expect(clippy::used_underscore_binding)]
             thread::sleep(Duration::new(0, _micros * 1000));
         }
     }
@@ -290,6 +300,7 @@ struct MemFSEntry {
 
 /// `MemFS` implements a completely in-memory file system, both for testing and temporary in-memory
 /// databases. It supports full concurrency.
+#[expect(missing_debug_implementations, reason = "contains too much data")]
 pub struct MemFS {
     store: Arc<Mutex<HashMap<String, MemFSEntry>>>,
 }
@@ -345,6 +356,10 @@ impl MemFS {
         }
 
         let mut children = Vec::new();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "unavoidable, and thus order of `children_of` is unspecified",
+        )]
         for k in fs.keys() {
             if k.starts_with(&prefix) {
                 children.push(Path::new(k.strip_prefix(&prefix).unwrap_or(k)).to_owned());

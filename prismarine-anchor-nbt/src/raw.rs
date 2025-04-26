@@ -435,7 +435,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
         (0..len).map(|_| reader.read_i32_varint()).collect()
 
     } else {
-        let mut data = vec![0i32; len];
+        let mut data = vec![0_i32; len];
         let data_slice = data.as_mut_slice();
 
         // SAFETY:
@@ -486,7 +486,7 @@ pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
         (0..len).map(|_| reader.read_i64_varint()).collect()
 
     } else {
-        let mut data = vec![0i64; len];
+        let mut data = vec![0_i64; len];
         let data_slice = data.as_mut_slice();
 
         // SAFETY:

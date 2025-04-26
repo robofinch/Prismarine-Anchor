@@ -10,7 +10,7 @@ use rusty_leveldb::{
 
 
 /// Initialize a LevelDB with settings that should be compatible with Minecraft
-pub fn new_leveldb<P: AsRef<Path>>(
+pub(super) fn new_leveldb<P: AsRef<Path>>(
     env: Rc<Box<dyn Env>>,
     db_path: P,
     create_if_missing: bool,
@@ -47,7 +47,7 @@ pub fn new_leveldb<P: AsRef<Path>>(
 /// and whether the Zlib header should be present in the data read and written.
 #[expect(unused)]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DBCompressor {
+pub(super) enum DBCompressor {
     None,
     ZlibWithHeader,
     /// Also known by terms like `ZlibRaw`
@@ -62,7 +62,8 @@ struct ZlibCompressor {
 }
 
 impl ZlibCompressor {
-    pub fn new(include_zlib_header: bool, compression_level: Compression) -> Self {
+    #[inline]
+    fn new(include_zlib_header: bool, compression_level: Compression) -> Self {
         Self {
             include_zlib_header,
             compression_level

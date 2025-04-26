@@ -290,10 +290,10 @@ impl<T> PalettizedSubchunk<T> {
         let num_u32s = bits_per_index.num_u32s_for_4096_indices();
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
         // This fits in a u32, which is used below.
-        let index_mask = (1usize << u8::from(bits_per_index)) - 1;
+        let index_mask = (1_usize << u8::from(bits_per_index)) - 1;
 
         let mut packed_indices = Vec::with_capacity(num_u32s);
-        let mut u32_block = 0u32;
+        let mut u32_block = 0_u32;
         let mut num_indices_in_block = 0;
 
         for value in unpacked_data {
@@ -317,8 +317,8 @@ impl<T> PalettizedSubchunk<T> {
         }
 
         Self {
-            packed_indices,
             bits_per_index,
+            packed_indices,
             palette,
         }
     }
@@ -365,10 +365,10 @@ impl<T> PalettizedSubchunk<T> {
         let num_u32s = bits_per_index.num_u32s_for_4096_indices();
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
         // This fits in a u32, which is used below.
-        let index_mask = (1usize << u8::from(bits_per_index)) - 1;
+        let index_mask = (1_usize << u8::from(bits_per_index)) - 1;
 
         let mut packed_indices = Vec::with_capacity(num_u32s);
-        let mut u32_block = 0u32;
+        let mut u32_block = 0_u32;
         let mut num_indices_in_block = 0;
 
         for value in &unpacked_data {
@@ -432,7 +432,7 @@ impl<T> PalettizedSubchunk<T> {
         let indices_per_u32 = bits_per_index.indices_per_u32();
         // let padding_bits = bits_per_index.padding_bits();
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
-        let index_mask = (1u32 << u8::from(bits_per_index)) - 1;
+        let index_mask = (1_u32 << u8::from(bits_per_index)) - 1;
 
         let mut packed_index_iter = packed_indices.iter();
         if let Some(&last_dword) = packed_index_iter.next_back() {
@@ -529,7 +529,7 @@ impl<T> PalettizedSubchunk<T> {
     where T: Clone
     {
         // `2^bits_per_index - 1` has the least-significant `bits_per_index` bits set.
-        let index_mask = (1u32 << u8::from(self.bits_per_index)) - 1;
+        let index_mask = (1_u32 << u8::from(self.bits_per_index)) - 1;
 
         let mut packed_ids = self.packed_indices.iter();
         let mut u32_block = 0;
