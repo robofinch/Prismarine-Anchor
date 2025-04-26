@@ -218,7 +218,7 @@ impl DBKey {
             // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents)
             // should never be allowed as tags here, to avoid a collision.
             let tag = raw_key[raw_key.len() - 1];
-            if ((43..=65).contains(&tag) && tag != 47) || tag == 118 || tag == 119 {
+            if ((43 <= tag && tag <= 65) && tag != 47) || tag == 118 || tag == 119 {
 
                 if let Ok(dimensioned_pos) = DimensionedChunkPos::try_from(
                     &raw_key[..raw_key.len() - 1]
@@ -289,6 +289,8 @@ impl DBKey {
                         NamedDimension::OVERWORLD
                     };
 
+                    // Note that len is 3 or 4, so this doesn't overflow or panic
+                    #[expect(clippy::match_on_vec_items)]
                     return Some(match parts[parts.len() - 1] {
                         "DWELLERS" => Self::VillageDwellers(dimension, uuid),
                         "INFO"     => Self::VillageInfo(dimension, uuid),
@@ -502,7 +504,7 @@ impl DBKey {
             }
             &Self::Map(map_id) => {
                 bytes.extend(b"map_");
-                bytes.extend(format!("{}", map_id).as_bytes());
+                bytes.extend(format!("{map_id}").as_bytes());
                 return
             }
             &Self::Portals => {
@@ -554,7 +556,7 @@ impl DBKey {
                 return
             }
             &Self::PositionTrackingDB(id) => {
-                let id = format!("{:08x}", id);
+                let id = format!("{id:08x}");
 
                 bytes.reserve(b"PosTrackDB-0x".len() + id.len());
                 bytes.extend(b"PosTrackDB-0x");

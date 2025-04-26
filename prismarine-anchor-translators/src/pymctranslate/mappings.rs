@@ -36,7 +36,7 @@ impl MappingFile {
     pub fn from_json<>(
         json: &str,
         opts: MappingParseOptions,
-    ) -> Result<MappingFile, MappingParseError> {
+    ) -> Result<Self, MappingParseError> {
 
         parse_mapping_file(serde_json::from_str(json)?, opts)
     }
@@ -61,7 +61,7 @@ pub enum MappingFunction {
     NewNbt(Box<[NewNbtOptions]>),
     /// Add new Properties to the block with the indicated SNBT values.
     NewProperties(BTreeMap<PropertyNameBoxed, BlockProperty>),
-    /// For something with one of the indicated NamespacedIdentifiers,
+    /// For something with one of the indicated `NamespacedIdentifier`s,
     /// apply the corresponding mapping functions to the block.
     MapBlockName(HashMap<NamespacedIdentifier, Box<[MappingFunction]>>),
     /// For something with an NBT value in the current path such that
@@ -70,17 +70,18 @@ pub enum MappingFunction {
     /// default `None` case (if it exists).
     MapNbt(BTreeMap<Option<ComparableNbtTag>, Box<[MappingFunction]>>),
     /// If something has a certain Property, and if its value for that Property is in
-    /// the map with BlockProperty keys, then apply the corresponding mapping functions
+    /// the map with `BlockProperty` keys, then apply the corresponding mapping functions
     /// to the block.
     MapProperties(HashMap<PropertyNameBoxed, HashMap<BlockProperty, Box<[MappingFunction]>>>),
     CarryNbt {
         outer_name: Box<str>, // option in source JSON
         outer_type: NbtContainerType,
-        // NbtContainerType is the type of the thing whose index is Index,
-        // not the type being index into.
+        /// `NbtContainerType` is the type of the thing whose index is Index,
+        /// not the type being indexed into.
         path: Option<Box<[(Index, NbtContainerType)]>>,
-        // For these two, None means unchanged
+        /// None means unchanged
         key: Option<Index>,
+        /// None means unchanged
         value_type: Option<NbtType>,
     },
     /// The keys might be property names or NBT keys. Any property or NBT key
@@ -183,8 +184,8 @@ enum IndexJson {
 impl From<IndexJson> for Index {
     fn from(value: IndexJson) -> Self {
         match value {
-            IndexJson::Number(n) => Index::Number(n),
-            IndexJson::String(string) => Index::String(string.into_boxed_str()),
+            IndexJson::Number(n) => Self::Number(n),
+            IndexJson::String(string) => Self::String(string.into_boxed_str()),
         }
     }
 }
@@ -603,6 +604,7 @@ fn parse_walk_nbt(
                 (
                     if let Some(index) = json.index {
                         let nested = index.into_iter().map(|(index, options)| {
+                            #[expect(clippy::map_err_ignore)]
                             let index = usize::from_str_radix(&index, 10)
                                 .map_err(|_| MappingParseError::InvalidIndex(index))?;
 

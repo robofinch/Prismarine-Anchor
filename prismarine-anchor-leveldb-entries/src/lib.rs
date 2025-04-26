@@ -142,8 +142,12 @@ pub struct EntryToBytesError {
 ///
 /// For example:
 /// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
-#[allow(dead_code)]
 fn print_debug(value: &[u8]) {
+    #![allow(dead_code)]
+    #![allow(clippy::all)]
+    // Apparently this wasn't covered.
+    #![expect(clippy::cast_lossless)]
+
     let mut nums = value.iter().peekable();
 
     while nums.peek().is_some() {
@@ -175,5 +179,5 @@ fn print_debug(value: &[u8]) {
         }
         print!("]");
     }
-    println!()
+    println!();
 }

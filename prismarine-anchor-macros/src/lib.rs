@@ -2,7 +2,7 @@ mod generate;
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, Token};
-use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, DeriveInput, Type};
+use syn::{punctuated::Punctuated, spanned::Spanned as _, Attribute, DeriveInput, Type};
 
 use self::generate::generate_impl;
 
@@ -14,7 +14,7 @@ pub fn custom_translator(tokens: TokenStream) -> TokenStream {
     let input: DeriveInput = parse_macro_input!(tokens as DeriveInput);
 
     match parse_input(&input) {
-        Ok(types) => generate_impl(input.ident, types),
+        Ok(types) => generate_impl(&input.ident, &types),
         Err(err) => err.into_compile_error(),
     }.into()
 }

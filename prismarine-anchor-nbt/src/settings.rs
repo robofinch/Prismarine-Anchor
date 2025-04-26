@@ -7,9 +7,16 @@ use serde::{Serialize, Deserialize};
 //      Limits
 // ================================
 
-/// The recursive NBT tags (Compounds and Lists) can be nested up to (and including)
-/// 512 levels deep in the standard specification.
-/// The limit may be increased here if the `configurable_depth` feature is enabled,
+/// The maximum depth that tags may be nested in recursive NBT tags (Compounds and Lists).
+///
+/// For instance, if the limit were 2, then an empty list may be in a compound in a list,
+/// as the root has a nesting depth of zero, and the innermost list has a nesting depth
+/// of 2, which does not exceed the limit. Any elements of the innermost list would exceed
+/// the depth limit. A byte in a byte array in a list in a list would be permitted,
+/// as byte arrays are not recursive and thus do not increase the nesting depth.
+///
+/// In standard Minecraft versions, the limit is 512, which is the default here.
+/// The limit here may be increased if the `configurable_depth` feature is enabled,
 /// but note that this crate uses recursive functions to read and write NBT data;
 /// if the limit is too high and unreasonably nested data is received,
 /// a crash could occur from the nested function calls exceeding the maximum stack size.
@@ -77,7 +84,7 @@ pub struct IoOptions {
     /// [Endianness] of some NBT data, primarily numeric data. Moreover, in the `NetworkLitleEndian`
     /// variant, `i32` and `i64` values are written or read with a variable-length varint encoding.
     ///
-    /// Bedrock Edition is LittleEndian, Java is BigEndian
+    /// Bedrock Edition is `LittleEndian`, Java is `BigEndian`
     ///
     /// [Endianness]: https://en.wikipedia.org/wiki/Endianness
     pub endianness: Endianness,
@@ -172,7 +179,7 @@ pub enum Endianness {
     LittleEndian,
     /// Used by Bedrock to serialize NBT over a network with variable-length encodings
     /// of 32- and 64-bit integers.
-    /// See https://wiki.bedrock.dev/nbt/nbt-in-depth#network-little-endian
+    /// See <https://wiki.bedrock.dev/nbt/nbt-in-depth#network-little-endian>
     /// for more information.
     NetworkLittleEndian,
 }
@@ -212,7 +219,7 @@ impl From<Compression> for CompressionLevel {
 
 impl From<CompressionLevel> for Compression {
     fn from(value: CompressionLevel) -> Self {
-        Compression::new(u32::from(value.0))
+        Self::new(u32::from(value.0))
     }
 }
 
@@ -233,7 +240,9 @@ pub enum StringEncoding {
 // ================================
 
 /// Determines which version of the SNBT specification should be used to convert between
-/// NBT and SNBT. The updated version is used in Java Edition at or above 1.21.5.
+/// NBT and SNBT.
+///
+/// The updated version is used in Java Edition at or above 1.21.5.
 /// The original version is used by Java before 1.21.5, as well as by
 /// other versions of Minecraft.
 ///
@@ -251,6 +260,7 @@ pub enum SnbtVersion {
     /// For Java 1.21.5 and later. Adds additional parsing features, and is mostly
     /// backwards-compatible, but the restrictions on numeric values and unquoted strings
     /// are slightly stricter.
+    ///
     /// Unquoted strings are prohibited from starting with `+`, `-`, `.`, or a digit,
     /// and can otherwise have any characters in `[0-9a-zA-Z]` or `_`, `-`, `.`, `+`.
     /// Only finite float values (not an infinity or NaN) are allowed.
@@ -273,8 +283,9 @@ pub enum SnbtVersion {
     UpdatedJava,
     /// For Java before 1.21.5, or Bedrock Edition.
     /// Fewer parsing features than the newer SNBT version. The specification for
-    /// unquoted strings is also slightly more lenient than with the newer version; for this
-    /// implementation, unquoted strings are prohibited from starting with `-` or a digit,
+    /// unquoted strings is also slightly more lenient than with the newer version.
+    ///
+    /// For this implementation, unquoted strings are prohibited from starting with `-` or a digit,
     /// and can otherwise have any characters in `[0-9a-zA-Z]` or `_`, `-`, `.`, `+`. If you
     /// manage to make a SNBT floating point literal larger than `f32::MAX` or `f64::MAX`, it
     /// wouldn't be rejected as invalid and would result in positive infinity.
@@ -377,6 +388,8 @@ impl SnbtParseOptions {
     }
 }
 
+/// Controls how the unquoted symbols `true` and `false` are parsed.
+///
 /// SNBT allows the unquoted symbols `true` and `false` to be used instead of `1b` and `0b`.
 /// This enum indicates whether they should always be parsed as bytes, always parsed
 /// as unquoted strings, or parsed as bytes unless they are an `NbtCompound` key or
@@ -390,6 +403,8 @@ pub enum ParseTrueFalse {
     AsString,
 }
 
+/// Controls how non-finite floating-point values (which are NaN or infinite) are parsed.
+///
 /// NBT and SNBT aren't meant to support infinite and NaN float or double values, but they
 /// could be encountered anyway. When an infinite NBT float is converted to SNBT and back, a normal
 /// parser would end up treating the result as a string. With Minecraft Java's default parser,
@@ -497,13 +512,16 @@ impl SnbtWriteOptions {
     }
 }
 
+/// Controls how non-finite floating-point values (which are NaN or infinite) are written.
+///
 /// NBT and SNBT aren't meant to support infinite and NaN float or double values, but they
 /// could be encountered anyway. When an infinite NBT float is converted to SNBT and back, a normal
 /// parser would end up treating the result as a string. With Minecraft Java's default parser,
 /// as per [MC-200070], a positive infinite double is printed as `Infinityd`,
 /// and an NaN float is printed as `NaNf`, for example. This enum indicates whether such a value
-/// in an NBT tag should be displayed in that form, or display positive infinity as though it were
-/// the `MAX` constant of `f32` or `f64`, negative infinity as the `MIN` constant, and NaN as `0.`.
+/// in an NBT tag should be displayed in that string form,
+/// or display positive infinity as though it were the `MAX` constant of `f32` or `f64`,
+/// negative infinity as the `MIN` constant, and NaN as `0.`.
 ///
 /// [MC-200070]: https://report.bugs.mojang.com/servicedesk/customer/portal/2/MC-200070
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -535,17 +553,19 @@ pub struct EnabledEscapeSequences(u16);
 impl EnabledEscapeSequences {
     /// Enables the escape sequences for which the provided function returns `true`.
     #[inline]
-    pub fn from_fn(f: impl Fn(EscapeSequence) -> bool) -> Self {
-        use EscapeSequence as E;
+    pub fn from_fn<E>(mut enabled_escapes: E) -> Self
+    where E: FnMut(EscapeSequence) -> bool
+    {
+        use EscapeSequence as ES;
 
         let mut bits = 0;
 
         for escape in [
-            E::B, E::F, E::N, E::R, E::S, E::T,
-            E::UnicodeTwo, E::UnicodeFour, E::UnicodeEight, E::UnicodeNamed
+            ES::B, ES::F, ES::N, ES::R, ES::S, ES::T,
+            ES::UnicodeTwo, ES::UnicodeFour, ES::UnicodeEight, ES::UnicodeNamed
         ] {
-            if f(escape) {
-                bits |= 1 << (escape as u8)
+            if enabled_escapes(escape) {
+                bits |= 1 << (escape as u8);
             }
         }
 

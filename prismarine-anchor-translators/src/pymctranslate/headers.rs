@@ -172,7 +172,7 @@ impl BiomeMap {
             path: "plains".into(),
         };
 
-        let default_biome_number = biome_to_number.get(&plains).cloned().flatten().unwrap_or(0);
+        let default_biome_number = biome_to_number.get(&plains).copied().flatten().unwrap_or(0);
 
         let to_universal = json.to_universal.into_iter().map(|(key, value)| {
             Ok((
@@ -212,7 +212,7 @@ impl NumericalBlockMap {
         let max_num_plus_one = to_number.values().max().map(|&m| usize::from(m)+1).unwrap_or(0);
 
         let mut to_identifier = vec![None; max_num_plus_one];
-        for (key, value) in to_number.iter() {
+        for (key, value) in &to_number {
             to_identifier[usize::from(*value)] = Some(key.clone());
         }
 

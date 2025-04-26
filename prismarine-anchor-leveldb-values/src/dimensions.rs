@@ -17,7 +17,7 @@ impl Dimension {
         match self {
             Self::Vanilla(v)       => Some(NumericDimension::Vanilla(*v)),
             Self::CustomNumeric(n) => Some(NumericDimension::CustomNumeric(*n)),
-            _ => None,
+            Self::CustomNamed(_)   => None,
         }
     }
 
@@ -25,9 +25,9 @@ impl Dimension {
     #[inline]
     pub fn named(self) -> Option<NamedDimension> {
         match self {
-            Self::Vanilla(v)     => Some(NamedDimension::Vanilla(v)),
-            Self::CustomNamed(n) => Some(NamedDimension::CustomNamed(n)),
-            _ => None,
+            Self::Vanilla(v)       => Some(NamedDimension::Vanilla(v)),
+            Self::CustomNumeric(_) => None,
+            Self::CustomNamed(n)   => Some(NamedDimension::CustomNamed(n)),
         }
     }
 }

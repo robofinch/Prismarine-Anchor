@@ -49,7 +49,7 @@ impl BedrockWorldFiles {
     /// `level.dat`, `levelname.txt`, and the LevelDB database
     /// should not be edited by anything else.
     pub fn open_world(env: Box<dyn Env>) -> Result<Self, BedrockWorldFileError> {
-        Self::open_world_from_path(env, PathBuf::new())
+        Self::open_world_from_path(env, Path::new(""))
     }
 
     /// Open a Bedrock world folder in the provided `Env` (with either the world folder or
@@ -60,7 +60,7 @@ impl BedrockWorldFiles {
     /// should not be edited by anything else.
     pub fn open_world_from_path(
         env: Box<dyn Env>,
-        root_path: PathBuf,
+        root_path: &Path,
     ) -> Result<Self, BedrockWorldFileError> {
 
         let env_ref = env.as_ref();
@@ -72,7 +72,7 @@ impl BedrockWorldFiles {
             BedrockWorldFileError::Io(Cow::Borrowed("trying to open a Bedrock world"), err)
         }
 
-        let mut list = env.children(&root_path).map_err(add_status_context)?;
+        let mut list = env.children(root_path).map_err(add_status_context)?;
 
         // Find the common directory of all children of the root path
         let mut nested_root_path = PathBuf::new();
@@ -92,21 +92,19 @@ impl BedrockWorldFiles {
             }
         }
 
-        let mut actual_root_path = root_path;
-        actual_root_path.push(nested_root_path);
+        let root_path = root_path.join(nested_root_path);
 
-        let level_dat = LevelDatFile::parse_from_env(env_ref, actual_root_path.clone())?;
+        let level_dat = LevelDatFile::parse_from_env(env_ref, &root_path)?;
 
         let mut level_name = String::new();
-        let _ = open_from_path(env_ref, "levelname.txt", actual_root_path.clone())
+        let _ = open_from_path(env_ref, &root_path, "levelname.txt")
             .map_err(add_status_context)?
             .read_to_string(&mut level_name)
             .map_err(add_io_context)?;
 
         let env = Rc::new(env);
 
-        let mut db_path = actual_root_path.clone();
-        db_path.push("db/");
+        let db_path = root_path.join("db/");
         let db = new_leveldb(env.clone(), db_path, false, DBCompressor::default())
             .map_err(add_status_context)?;
 
@@ -115,7 +113,7 @@ impl BedrockWorldFiles {
             level_name,
             db,
             env,
-            root_path: actual_root_path,
+            root_path,
         })
     }
 
@@ -131,7 +129,7 @@ impl BedrockWorldFiles {
 
     /// Write the in-memory `level.dat` information to this world's `Env`.
     pub fn save_level_dat(&self) -> Result<(), BedrockWorldFileError> {
-        self.level_dat.write_to_env(self.env.as_ref().as_ref(), self.root_path.clone())
+        self.level_dat.write_to_env(self.env.as_ref().as_ref(), &self.root_path)
     }
 
     /// Read the in-memory `levelname.txt` information.
@@ -156,7 +154,7 @@ impl BedrockWorldFiles {
 
         let env = self.env.as_ref().as_ref();
 
-        let mut file = write_to_path(env, "levelname.txt", self.root_path.clone())
+        let mut file = write_to_path(env, &self.root_path, "levelname.txt")
             .map_err(add_status_context)?;
 
         file.write_all(self.level_name.as_bytes()).map_err(add_io_context)?;
@@ -195,7 +193,7 @@ impl BedrockWorldFiles {
 
     /// Read the world's icon from this world's `Env`.
     pub fn world_icon(&self) -> Result<Box<dyn Read>, BedrockWorldFileError> {
-        open_from_path(self.env.as_ref().as_ref(), "world_icon.jpeg", self.root_path.clone())
+        open_from_path(self.env.as_ref().as_ref(), &self.root_path, "world_icon.jpeg")
             .map_err(|err| BedrockWorldFileError::StatusCode(
                 Cow::Borrowed("opening a world's icon image"),
                 err,
@@ -220,7 +218,7 @@ impl LevelDatFile {
     /// inside the provided `Env`.
     pub fn parse_from_env(
         env: &dyn Env,
-        root_path: PathBuf,
+        root_path: &Path,
     ) -> Result<Self, BedrockWorldFileError> {
 
         fn add_status_context(err: Status) -> BedrockWorldFileError {
@@ -230,7 +228,7 @@ impl LevelDatFile {
             BedrockWorldFileError::NbtError(Cow::Borrowed("reading level.dat"), err)
         }
 
-        let mut file = open_from_path(env, "level.dat", root_path)
+        let mut file = open_from_path(env, root_path, "level.dat")
             .map_err(add_status_context)?;
 
         let (version, _) = nbt_io::read_bedrock_header(
@@ -254,7 +252,7 @@ impl LevelDatFile {
     pub fn write_to_env(
         &self,
         env: &dyn Env,
-        root_path: PathBuf,
+        root_path: &Path,
     ) -> Result<(), BedrockWorldFileError> {
 
         fn add_status_context(err: Status) -> BedrockWorldFileError {
@@ -267,12 +265,8 @@ impl LevelDatFile {
             BedrockWorldFileError::NbtError(Cow::Borrowed("writing to level.dat"), err)
         }
 
-        let mut dat_path = root_path.clone();
-        dat_path.push("level.dat");
-        let mut new_dat_path = root_path;
-        new_dat_path.push("level.dat_new");
-        let dat_path = dat_path;
-        let new_dat_path = new_dat_path;
+        let dat_path = root_path.join("level.dat");
+        let new_dat_path = root_path.join("level.dat_new");
 
         let mut nbt_buffer = Cursor::new(Vec::new());
 
@@ -314,20 +308,16 @@ pub enum BedrockWorldFileError {
     Io(Cow<'static, str>, io::Error),
 }
 
-fn open_from_path(
-    env: &dyn Env, rel_path: impl AsRef<Path>, root_path: PathBuf,
+#[inline]
+fn open_from_path<P: AsRef<Path>>(
+    env: &dyn Env, root_path: &Path, rel_path: P,
 ) -> Result<Box<dyn Read>, Status> {
-
-    let mut path = root_path;
-    path.push(rel_path);
-    env.open_sequential_file(&path)
+    env.open_sequential_file(&root_path.join(rel_path))
 }
 
-fn write_to_path(
-    env: &dyn Env, rel_path: impl AsRef<Path>, root_path: PathBuf,
+#[inline]
+fn write_to_path<P: AsRef<Path>>(
+    env: &dyn Env, root_path: &Path, rel_path: P,
 ) -> Result<Box<dyn Write>, Status> {
-
-    let mut path = root_path;
-    path.push(rel_path);
-    env.open_writable_file(&path)
+    env.open_writable_file(&root_path.join(rel_path))
 }

@@ -1,9 +1,9 @@
-//! Modified from mem_env.rs in rusty-leveldb, a.k.a. leveldb-rs
+//! Modified from `mem_env.rs` in `rusty-leveldb`, a.k.a. `leveldb-rs`
 // MemEnv didn't expose some of the stuff necessary for converting back to a ZIP archive,
 // in particular an iterator over all files.
 
 use std::io;
-use std::{borrow::Cow, ops::Deref};
+use std::borrow::Cow;
 use std::{
     collections::{HashMap, hash_map::Entry},
     io::{Cursor, Read, Result as IoResult, Seek, Write},
@@ -30,8 +30,8 @@ impl Default for ZipEnv {
 }
 
 impl ZipEnv {
-    pub fn new() -> ZipEnv {
-        ZipEnv(MemFS::new())
+    pub fn new() -> Self {
+        Self(MemFS::new())
     }
 
     pub fn try_into_bytes(self) -> Result<Vec<u8>, ZipEnvError> {
@@ -70,7 +70,7 @@ impl<R: Read + Seek> TryFrom<ZipArchive<R>> for ZipEnv {
 
     fn try_from(mut archive: ZipArchive<R>) -> Result<Self, ZipEnvError> {
 
-        let fs: MemFS = MemFS::new();
+        let fs = MemFS::new();
 
         for idx in 0..archive.len() {
             let mut file = archive.by_index(idx)?;
@@ -145,9 +145,9 @@ impl Env for ZipEnv {
         // Having an unbounded loop for this would feel weird to me, even though
         // that's what leveldb-rs does
         for _ in 0..1_000_000 {
-            match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Err(_) => continue,
-                Ok(dur) => return dur.as_micros() as u64
+            if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
+                // In theory, this could overflow.
+                return dur.as_micros() as u64;
             }
         }
         0
@@ -196,23 +196,23 @@ impl RandomAccess for BufferBackedFile {
     }
 }
 
-/// A MemFile holds a shared, concurrency-safe buffer. It can be shared among several
-/// MemFileReaders and MemFileWriters, each with an independent offset.
+/// A `MemFile` holds a shared, concurrency-safe buffer. It can be shared among several
+/// `MemFileReader`s and `MemFileWriter`s, each with an independent offset.
 #[derive(Debug, Clone)]
 struct MemFile(Arc<Mutex<BufferBackedFile>>);
 
 impl MemFile {
-    fn new() -> MemFile {
-        MemFile(Arc::new(Mutex::new(BufferBackedFile(Vec::new()))))
+    fn new() -> Self {
+        Self(Arc::new(Mutex::new(BufferBackedFile(Vec::new()))))
     }
 }
 
-/// A MemFileReader holds a reference to a MemFile and a read offset.
+/// A `MemFileReader` holds a reference to a `MemFile` and a read offset.
 struct MemFileReader(MemFile, usize);
 
 impl MemFileReader {
-    fn new(f: MemFile, from: usize) -> MemFileReader {
-        MemFileReader(f, from)
+    fn new(f: MemFile, from: usize) -> Self {
+        Self(f, from)
     }
 }
 
@@ -239,13 +239,13 @@ impl Read for MemFileReader {
     }
 }
 
-/// A MemFileWriter holds a reference to a MemFile and a write offset.
+/// A `MemFileWriter` holds a reference to a `MemFile` and a write offset.
 struct MemFileWriter(MemFile, usize);
 
 impl MemFileWriter {
-    fn new(f: MemFile, append: bool) -> MemFileWriter {
+    fn new(f: MemFile, append: bool) -> Self {
         let len = f.0.lock().unwrap().0.len();
-        MemFileWriter(f, if append { len } else { 0 })
+        Self(f, if append { len } else { 0 })
     }
 }
 
@@ -278,7 +278,7 @@ impl Write for MemFileWriter {
 impl RandomAccess for MemFile {
     fn read_at(&self, off: usize, dst: &mut [u8]) -> StatusResult<usize> {
         let guard = self.0.lock().unwrap();
-        let buf: &BufferBackedFile = guard.deref();
+        let buf: &BufferBackedFile = &guard;
         buf.read_at(off, dst)
     }
 }
@@ -288,21 +288,21 @@ struct MemFSEntry {
     locked: bool,
 }
 
-/// MemFS implements a completely in-memory file system, both for testing and temporary in-memory
+/// `MemFS` implements a completely in-memory file system, both for testing and temporary in-memory
 /// databases. It supports full concurrency.
 pub struct MemFS {
     store: Arc<Mutex<HashMap<String, MemFSEntry>>>,
 }
 
 impl MemFS {
-    fn new() -> MemFS {
-        MemFS {
+    fn new() -> Self {
+        Self {
             store: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    /// Open a file. The caller can use the MemFile either inside a MemFileReader or as
-    /// RandomAccess.
+    /// Open a file. The caller can use the `MemFile` either inside a `MemFileReader` or as
+    /// `RandomAccess`.
     fn open(&self, p: &Path, create: bool) -> StatusResult<MemFile> {
         let mut fs = self.store.lock().unwrap();
         match fs.entry(path_to_string(p)) {
@@ -324,6 +324,7 @@ impl MemFS {
         }
     }
     /// Open a file for writing.
+    #[expect(clippy::fn_params_excessive_bools, reason = "originated from rusty-leveldb's code")]
     fn open_w(&self, p: &Path, append: bool, truncate: bool) -> StatusResult<Box<dyn Write>> {
         let f = self.open(p, true)?;
         if truncate {
@@ -355,7 +356,7 @@ impl MemFS {
         let mut fs = self.store.lock()?;
         match fs.entry(path_to_string(p)) {
             Entry::Occupied(o) => Ok(o.get().f.0.lock()?.0.len()),
-            _ => Err(Status::new(
+            Entry::Vacant(_) => Err(Status::new(
                 StatusCode::NotFound,
                 &format!("size_of: file not found: {}", path_to_str(p)),
             )),
@@ -368,7 +369,7 @@ impl MemFS {
                 o.remove_entry();
                 Ok(())
             }
-            _ => Err(Status::new(
+            Entry::Vacant(_) => Err(Status::new(
                 StatusCode::NotFound,
                 &format!("delete: file not found: {}", path_to_str(p)),
             )),
@@ -381,7 +382,7 @@ impl MemFS {
                 fs.insert(path_to_string(to), v);
                 Ok(())
             }
-            _ => Err(Status::new(
+            None => Err(Status::new(
                 StatusCode::NotFound,
                 &format!("rename: file not found: {}", path_to_str(from)),
             )),
@@ -423,16 +424,16 @@ impl MemFS {
                 if !o.get().locked {
                     Err(Status::new(
                         StatusCode::LockError,
-                        &format!("unlocking unlocked file: {}", id),
+                        &format!("unlocking unlocked file: {id}"),
                     ))
                 } else {
                     o.get_mut().locked = false;
                     Ok(())
                 }
             }
-            _ => Err(Status::new(
+            Entry::Vacant(_) => Err(Status::new(
                 StatusCode::NotFound,
-                &format!("unlock: file not found: {}", id),
+                &format!("unlock: file not found: {id}"),
             )),
         }
     }

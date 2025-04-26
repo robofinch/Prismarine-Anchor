@@ -1,4 +1,4 @@
-use std::{io::Read, path::Path, rc::Rc};
+use std::{io::Read as _, path::Path, rc::Rc};
 
 use flate2::{Compress, Compression, Decompress};
 use flate2::bufread::{ZlibDecoder, ZlibEncoder};
@@ -9,10 +9,10 @@ use rusty_leveldb::{
 };
 
 
-/// Create a new LevelDB with settings that should be compatible with Minecraft
-pub fn new_leveldb(
+/// Initialize a LevelDB with settings that should be compatible with Minecraft
+pub fn new_leveldb<P: AsRef<Path>>(
     env: Rc<Box<dyn Env>>,
-    db_path: impl AsRef<Path>,
+    db_path: P,
     create_if_missing: bool,
     compressor: DBCompressor,
 ) -> Result<DB, Status> {
@@ -45,12 +45,12 @@ pub fn new_leveldb(
 
 /// Indicates whether world data should be read and written as compressed,
 /// and whether the Zlib header should be present in the data read and written.
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DBCompressor {
     None,
     ZlibWithHeader,
-    /// Also known by terms like ZlibRaw
+    /// Also known by terms like `ZlibRaw`
     #[default]
     ZlibWithoutHeader,
 }

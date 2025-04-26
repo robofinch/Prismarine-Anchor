@@ -95,7 +95,7 @@ impl Block {
     pub fn new(
         identifier: NamespacedIdentifier,
         properties: Option<BlockProperties>,
-        extra_layers: Option<Vec<Block>>,
+        extra_layers: Option<Vec<Self>>,
     ) -> Self {
         Self {
             identifier,
@@ -351,6 +351,7 @@ pub enum GameVersion {
 
 impl PartialOrd for GameVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        #[expect(clippy::match_same_arms, reason = "clarity")]
         match (self, other) {
             (Self::Universal, Self::Universal)
                 => Some(Ordering::Equal),

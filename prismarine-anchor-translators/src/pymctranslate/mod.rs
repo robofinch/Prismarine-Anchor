@@ -1,4 +1,5 @@
 //! Translator corresponding to PyMCTranslate data.
+//!
 //! Currently, PyMCTranslate only handles blocks, not entities or items.
 //! For instance, item frame blocks from Bedrock are set to air when converted to Java,
 //! without adding a new entity.
@@ -103,7 +104,7 @@ pub enum MappingParseError {
 
 impl MappingParseError {
     #[inline]
-    pub fn invalid_property(tag: NbtTag) -> Self {
+    pub fn invalid_property(tag: &NbtTag) -> Self {
         Self::InvalidProperty(tag_description(&tag.tag_type()))
     }
 }
@@ -122,7 +123,7 @@ pub fn block_property_from_str(
             error,
         })?;
 
-    tag.try_into().map_err(MappingParseError::invalid_property)
+    tag.try_into().map_err(|tag| MappingParseError::invalid_property(&tag))
 }
 
 #[inline]
@@ -151,7 +152,7 @@ pub fn container_type(name: &str) -> Result<NbtContainerType, MappingParseError>
         "byte_array" => Ok(NbtContainerType::ByteArray),
         "int_array"  => Ok(NbtContainerType::IntArray),
         "long_array" => Ok(NbtContainerType::LongArray),
-        _ => Err(MappingParseError::InvalidContainerType(name.to_string())),
+        _ => Err(MappingParseError::InvalidContainerType(name.to_owned())),
     }
 }
 
@@ -170,6 +171,6 @@ pub fn nbt_type(name: &str) -> Result<NbtType, MappingParseError> {
         "compound"   => Ok(NbtType::Compound),
         "int_array"  => Ok(NbtType::IntArray),
         "long_array" => Ok(NbtType::LongArray),
-        _ => Err(MappingParseError::InvalidNbtType(name.to_string())),
+        _ => Err(MappingParseError::InvalidNbtType(name.to_owned())),
     }
 }

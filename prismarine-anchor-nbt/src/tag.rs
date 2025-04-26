@@ -19,6 +19,7 @@ use crate::{
 
 
 /// The hash map type utilized in this crate.
+///
 /// If `preserve_order` is enabled, the map will iterate over keys and values
 /// in the order they were inserted by using the `IndexMap` type
 /// from the crate <https://docs.rs/indexmap/latest/indexmap/>.
@@ -27,6 +28,7 @@ use crate::{
 pub type Map<T> = indexmap::IndexMap<String, T>;
 
 /// The hash map type utilized in this crate.
+///
 /// If `preserve_order` is enabled, the map will iterate over keys and values
 /// in the order they were inserted by using the `IndexMap` type
 /// from the crate <https://docs.rs/indexmap/latest/indexmap/>.
@@ -35,15 +37,15 @@ pub type Map<T> = indexmap::IndexMap<String, T>;
 pub type Map<T> = std::collections::HashMap<String, T>;
 
 
-/// The generic NBT tag type, containing all supported tag variants which wrap around a corresponding
-/// rust type.
+/// The generic NBT tag type, containing all supported tag variants
+/// which wrap around a corresponding Rust type.
 ///
 /// This type will implement both `Serialize` and `Deserialize` when the serde feature is enabled,
 /// however this type should still be read and written with the utilities in the [`io`] module when
-/// possible if speed is the main priority. When linking into the serde ecosystem, we ensured that all
-/// tag types would have their data inlined into the resulting NBT output of our Serializer. Because of
-/// this, NBT tags are only compatible with self-describing formats, and also have slower deserialization
-/// implementations due to this restriction.
+/// possible if speed is the main priority. When linking into the serde ecosystem, we ensured that
+/// all tag types would have their data inlined into the resulting NBT output of our Serializer.
+/// Because of this, NBT tags are only compatible with self-describing formats, and also have
+/// slower deserialization implementations due to this restriction.
 ///
 /// [`io`]: crate::io
 #[derive(Clone, PartialEq)]
@@ -68,7 +70,7 @@ pub enum NbtTag {
     /// in this library; it exists solely to handle strange edge cases.
     /// The methods in the `io` module support it.
     /// It is serialized into invalid but human-readable SNBT. When serialized through serde,
-    /// it is treated as a ByteArray instead.
+    /// it is treated as a `ByteArray` instead.
     ByteString(Vec<u8>),
     /// An NBT tag list.
     List(NbtList),
@@ -111,14 +113,13 @@ impl NbtTag {
     #[inline]
     pub fn type_specifier(&self) -> Option<&'static str> {
         match self {
-            Self::Byte(_)      => Some("B"),
-            Self::Short(_)     => Some("S"),
-            Self::Long(_)      => Some("L"),
-            Self::Float(_)     => Some("F"),
-            Self::Double(_)    => Some("D"),
-            Self::ByteArray(_) => Some("B"),
-            Self::IntArray(_)  => Some("I"),
-            Self::LongArray(_) => Some("L"),
+            Self::Short(_)    => Some("S"),
+            Self::Float(_)    => Some("F"),
+            Self::Double(_)   => Some("D"),
+            Self::IntArray(_) => Some("I"),
+            Self::Byte(_) | Self::ByteArray(_) => Some("B"),
+            Self::Long(_) | Self::LongArray(_) => Some("L"),
+            // Note that in particular, `Self::Int` has no type specifier.
             _ => None,
         }
     }
@@ -134,6 +135,7 @@ impl NbtTag {
             Self::Float(_)      => NbtType::Float,
             Self::Double(_)     => NbtType::Double,
             Self::ByteArray(_)  => NbtType::ByteArray,
+            #[expect(clippy::match_same_arms)]
             Self::String(_)     => NbtType::String,
             Self::ByteString(_) => NbtType::String,
             Self::List(_)       => NbtType::List,
@@ -165,19 +167,20 @@ impl NbtTag {
     #[inline]
     pub(crate) fn tag_name(&self) -> &'static str {
         match self {
-            NbtTag::Byte(_)       => "Byte",
-            NbtTag::Short(_)      => "Short",
-            NbtTag::Int(_)        => "Int",
-            NbtTag::Long(_)       => "Long",
-            NbtTag::Float(_)      => "Float",
-            NbtTag::Double(_)     => "Double",
-            NbtTag::String(_)     => "String",
-            NbtTag::ByteString(_) => "String",
-            NbtTag::ByteArray(_)  => "ByteArray",
-            NbtTag::IntArray(_)   => "IntArray",
-            NbtTag::LongArray(_)  => "LongArray",
-            NbtTag::Compound(_)   => "Compound",
-            NbtTag::List(_)       => "List",
+            Self::Byte(_)       => "Byte",
+            Self::Short(_)      => "Short",
+            Self::Int(_)        => "Int",
+            Self::Long(_)       => "Long",
+            Self::Float(_)      => "Float",
+            Self::Double(_)     => "Double",
+            #[expect(clippy::match_same_arms)]
+            Self::String(_)     => "String",
+            Self::ByteString(_) => "String",
+            Self::ByteArray(_)  => "ByteArray",
+            Self::IntArray(_)   => "IntArray",
+            Self::LongArray(_)  => "LongArray",
+            Self::Compound(_)   => "Compound",
+            Self::List(_)       => "List",
         }
     }
 
@@ -192,7 +195,7 @@ impl NbtTag {
     /// via the standard library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_snbt(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with extra spacing for
@@ -207,7 +210,7 @@ impl NbtTag {
     /// library's [`format!`] macro to pass additional formatting parameters.
     /// Note that some formatting parameters may result in invalid SNBT.
     pub fn to_pretty_snbt(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 
     /// Converts this NBT tag into a valid, parsable SNBT string with no extraneous spacing.
@@ -356,7 +359,7 @@ impl NbtTag {
         self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
-    #[allow(clippy::write_with_newline)]
+    #[expect(clippy::write_with_newline)]
     fn recursively_format_snbt(
         &self,
         indent: &mut String,
@@ -365,6 +368,9 @@ impl NbtTag {
         opts: SnbtWriteOptions,
     ) -> fmt::Result {
 
+        // impl Display is fine, since this is an internal function and we don't
+        // end up needing turbofish
+        // #[expect(clippy::impl_trait_in_params, reason = "internal function")]
         fn write_list(
             list: &[impl Display],
             indent: &mut String,
@@ -372,22 +378,23 @@ impl NbtTag {
             f: &mut Formatter<'_>,
         ) -> fmt::Result {
             if list.is_empty() {
-                return write!(f, "[{};]", ts);
+                return write!(f, "[{ts};]");
             }
 
             if f.alternate() {
                 indent.push_str("    ");
-                write!(f, "[\n{}{};\n", indent, ts)?;
+                write!(f, "[\n{indent}{ts};\n")?;
             } else {
-                write!(f, "[{};", ts)?;
+                write!(f, "[{ts};")?;
             }
 
             let last_index = list.len() - 1;
             for (index, element) in list.iter().enumerate() {
                 if f.alternate() {
-                    write!(f, "{}", indent)?;
+                    write!(f, "{indent}")?;
                 }
                 Display::fmt(element, f)?;
+                // TODO: suffix after each element?
                 if index != last_index {
                     if f.alternate() {
                         write!(f, ",\n")?;
@@ -399,18 +406,21 @@ impl NbtTag {
 
             if f.alternate() {
                 indent.truncate(indent.len() - 4);
-                write!(f, "\n{}]", &indent)
+                write!(f, "\n{indent}]")
             } else {
                 write!(f, "]")
             }
         }
 
+        // impl Display is fine, since this is an internal function and we don't
+        // end up needing turbofish
+        // #[expect(clippy::impl_trait_in_params, reason = "internal function")]
         #[inline]
         fn write(value: &impl Display, ts: Option<&str>, f: &mut Formatter<'_>) -> fmt::Result {
             match ts {
                 Some(ts) => {
                     Display::fmt(value, f)?;
-                    write!(f, "{}", ts)
+                    write!(f, "{ts}")
                 }
                 None => Display::fmt(value, f),
             }
@@ -419,11 +429,11 @@ impl NbtTag {
         let ts = self.type_specifier();
 
         match self {
-            NbtTag::Byte(value)  => write(value, ts, f),
-            NbtTag::Short(value) => write(value, ts, f),
-            NbtTag::Int(value)   => write(value, ts, f),
-            NbtTag::Long(value)  => write(value, ts, f),
-            NbtTag::Float(value) => match opts.non_finite {
+            Self::Byte(value)  => write(value, ts, f),
+            Self::Short(value) => write(value, ts, f),
+            Self::Int(value)   => write(value, ts, f),
+            Self::Long(value)  => write(value, ts, f),
+            Self::Float(value) => match opts.non_finite {
                 WriteNonFinite::PrintFloats => {
                     let float = if value.is_finite() {
                         value
@@ -455,7 +465,7 @@ impl NbtTag {
                     }
                 }
             }
-            NbtTag::Double(value) => match opts.non_finite {
+            Self::Double(value) => match opts.non_finite {
                 WriteNonFinite::PrintFloats => {
                     let float = if value.is_finite() {
                         value
@@ -489,9 +499,9 @@ impl NbtTag {
             }
             // TODO: doesn't there need to be a type suffix on each element in write_list,
             // not just the header (at least in the older version?)
-            NbtTag::ByteArray(value) => write_list(value, indent, ts.unwrap(), f),
-            NbtTag::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
-            NbtTag::ByteString(value) => {
+            Self::ByteArray(value) => write_list(value, indent, ts.unwrap(), f),
+            Self::String(value) => write!(f, "{}", Self::string_to_snbt(value, opts)),
+            Self::ByteString(value) => {
                 if let Ok(string) = String::from_utf8(value.clone()) {
                     write!(f, "{}", Self::string_to_snbt(&string, opts))
                 } else {
@@ -502,7 +512,7 @@ impl NbtTag {
                     write_list(value, indent, "ByteString", f)
                 }
             }
-            NbtTag::List(value) => if current_depth >= opts.depth_limit.0 {
+            Self::List(value) => if current_depth >= opts.depth_limit.0 {
                 // Converting to a string should be infallible; we can't simply error out.
                 // Instead, unfortunately, we must just print something that
                 // hopefully indicates the issue.
@@ -527,7 +537,7 @@ impl NbtTag {
                 // and that list tag *is* the current NbtTag, more or less.
                 value.recursively_format_snbt(indent, f, current_depth, opts)
             },
-            NbtTag::Compound(value) => if current_depth >= opts.depth_limit.0 {
+            Self::Compound(value) => if current_depth >= opts.depth_limit.0 {
                 write!(f, "{}", Self::string_to_snbt(
                     &format!(
                         "Depth limit of {} reached; could not add Compound tag",
@@ -538,8 +548,8 @@ impl NbtTag {
             } else {
                 value.recursively_format_snbt(indent, f, current_depth, opts)
             },
-            NbtTag::IntArray(value)  => write_list(value, indent, ts.unwrap(), f),
-            NbtTag::LongArray(value) => write_list(value, indent, ts.unwrap(), f),
+            Self::IntArray(value)  => write_list(value, indent, ts.unwrap(), f),
+            Self::LongArray(value) => write_list(value, indent, ts.unwrap(), f),
         }
     }
 }
@@ -575,36 +585,36 @@ tag_from!(
 
 impl From<&str> for NbtTag {
     #[inline]
-    fn from(value: &str) -> NbtTag {
-        NbtTag::String(value.to_owned())
+    fn from(value: &str) -> Self {
+        Self::String(value.to_owned())
     }
 }
 
 impl From<&String> for NbtTag {
     #[inline]
-    fn from(value: &String) -> NbtTag {
-        NbtTag::String(value.clone())
+    fn from(value: &String) -> Self {
+        Self::String(value.clone())
     }
 }
 
 impl From<bool> for NbtTag {
     #[inline]
-    fn from(value: bool) -> NbtTag {
-        NbtTag::Byte(if value { 1 } else { 0 })
+    fn from(value: bool) -> Self {
+        Self::Byte(if value { 1 } else { 0 })
     }
 }
 
 impl From<u8> for NbtTag {
     #[inline]
     fn from(value: u8) -> Self {
-        NbtTag::Byte(value as i8)
+        Self::Byte(value as i8)
     }
 }
 
 impl From<Vec<u8>> for NbtTag {
     #[inline]
     fn from(value: Vec<u8>) -> Self {
-        NbtTag::ByteArray(raw::cast_byte_buf_to_signed(value))
+        Self::ByteArray(raw::cast_byte_buf_to_signed(value))
     }
 }
 
@@ -658,6 +668,7 @@ impl TryFrom<&NbtTag> for u8 {
 
     #[inline]
     fn try_from(tag: &NbtTag) -> Result<Self, Self::Error> {
+        #[expect(clippy::use_self, reason = "clarity; it's a u8")]
         match *tag {
             NbtTag::Byte(value) => Ok(value as u8),
             _ => Err(NbtStructureError::type_mismatch("Byte", tag.tag_name())),
@@ -811,7 +822,7 @@ impl NbtList {
     /// Returns a new NBT tag list with an empty internal vec.
     #[inline]
     pub const fn new() -> Self {
-        NbtList(Vec::new())
+        Self(Vec::new())
     }
 
     /// Returns a mutable reference to the internal vector of this NBT list.
@@ -829,7 +840,7 @@ impl NbtList {
     /// Returns a new NBT tag list with the given initial capacity.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        NbtList(Vec::with_capacity(capacity))
+        Self(Vec::with_capacity(capacity))
     }
 
     /// Clones the data in the given list and converts it into an [`NbtList`].
@@ -839,7 +850,7 @@ impl NbtList {
         T: Clone + Into<NbtTag> + 'a,
         L: IntoIterator<Item = &'a T>,
     {
-        NbtList(list.into_iter().map(|x| x.clone().into()).collect())
+        Self(list.into_iter().map(|x| x.clone().into()).collect())
     }
 
     /// Iterates over this tag list, converting each tag reference into the specified type.
@@ -862,16 +873,18 @@ impl NbtList {
     /// Converts this tag list into a valid SNBT string. See `NbtTag::`[`to_snbt`] for details.
     ///
     /// [`to_snbt`]: crate::NbtTag::to_snbt
+    #[inline]
     pub fn to_snbt(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 
     /// Converts this tag list into a valid SNBT string with extra spacing for readability.
     /// See `NbtTag::`[`to_pretty_snbt`] for details.
     ///
     /// [`to_pretty_snbt`]: crate::NbtTag::to_pretty_snbt
+    #[inline]
     pub fn to_pretty_snbt(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 
     /// Converts this tag list into a valid SNBT string.
@@ -983,7 +996,7 @@ impl NbtList {
         self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
-    #[allow(clippy::write_with_newline)]
+    #[expect(clippy::write_with_newline)]
     fn recursively_format_snbt(
         &self,
         indent: &mut String,
@@ -1005,7 +1018,7 @@ impl NbtList {
         let last_index = self.len() - 1;
         for (index, element) in self.0.iter().enumerate() {
             if f.alternate() {
-                write!(f, "{}", indent)?;
+                write!(f, "{indent}")?;
             }
 
             // Conceptually, current_depth is the depth of this List itself;
@@ -1023,7 +1036,7 @@ impl NbtList {
 
         if f.alternate() {
             indent.truncate(indent.len() - 4);
-            write!(f, "\n{}]", indent)
+            write!(f, "\n{indent}]")
         } else {
             write!(f, "]")
         }
@@ -1033,14 +1046,14 @@ impl NbtList {
 impl Default for NbtList {
     #[inline]
     fn default() -> Self {
-        NbtList::new()
+        Self::new()
     }
 }
 
 impl<T: Into<NbtTag>> From<Vec<T>> for NbtList {
     #[inline]
     fn from(list: Vec<T>) -> Self {
-        NbtList(list.into_iter().map(|x| x.into()).collect())
+        Self(list.into_iter().map(|x| x.into()).collect())
     }
 }
 
@@ -1077,7 +1090,7 @@ impl<'a> IntoIterator for &'a mut NbtList {
 impl FromIterator<NbtTag> for NbtList {
     #[inline]
     fn from_iter<T: IntoIterator<Item = NbtTag>>(iter: T) -> Self {
-        NbtList(Vec::from_iter(iter))
+        Self(Vec::from_iter(iter))
     }
 }
 
@@ -1165,7 +1178,7 @@ impl NbtCompound {
     /// Returns a new NBT tag compound with an empty internal hash map.
     #[inline]
     pub fn new() -> Self {
-        NbtCompound(Map::new())
+        Self(Map::new())
     }
 
     /// Returns a reference to the internal hash map of this compound.
@@ -1192,12 +1205,12 @@ impl NbtCompound {
     pub fn with_capacity(capacity: usize) -> Self {
         #[cfg(not(feature = "comparable"))]
         {
-            NbtCompound(Map::with_capacity(capacity))
+            Self(Map::with_capacity(capacity))
         }
         #[cfg(feature = "comparable")]
         {
             let _ = capacity;
-            NbtCompound(Map::new())
+            Self(Map::new())
         }
     }
 
@@ -1209,7 +1222,7 @@ impl NbtCompound {
         V: Clone + Into<NbtTag> + 'a,
         &'a M: IntoIterator<Item = (&'a K, &'a V)>,
     {
-        NbtCompound(
+        Self(
             map.into_iter()
                 .map(|(key, value)| (key.clone().into(), value.clone().into()))
                 .collect(),
@@ -1244,7 +1257,7 @@ impl NbtCompound {
     ///
     /// [`to_snbt`]: crate::tag::NbtTag::to_snbt
     pub fn to_snbt(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 
     /// Converts this tag compound into a valid SNBT string with extra spacing for readability.
@@ -1252,7 +1265,7 @@ impl NbtCompound {
     ///
     /// [`to_pretty_snbt`]: crate::tag::NbtTag::to_pretty_snbt
     pub fn to_pretty_snbt(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 
     /// Converts this tag compound into a valid SNBT string.
@@ -1408,7 +1421,7 @@ impl NbtCompound {
         self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
-    #[allow(clippy::write_with_newline)]
+    #[expect(clippy::write_with_newline)]
     fn recursively_format_snbt(
         &self,
         indent: &mut String,
@@ -1433,9 +1446,9 @@ impl NbtCompound {
             let key = NbtTag::string_to_snbt(key, opts);
 
             if f.alternate() {
-                write!(f, "{}{}: ", indent, key)?;
+                write!(f, "{indent}{key}: ")?;
             } else {
-                write!(f, "{}:", key)?;
+                write!(f, "{key}:")?;
             }
 
             // Conceptually, current_depth is the depth of this Compound itself;
@@ -1453,7 +1466,7 @@ impl NbtCompound {
 
         if f.alternate() {
             indent.truncate(indent.len() - 4);
-            write!(f, "\n{}}}", indent)
+            write!(f, "\n{indent}}}")
         } else {
             write!(f, "}}")
         }
@@ -1463,7 +1476,17 @@ impl NbtCompound {
 impl Default for NbtCompound {
     #[inline]
     fn default() -> Self {
-        NbtCompound::new()
+        Self::new()
+    }
+}
+
+impl NbtCompound {
+    pub fn iter(&self) -> <&Map<NbtTag> as IntoIterator>::IntoIter {
+       self.into_iter()
+    }
+
+    pub fn iter_mut(&mut self) -> <&mut Map<NbtTag> as IntoIterator>::IntoIter {
+        self.into_iter()
     }
 }
 
@@ -1500,7 +1523,7 @@ impl<'a> IntoIterator for &'a mut NbtCompound {
 impl FromIterator<(String, NbtTag)> for NbtCompound {
     #[inline]
     fn from_iter<T: IntoIterator<Item = (String, NbtTag)>>(iter: T) -> Self {
-        NbtCompound(Map::from_iter(iter))
+        Self(Map::from_iter(iter))
     }
 }
 

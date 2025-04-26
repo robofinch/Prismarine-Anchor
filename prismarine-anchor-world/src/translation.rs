@@ -96,17 +96,22 @@ impl Translators {
     /// If not `searching_for_source` and not `searching_for_next`,
     /// then a pair of the form `(source, v)` is searched for,
     /// where `v` is **less** than or equal to `target`.
+    #[expect(
+        clippy::fn_params_excessive_bools,
+        reason = "This is temporary. This code needs to be improved."
+        // TODO: revamp universal translation stuff
+    )]
     pub fn find_available_translator(
-        &self, source: GameVersion, target: GameVersion,
+        &self, source: &GameVersion, target: &GameVersion,
         searching_for_source: bool, searching_for_next: bool
     ) -> Option<&InternalTranslator> {
 
         let mut possibilities = self.translators.keys()
             .filter(|key| {
-                if searching_for_source && target == key.1 {
+                if searching_for_source && target == &key.1 {
                     if let Some(ordering) = source.partial_cmp(&key.0) {
                         // I think the match is more readable
-                        #[allow(clippy::match_like_matches_macro)]
+                        #[expect(clippy::match_like_matches_macro)]
                         return match (searching_for_next, ordering) {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,
@@ -115,10 +120,10 @@ impl Translators {
                         }
                     }
 
-                } else if !searching_for_source && source == key.0 {
+                } else if !searching_for_source && source == &key.0 {
                     if let Some(ordering) = target.partial_cmp(&key.1) {
                         // I think the match is more readable
-                        #[allow(clippy::match_like_matches_macro)]
+                        #[expect(clippy::match_like_matches_macro)]
                         return match (searching_for_next, ordering) {
                             (true,  Ordering::Greater) => true,
                             (_,     Ordering::Equal)   => true,

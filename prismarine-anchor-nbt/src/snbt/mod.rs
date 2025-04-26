@@ -153,7 +153,7 @@ pub fn parse_compound_and_size<T: AsRef<str> + ?Sized>(
     opts: SnbtParseOptions,
 ) -> Result<(NbtCompound, usize), SnbtError> {
     let mut tokens = Lexer::new(string_nbt.as_ref(), opts);
-    let open_curly = tokens.assert_next(Token::OpenCurly, false)?;
+    let open_curly = tokens.assert_next(&Token::OpenCurly, false)?;
     parse_compound_tag(&mut tokens, &open_curly, 0)
 }
 
@@ -500,7 +500,7 @@ fn parse_compound_tag(
                         // First loop iteration or no comma
                         Some(0) | None => return Ok((compound, tokens.index())),
                         // Later iteration with a trailing comma
-                        Some(index) => if let SnbtVersion::Original = tokens.snbt_version() {
+                        Some(index) => if matches!(tokens.snbt_version(), SnbtVersion::Original) {
                             return Err(SnbtError::trailing_comma(tokens.raw(), index));
                         }
                     }
@@ -525,7 +525,7 @@ fn parse_compound_tag(
                                 ))
                             }
 
-                            tokens.assert_next(Token::Colon, false)?;
+                            tokens.assert_next(&Token::Colon, false)?;
                             compound.insert(
                                 key,
                                 parse_next_value(tokens, false, current_depth + 1)?,

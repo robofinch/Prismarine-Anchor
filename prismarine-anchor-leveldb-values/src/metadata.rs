@@ -1,6 +1,6 @@
 use std::io;
 use std::{collections::BTreeMap, ops::Range};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read as _, Write as _};
 
 use indexmap::IndexMap;
 use thiserror::Error;
@@ -405,7 +405,7 @@ impl From<MetaData> for NbtCompound {
         add_short_flag!(value.skull_flattening_performed, SkullFlatteningPerformed);
 
         // preserve_order is enabled in order to ensure that the compound remains sorted.
-        NbtCompound::from_iter(compound)
+        Self::from_iter(compound)
     }
 }
 

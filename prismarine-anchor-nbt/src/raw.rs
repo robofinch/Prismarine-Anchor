@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use std::{slice, str};
+use std::{ptr, slice, str};
 use std::{borrow::Cow, mem::ManuallyDrop};
 use std::io::{Read, Result as IoResult, Write};
 
@@ -25,8 +25,8 @@ pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
         Some(NbtTag::Float(..))      => 0x5,
         Some(NbtTag::Double(..))     => 0x6,
         Some(NbtTag::ByteArray(..))  => 0x7,
-        Some(NbtTag::String(..))     => 0x8,
         #[expect(clippy::match_same_arms)]
+        Some(NbtTag::String(..))     => 0x8,
         Some(NbtTag::ByteString(..)) => 0x8,
         Some(NbtTag::List(..))       => 0x9,
         Some(NbtTag::Compound(..))   => 0xA,
@@ -133,13 +133,13 @@ pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<'_, [u8]> {
 
 #[inline]
 pub fn read_i32_as_usize<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
-    #[allow(clippy::map_err_ignore, reason = "out-of-range i32 is the only possible error ignored")]
+    #[expect(clippy::map_err_ignore, reason = "out-of-range i32 is the only possible error ignored")]
     usize::try_from(read_i32(reader, opts)?).map_err(|_| NbtIoError::ExcessiveLength)
 }
 
 #[inline]
 pub fn read_string_len<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
-    #[allow(clippy::map_err_ignore, reason = "out-of-range u32 is the only possible error ignored")]
+    #[expect(clippy::map_err_ignore, reason = "out-of-range u32 is the only possible error ignored")]
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian
             => Ok(usize::from(read_u16(reader, opts)?)),
@@ -258,7 +258,7 @@ pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> IoRes
 
 #[inline]
 pub fn write_usize_as_i32<W: Write>(writer: &mut W, opts: IoOptions, value: usize) -> NbtResult<()> {
-    #[allow(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
+    #[expect(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
     let value = i32::try_from(value).map_err(|_| NbtIoError::ExcessiveLength)?;
     write_i32(writer, opts, value)?;
     Ok(())
@@ -267,7 +267,7 @@ pub fn write_usize_as_i32<W: Write>(writer: &mut W, opts: IoOptions, value: usiz
 #[inline]
 pub fn write_string_len<W: Write>(writer: &mut W, opts: IoOptions, len: usize) -> NbtResult<()> {
     // Error if the length can't be written
-    #[allow(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
+    #[expect(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian => {
             let len = u16::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
@@ -320,7 +320,7 @@ pub fn cast_byte_buf_to_signed(buf: Vec<u8>) -> Vec<i8> {
 pub fn cast_byte_buf_to_unsigned(buf: Vec<i8>) -> Vec<u8> {
     let mut me = ManuallyDrop::new(buf);
     // Pointer cast is valid because i8 and u8 have the same layout
-    let ptr = me.as_mut_ptr() as *mut u8;
+    let ptr = me.as_mut_ptr().cast::<u8>();
     let length = me.len();
     let capacity = me.capacity();
 
@@ -333,9 +333,9 @@ pub fn cast_byte_buf_to_unsigned(buf: Vec<i8>) -> Vec<u8> {
 
 // Currently unused, but might be used later
 #[inline]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub fn cast_bytes_to_signed(bytes: &[u8]) -> &[i8] {
-    let data = bytes.as_ptr() as *const i8;
+    let data = bytes.as_ptr().cast::<i8>();
     let len = bytes.len();
 
     // SAFETY:
@@ -351,7 +351,7 @@ pub fn cast_bytes_to_signed(bytes: &[u8]) -> &[i8] {
 
 #[inline]
 pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
-    let data = bytes.as_ptr() as *const u8;
+    let data = bytes.as_ptr().cast::<u8>();
     let len = bytes.len();
 
     // SAFETY:
@@ -366,8 +366,15 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
 }
 
 pub fn ref_i8_to_ref_u8(byte: &i8) -> &u8 {
-    // TODO: safety
-    unsafe { &*(byte as *const i8 as *const u8) }
+    let ptr = ptr::from_ref::<i8>(byte).cast::<u8>();
+
+    // SAFETY:
+    // * `ptr` came from a valid reference to an i8, so it is non-null.
+    // * u8 has the same size and alignment as i8,
+    //   so `ptr` is correctly aligned and dereferenceable.
+    // * `ptr` points to a valid byte (no matter what that byte is)
+    // * aliasing is satisfied, since we inherit the lifetime of the `byte` argument.
+    unsafe { &*ptr }
 }
 
 /// Convert a mutable reference to a slice of non-zero-sized values to a mutable reference
@@ -382,12 +389,15 @@ pub fn ref_i8_to_ref_u8(byte: &i8) -> &u8 {
 /// the alignment of `u8`, the function panics.
 unsafe fn non_zst_slice_to_bytes<T>(data: &mut [T]) -> &mut [u8] {
     const {
-        if size_of::<T>() == 0 {
-            panic!("non_zst_slice_to_bytes was called on a slice of a zero-sized type");
-        }
-        if align_of::<u8>() > align_of::<T>() {
-            panic!("You managed to run this on hardware where u8 has alignment that's too high")
-        }
+        // Note that `assert_ne!` currently can't be called in a const block.
+        assert!(
+            size_of::<T>() != 0,
+            "non_zst_slice_to_bytes was called on a slice of a zero-sized type",
+        );
+        assert!(
+            align_of::<u8>() <= align_of::<T>(),
+            "You managed to run this on hardware where u8 has alignment that's too high",
+        );
     }
 
     let ptr = data.as_mut_ptr().cast::<u8>();
@@ -419,7 +429,7 @@ unsafe fn non_zst_slice_to_bytes<T>(data: &mut [T]) -> &mut [u8] {
 #[inline]
 pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i32>> {
 
-    if let Endianness::NetworkLittleEndian = opts.endianness {
+    if matches!(opts.endianness, Endianness::NetworkLittleEndian) {
         // The number of bytes to read per i32 is variable; we can't do any better than reading
         // the values one-at-a-time
         (0..len).map(|_| reader.read_i32_varint()).collect()
@@ -443,7 +453,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
                 #[cfg(target_endian = "little")]
                 {
                     // We need to swap the endianness.
-                    for entry in data.iter_mut() {
+                    for entry in &mut data {
                         *entry = entry.swap_bytes();
                     }
                 }
@@ -470,7 +480,7 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
 #[inline]
 pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> IoResult<Vec<i64>> {
 
-    if let Endianness::NetworkLittleEndian = opts.endianness {
+    if matches!(opts.endianness, Endianness::NetworkLittleEndian) {
         // The number of bytes to read per i64 is variable; we can't do any better than reading
         // the values one-at-a-time
         (0..len).map(|_| reader.read_i64_varint()).collect()
@@ -493,7 +503,7 @@ pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
             Endianness::BigEndian => {
                 #[cfg(target_endian = "little")]
                 {
-                    for entry in data.iter_mut() {
+                    for entry in &mut data {
                         *entry = entry.swap_bytes();
                     }
                 }

@@ -18,7 +18,7 @@ use crate::{
     ValueToBytesError, ValueToBytesOptions, ValueParseResult,
 };
 
-/// The entries in a world's LevelDB database used by Minecraft Bedrock,
+/// The entries in a world's `LevelDB` database used by Minecraft Bedrock,
 /// parsed out of binary, but not necessary into the most useful completely-parsed format.
 ///
 /// Based on information from [minecraft.wiki], [LeviLamina],
@@ -217,28 +217,28 @@ impl DBEntry {
             DBKey::Data3D(chunk_pos) => {
                 if let Some(data_3d) = Data3D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::Data3D(chunk_pos, Box::new(data_3d))
+                        Self::Data3D(chunk_pos, Box::new(data_3d))
                     );
                 }
             }
             DBKey::Data2D(chunk_pos) => {
                 if let Some(data_2d) = Data2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::Data2D(chunk_pos, Box::new(data_2d))
+                        Self::Data2D(chunk_pos, Box::new(data_2d))
                     );
                 }
             }
             DBKey::LegacyData2D(chunk_pos) => {
                 if let Some(legacy_data_2d) = LegacyData2D::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::LegacyData2D(chunk_pos, Box::new(legacy_data_2d))
+                        Self::LegacyData2D(chunk_pos, Box::new(legacy_data_2d))
                     );
                 }
             }
             DBKey::SubchunkBlocks(chunk_pos, y_index) => {
                 if let Some(subchunk_blocks) = SubchunkBlocks::parse(value) {
                     return ValueParseResult::Parsed(
-                        DBEntry::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks)
+                        Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks)
                     )
                 }
             }
@@ -326,7 +326,7 @@ impl DBEntry {
                 => DBKey::SubchunkBlocks(*chunk_pos, *y_index),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
-            Self::PendingTicks(chunk_pos, ..)       => DBKey::RandomTicks(*chunk_pos),
+            Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
             Self::CavesAndCliffsBlending(chunk_pos, ..)
@@ -366,13 +366,14 @@ impl DBEntry {
         }
     }
 
-    /// If `error_on_excessive_length` is true and this is a LevelChunkMetaDataDictionary
+    /// If `error_on_excessive_length` is true and this is a `LevelChunkMetaDataDictionary`
     /// entry whose number of values is too large to fit in a u32, then an error is returned.
     pub fn to_value_bytes(
         &self,
         opts: ValueToBytesOptions,
     ) -> Result<Vec<u8>, ValueToBytesError> {
 
+        #[expect(clippy::match_same_arms, reason = "clarity")]
         Ok(match self {
             Self::Version(.., version)                => vec![u8::from(*version)],
             Self::LegacyVersion(.., version)          => vec![u8::from(*version)],

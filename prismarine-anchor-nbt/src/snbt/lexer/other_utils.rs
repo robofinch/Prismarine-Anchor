@@ -92,29 +92,30 @@ const UUID_FUNC: &str = "uuid(";
 const FUNC_SUFFIX: &str = ")";
 
 impl Lexer<'_> {
-    /// Parse operations (if the token_string is an operation)
+    /// Parse operations if the `token_string` is an operation,
+    /// and the version supports operations.
     #[inline]
     pub fn try_parse_operations(
         &mut self, start: usize, char_width: usize, token_string: &str
     ) -> Option<Result<TokenData, SnbtError>> {
 
-        if let SnbtVersion::UpdatedJava = self.snbt_version() {
-            if token_string.ends_with(FUNC_SUFFIX) {
-                if token_string.starts_with(BOOL_FUNC) {
-                    return Some(self.parse_bool_func(start, char_width, token_string));
+        if matches!(self.snbt_version(), SnbtVersion::UpdatedJava)
+            && token_string.ends_with(FUNC_SUFFIX)
+        {
+            if token_string.starts_with(BOOL_FUNC) {
+                return Some(self.parse_bool_func(start, char_width, token_string));
 
-                } else if token_string.starts_with(UUID_FUNC) {
-                    return Some(self.parse_uuid_func(start, char_width, token_string));
-                }
+            } else if token_string.starts_with(UUID_FUNC) {
+                return Some(self.parse_uuid_func(start, char_width, token_string));
             }
         }
 
         None
     }
 
-    /// Parse the bool(..) operation
+    /// Parse the `bool(..)` operation
     fn parse_bool_func(
-        &mut self,
+        &self,
         start: usize,
         char_width: usize,
         token_string: &str,
@@ -156,6 +157,7 @@ impl Lexer<'_> {
                 => self.parse_original_numeric(num_index, num_char_width, arg),
         }?;
 
+        #[expect(clippy::match_same_arms, reason = "clarity")]
         let nonzero = match numeric_tag.token {
             Token::Byte(n)          => n != 0,
             Token::Short(n)         => n != 0,
@@ -176,7 +178,7 @@ impl Lexer<'_> {
         ))
     }
 
-    /// Parse the uuid(..) operation
+    /// Parse the `uuid(..)` operation
     fn parse_uuid_func(
         &mut self,
         start: usize,
@@ -444,7 +446,7 @@ impl Lexer<'_> {
 
         // Read two characters and parse
         // The function calls to create errors are cheap and will probably be inlined
-        #[allow(clippy::or_fun_call)]
+        #[expect(clippy::or_fun_call)]
         let chars = [
             self.next_ch().ok_or(SnbtError::unexpected_eos(
                 "two-character hex unicode value",
@@ -512,7 +514,7 @@ impl Lexer<'_> {
 
         let mut get_char = || {
             // The function calls to create errors are cheap and will probably be inlined
-            #[allow(clippy::or_fun_call)]
+            #[expect(clippy::or_fun_call)]
             self.next_ch().ok_or(SnbtError::unexpected_eos(
                 "four-character hex unicode value",
             ))
@@ -578,7 +580,7 @@ impl Lexer<'_> {
 
         let mut get_char = || {
             // The function calls to create errors are cheap and will probably be inlined
-            #[allow(clippy::or_fun_call)]
+            #[expect(clippy::or_fun_call)]
             self.next_ch().ok_or(SnbtError::unexpected_eos(
                 "eight-character hex unicode value",
             ))
@@ -700,7 +702,7 @@ impl Lexer<'_> {
             let name_end = self.index - 1;
 
             // The function calls to create errors are cheap and will probably be inlined
-            #[allow(clippy::or_fun_call)]
+            #[expect(clippy::or_fun_call)]
             let escaped = unicode_names2::character(
                 &self.raw[name_start..name_end]
             ).ok_or(SnbtError::unknown_escape_sequence(

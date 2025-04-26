@@ -15,7 +15,7 @@ use super::{Lexer, Token, TokenData};
 // - Helper functions
 // - Numeric parse error
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum IntSuffix {
     B,
     S,
@@ -86,7 +86,8 @@ type CharIter<'a> = Peekable<Chars<'a>>;
 // ================================================================
 
 impl Lexer<'_> {
-    /// Parses a numeric token, in the UpdatedJava version. See numeric module source for details.
+    /// Parses a numeric token, in the `UpdatedJava` version.
+    /// See numeric module source for details.
     pub fn parse_updated_numeric(
         &self,
         index: usize,
@@ -104,7 +105,7 @@ impl Lexer<'_> {
             .map_err(|err| SnbtError::invalid_number(num_string, index, char_width, err))
     }
 
-    /// Parses a numeric token, in the Original version. See numeric module source for details.
+    /// Parses a numeric token, in the `Original` version. See numeric module source for details.
     pub fn parse_original_numeric(
         &self,
         index: usize,
@@ -127,7 +128,8 @@ impl Lexer<'_> {
 //      Central parsing functions: updated int, original int, float
 // ================================================================
 
-/// Tries to parse `num_string` into an integer token in the UpdatedJava version.
+/// Tries to parse `num_string` into an integer token in the `UpdatedJava` version.
+///
 /// Note that this function is not entirely decoupled from float parsing,
 /// as whether it returns `None` or `Some(Err(..))`
 /// depends on whether the value can be confirmed invalid for only integers
@@ -136,10 +138,9 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, NumericParseE
 
     let mut chars = num_string.chars().peekable();
 
-    let positive_sign = match read_sign(&mut chars) {
-        Some(s) => s,
+    let Some(positive_sign) = read_sign(&mut chars) else {
         // Empty `num_string` is invalid
-        None => return Some(Err(NumericParseError::EmptyString))
+        return Some(Err(NumericParseError::EmptyString))
     };
 
     // Hilariously, the bulk of the `try_parse_int` function is actually just reading the radix
@@ -198,6 +199,7 @@ fn try_parse_updated_int(num_string: &str) -> Option<Result<Token, NumericParseE
 
     // A helper function is a machine that converts code duplication
     // into analyzing how to use the helper function.
+    #[expect(clippy::match_same_arms, reason = "clarity")]
     match read_result {
         // We reached the end, the string is [+ | -][0x | 0b],
         // which isn't a valid integer or float.
@@ -232,10 +234,9 @@ fn try_parse_original_int(num_string: &str) -> Option<Result<Token, NumericParse
 
     let mut chars = num_string.chars().peekable();
 
-    let positive_sign = match read_sign(&mut chars) {
-        Some(s) => s,
+    let Some(positive_sign) = read_sign(&mut chars) else {
         // Empty `num_string` is invalid
-        None => return Some(Err(NumericParseError::EmptyString))
+        return Some(Err(NumericParseError::EmptyString))
     };
 
     // Read digits
@@ -243,6 +244,7 @@ fn try_parse_original_int(num_string: &str) -> Option<Result<Token, NumericParse
         &mut chars, 10, false, false, |_| false
     );
 
+    #[expect(clippy::match_same_arms, reason = "clarity")]
     match read_result {
         // We don't read a single character before reaching end of input;
         // the string is [+ | -] which is invalid for floats as well.
@@ -278,6 +280,7 @@ fn try_parse_original_int(num_string: &str) -> Option<Result<Token, NumericParse
 }
 
 /// Tries to parse `num_string` into a floating-point token. See module source for details.
+#[expect(clippy::fn_params_excessive_bools, reason = "internal function for this module")]
 fn parse_float(
     num_string: &str,
     allow_underscores: bool,
@@ -296,6 +299,7 @@ fn parse_float(
         &mut chars, 10, allow_underscores, false, |ch| ch == '.'
     );
 
+    #[expect(clippy::match_same_arms, reason = "clarity")]
     match read_result {
         // We reached the end, the string is [+ | -], which isn't a valid float.
         ReadDigitsResult::FirstPeekedNone => return Err(NumericParseError::NoDigits),
@@ -330,6 +334,7 @@ fn parse_float(
         |ch| matches!(ch, 'e' | 'E' | 'f' | 'F' | 'd' | 'D')
     );
 
+    #[expect(clippy::match_same_arms, reason = "clarity")]
     match read_result {
         // `integral_digits` was empty, and we read `None`.
         ReadDigitsResult::FirstPeekedNone => return Err(NumericParseError::NoDigits),
@@ -372,6 +377,7 @@ fn parse_float(
             |_| false
         );
 
+        #[expect(clippy::match_same_arms, reason = "clarity")]
         match read_result {
             // In either of these first two cases, `exp_digits` is empty, which isn't allowed
             ReadDigitsResult::FirstPeekedNone   => return Err(NumericParseError::NoExponentDigits),
@@ -416,6 +422,7 @@ fn parse_float(
 //      Calculations of values
 // ================================================================
 
+#[expect(clippy::fn_params_excessive_bools, reason = "internal function for this module")]
 fn integral_value(
     positive_sign: bool,
     radix: u32,
@@ -450,6 +457,7 @@ fn integral_value(
     Ok(match (positive_sign, unsigned) {
         // The int has to fit in a smaller number.
         // Note that the "as i8/i16/i32" are no-ops added to make "as i64" sign-extend.
+        #[expect(clippy::map_err_ignore, reason = "out-of-range is the only possible error ignored")]
         (true, true) => match suffix {
             IntSuffix::B => Token::Byte(  u8::try_from(num).map_err(|_| pos_oor("u8"))? as i8),
             IntSuffix::S => Token::Short(u16::try_from(num).map_err(|_| pos_oor("u16"))? as i16),
@@ -460,6 +468,7 @@ fn integral_value(
         },
 
         // The negative half of the range would have a minus sign
+        #[expect(clippy::map_err_ignore, reason = "out-of-range is the only possible error ignored")]
         (true, false) => match suffix {
             IntSuffix::B => Token::Byte(  i8::try_from(num).map_err(|_| pos_oor("i8"))?),
             IntSuffix::S => Token::Short(i16::try_from(num).map_err(|_| pos_oor("i16"))?),
@@ -517,6 +526,7 @@ fn integral_value(
     })
 }
 
+#[expect(clippy::fn_params_excessive_bools, reason = "internal function for this module")]
 fn float_value(
     positive_sign: bool,
     integral_digits: Vec<u8>,
@@ -531,12 +541,12 @@ fn float_value(
 
     // No need to worry about panics, thanks to infinity.
     for digit in integral_digits {
-        num = (num * 10.) + digit as f64;
+        num = (num * 10.) + f64::from(digit);
     }
 
     let mut factor = 0.1;
     for digit in fractional_digits {
-        num += digit as f64 * factor;
+        num += f64::from(digit) * factor;
         factor *= 0.1;
     }
 
@@ -573,7 +583,7 @@ fn float_value(
         // Also, these calculations won't overflow since 999_999 is much less than 2^31
         let mut exponent: i32 = 0;
         for digit in digits.take(6) {
-            exponent = exponent * 10 + digit as i32;
+            exponent = exponent * 10 + i32::from(digit);
         }
 
         if !exp_sign {
@@ -685,12 +695,13 @@ enum ReadDigitsResult {
 /// returning true on such characters may cause unexpected results.
 /// ## Panics
 /// Panics if radix is not between 2 and 36, inclusive.
-fn read_digits(
+#[expect(clippy::fn_params_excessive_bools, reason = "internal function for this module")]
+fn read_digits<S: FnOnce(char) -> bool>(
     chars: &mut CharIter<'_>,
     radix: u32,
     allow_underscores: bool,
     allow_first_none: bool,
-    first_chars_to_skip: impl FnOnce(char) -> bool,
+    first_chars_to_skip: S,
 ) -> (Vec<u8>, ReadDigitsResult) {
 
     let mut digits = Vec::new();
@@ -752,7 +763,7 @@ fn read_digits(
     (digits, halt_cause)
 }
 
-/// Helper function for UpdatedJava integer parsing.
+/// Helper function for `UpdatedJava` integer parsing.
 /// If successful, returns whether the integer is unsigned and what its suffix is.
 /// (True indicates unsigned, false indicates signed.)
 /// A `None` return value indicates that no suffix could be parsed,

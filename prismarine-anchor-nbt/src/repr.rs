@@ -15,7 +15,7 @@ pub enum NbtReprError {
 impl NbtReprError {
     /// Creates a new NBT representation error from the given structure error.
     pub fn structure(error: NbtStructureError) -> Self {
-        NbtReprError::Structure(Box::new(error))
+        Self::Structure(Box::new(error))
     }
 
     /// Creates a `NbtReprError` from the given error. If the given error is a [`NbtStructureError`],
@@ -26,34 +26,34 @@ impl NbtReprError {
         let mut error = <E as Into<anyhow::Error>>::into(error);
 
         error = match error.downcast::<Self>() {
-            Ok(error) => return error,
+            Ok(error)  => return error,
             Err(error) => error,
         };
 
         match error.downcast::<NbtStructureError>() {
-            Ok(error) => NbtReprError::Structure(Box::new(error)),
-            Err(error) => NbtReprError::Custom(error),
+            Ok(error)  => Self::Structure(Box::new(error)),
+            Err(error) => Self::Custom(error),
         }
     }
 }
 
 impl From<NbtStructureError> for NbtReprError {
     fn from(error: NbtStructureError) -> Self {
-        NbtReprError::Structure(Box::new(error))
+        Self::Structure(Box::new(error))
     }
 }
 
 impl From<Box<NbtStructureError>> for NbtReprError {
     fn from(error: Box<NbtStructureError>) -> Self {
-        NbtReprError::Structure(error)
+        Self::Structure(error)
     }
 }
 
 impl Display for NbtReprError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            NbtReprError::Structure(error) => Display::fmt(error, f),
-            NbtReprError::Custom(custom) => Display::fmt(custom, f),
+            Self::Structure(error) => Display::fmt(error, f),
+            Self::Custom(custom)   => Display::fmt(custom, f),
         }
     }
 }
@@ -61,8 +61,8 @@ impl Display for NbtReprError {
 impl error::Error for NbtReprError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            NbtReprError::Structure(error) => Some(error),
-            NbtReprError::Custom(custom) => Some(&**custom),
+            Self::Structure(error) => Some(error),
+            Self::Custom(custom)   => Some(&**custom),
         }
     }
 }

@@ -1,4 +1,4 @@
-#![allow(clippy::len_zero)]
+#![expect(clippy::len_zero)]
 
 use std::{array, slice};
 use std::{collections::BTreeSet, convert::Infallible, io::Read};
@@ -70,12 +70,12 @@ pub enum PaletteType {
 // ================================
 
 /// Attempt to read exactly `num_u32s`-many little-endian `u32`s.
-pub fn read_le_u32s(reader: &mut impl Read, num_u32s: usize) -> Option<Vec<u32>> {
+pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Option<Vec<u32>> {
     let mut u32s = vec![0; num_u32s * 4];
     reader.read_exact(&mut u32s).ok()?;
 
     let mut u32s = u32s.into_iter();
-    Some(Vec::from_iter((0..num_u32s).map(|_| {
+    Some((0..num_u32s).map(|_| {
         // We know that u32s has length exactly num_u32s * 4,
         // so these unwraps succeed.
         let block = [
@@ -85,7 +85,7 @@ pub fn read_le_u32s(reader: &mut impl Read, num_u32s: usize) -> Option<Vec<u32>>
             u32s.next().unwrap(),
         ];
         u32::from_le_bytes(block)
-    })))
+    }).collect())
 }
 
 /// Write many `u32`s to little-endian bytes. Infallible.
@@ -104,12 +104,15 @@ pub fn write_le_u32s(u32s: &[u32], bytes: &mut Vec<u8>) -> Result<(), Infallible
 impl<T> PalettizedStorage<T> {
     // TODO: return a Result instead of an Option
     // TODO: have the option to not accept the special cases
-    pub fn parse<R: Read>(
+    pub fn parse<R, F>(
         reader: &mut R,
         bits_per_index: HeaderBitsPerIndex,
-        mut parse_palette: impl FnMut(&mut R, usize) -> Option<Vec<T>>,
-    ) -> Option<Self> {
-
+        mut parse_palette: F,
+    ) -> Option<Self>
+    where
+        R: Read,
+        F: FnMut(&mut R, usize) -> Option<Vec<T>>,
+    {
         match bits_per_index {
             HeaderBitsPerIndex::Empty   => Some(Self::Empty),
             HeaderBitsPerIndex::Uniform => {
@@ -156,13 +159,15 @@ impl<T> PalettizedStorage<T> {
     }
 
     // TODO: have the option to error on the special cases
-    pub fn extend_serialized<E>(
+    pub fn extend_serialized<E, F>(
         &self,
         bytes: &mut Vec<u8>,
         palette_type: PaletteType,
         reserve: bool,
-        mut write_palette_to_vec: impl FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
-    ) -> Result<(), E> {
+        mut write_palette_to_vec: F,
+    ) -> Result<(), E>
+    where F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
+    {
         let header = PaletteHeader {
             palette_type,
             bits_per_index: self.bits_per_index(),
@@ -208,12 +213,14 @@ impl<T> PalettizedStorage<T> {
     }
 
     #[inline]
-    pub fn to_bytes<E>(
+    pub fn to_bytes<E, F>(
         &self,
         palette_type: PaletteType,
         reserve: bool,
-        write_palette_to_vec: impl FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
-    ) -> Result<Vec<u8>, E> {
+        write_palette_to_vec: F,
+    ) -> Result<Vec<u8>, E>
+    where F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
+    {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes, palette_type, reserve, write_palette_to_vec)?;
         Ok(bytes)
@@ -223,7 +230,7 @@ impl<T> PalettizedStorage<T> {
 impl PaletteHeader {
     /// Parses the `PaletteType` and bits per index of the palettized storage,
     /// including special cases.
-    pub fn parse_header(reader: &mut impl Read) -> Option<Self> {
+    pub fn parse_header<R: Read>(reader: &mut R) -> Option<Self> {
         let mut header = [0; 1];
         reader.read_exact(&mut header).ok()?;
         let header = header[0];
@@ -235,6 +242,7 @@ impl PaletteHeader {
 }
 
 impl From<PaletteHeader> for u8 {
+    #[expect(clippy::use_self, reason = "clarity and brevity")]
     #[inline]
     fn from(value: PaletteHeader) -> Self {
         let palette_type   = u8::from(value.palette_type);
@@ -616,7 +624,7 @@ impl From<HeaderBitsPerIndex> for u8 {
         match value {
             HeaderBitsPerIndex::Empty   => 127,
             HeaderBitsPerIndex::Uniform => 0,
-            HeaderBitsPerIndex::Palettized(bits_per_index) => u8::from(bits_per_index),
+            HeaderBitsPerIndex::Palettized(bits_per_index) => Self::from(bits_per_index),
         }
     }
 }
@@ -736,8 +744,8 @@ impl From<u8> for PaletteType {
     #[inline]
     fn from(value: u8) -> Self {
         match value {
-            0 => PaletteType::Persistent,
-            _ => PaletteType::Runtime,
+            0 => Self::Persistent,
+            _ => Self::Runtime,
         }
     }
 }

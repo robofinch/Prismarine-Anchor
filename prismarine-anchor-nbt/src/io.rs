@@ -36,15 +36,15 @@ macro_rules! compression_wrapper {
 
 /// Reads the given encoding of NBT compound data from the given reader,
 /// returning the resulting NBT compound and associated root name.
-pub fn read_compound(
-    reader: &mut impl Read,
+pub fn read_compound<R: Read>(
+    reader: &mut R,
     opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
     compression_wrapper!(read_compound_uncompressed, reader, opts)
 }
 
-fn read_compound_uncompressed(
-    reader: &mut impl Read, opts: IoOptions
+fn read_compound_uncompressed<R: Read>(
+    reader: &mut R, opts: IoOptions
 ) -> Result<(NbtCompound, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -66,16 +66,16 @@ fn read_compound_uncompressed(
 /// Reads the given encoding of NBT list data from the given reader,
 /// returning the resulting NBT list and associated root name.
 #[cfg(feature = "allow_list_root")]
-pub fn read_list(
-    reader: &mut impl Read,
+pub fn read_list<R: Read>(
+    reader: &mut R,
     opts: IoOptions
 ) -> Result<(NbtList, String), NbtIoError> {
     compression_wrapper!(read_list_uncompressed, reader, opts)
 }
 
 #[cfg(feature = "allow_list_root")]
-fn read_list_uncompressed(
-    reader: &mut impl Read, opts: IoOptions
+fn read_list_uncompressed<R: Read>(
+    reader: &mut R, opts: IoOptions
 ) -> Result<(NbtList, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -97,16 +97,16 @@ fn read_list_uncompressed(
 /// Reads the given encoding of NBT data from the given reader,
 /// returning the resulting NBT tag and associated root name.
 #[cfg(feature = "allow_any_root")]
-pub fn read_any_nbt(
-    reader: &mut impl Read,
+pub fn read_any_nbt<R: Read>(
+    reader: &mut R,
     opts: IoOptions
 ) -> Result<(NbtTag, String), NbtIoError> {
     compression_wrapper!(read_any_nbt_uncompressed, reader, opts)
 }
 
 #[cfg(feature = "allow_any_root")]
-fn read_any_nbt_uncompressed(
-    reader: &mut impl Read, opts: IoOptions
+fn read_any_nbt_uncompressed<R: Read>(
+    reader: &mut R, opts: IoOptions
 ) -> Result<(NbtTag, String), NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
@@ -119,24 +119,24 @@ fn read_any_nbt_uncompressed(
 /// Reads the given encoding of NBT data with no root name from the given reader,
 /// returning the resulting NBT tag.
 #[cfg(feature = "allow_unnamed_root")]
-pub fn read_any_unnamed_nbt(
-    reader: &mut impl Read,
+pub fn read_any_unnamed_nbt<R: Read>(
+    reader: &mut R,
     opts: IoOptions
 ) -> Result<NbtTag, NbtIoError> {
     compression_wrapper!(read_any_unnamed_nbt_uncompressed, reader, opts)
 }
 
 #[cfg(feature = "allow_unnamed_root")]
-fn read_any_unnamed_nbt_uncompressed(
-    reader: &mut impl Read, opts: IoOptions
+fn read_any_unnamed_nbt_uncompressed<R: Read>(
+    reader: &mut R, opts: IoOptions
 ) -> Result<NbtTag, NbtIoError> {
 
     let root_id = raw::read_u8(reader, opts)?;
     read_tag_body_dyn(reader, opts, root_id, 0)
 }
 
-fn read_tag_body_dyn(
-    reader: &mut impl Read, opts: IoOptions, tag_id: u8, current_depth: u32
+fn read_tag_body_dyn<R: Read>(
+    reader: &mut R, opts: IoOptions, tag_id: u8, current_depth: u32
 ) -> Result<NbtTag, NbtIoError> {
 
     macro_rules! drive_reader {
@@ -151,6 +151,9 @@ fn read_tag_body_dyn(
     drive_reader!(0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xA 0xB 0xC)
 }
 
+// Note that impl Read is used because this is an internal function
+// and we never need to specify the Read type with a turbofish here.
+// #[expect(clippy::impl_trait_in_params, reason = "internal function")]
 #[inline]
 fn read_tag_body_const<const TAG_ID: u8>(
     reader: &mut impl Read, opts: IoOptions, current_depth: u32
@@ -260,8 +263,8 @@ fn read_tag_body_const<const TAG_ID: u8>(
 
 macro_rules! write_with_compression {
     ($fn_name:ident, $uncompressed_fn:ident, $tag_type:ty) => {
-        fn $fn_name(
-            writer: &mut impl Write,
+        fn $fn_name<W: Write>(
+            writer: &mut W,
             opts: IoOptions,
             root_name: Option<&str>,
             root: $tag_type,
@@ -299,8 +302,8 @@ write_with_compression!(write_any_nbt_unnamed_impl, write_any_nbt_uncompressed, 
 
 /// Writes the provided NBT compound tag to the given writer using the indicated encoding.
 /// If no root name is provided, the empty string is used.
-pub fn write_compound(
-    writer: &mut impl Write,
+pub fn write_compound<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
@@ -311,8 +314,8 @@ pub fn write_compound(
 /// Writes the provided NBT list tag to the given writer using the indicated encoding.
 /// If no root name is provided, the empty string is used.
 #[cfg(feature = "allow_list_root")]
-pub fn write_list(
-    writer: &mut impl Write,
+pub fn write_list<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtList,
@@ -323,8 +326,8 @@ pub fn write_list(
 /// Write any NBT tag to the provided writer, using the provided encoding. If a root name for the
 /// tag is not provided, then the empty string is used.
 #[cfg(feature = "allow_any_root")]
-pub fn write_any_nbt(
-    writer: &mut impl Write,
+pub fn write_any_nbt<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtTag,
@@ -335,8 +338,8 @@ pub fn write_any_nbt(
 /// Write any NBT tag to the provided writer, using the provided encoding. Does not write any root
 /// name for the tag.
 #[cfg(feature = "allow_unnamed_root")]
-pub fn write_any_nbt_unnamed(
-    writer: &mut impl Write,
+pub fn write_any_nbt_unnamed<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root: &NbtTag,
 ) -> Result<(), NbtIoError> {
@@ -345,8 +348,8 @@ pub fn write_any_nbt_unnamed(
 
 /// Writes the given NBT compound to the provided writer, writing only the raw
 /// NBT data without any compression. If no name is provided, the empty string is used.
-fn write_named_compound_uncompressed(
-    writer: &mut impl Write,
+fn write_named_compound_uncompressed<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtCompound,
@@ -375,8 +378,8 @@ fn write_named_compound_uncompressed(
 /// Writes the given NBT list to the provided writer, writing only the raw
 /// NBT data without any compression. If no name is provided, the empty string is used.
 #[cfg(feature = "allow_list_root")]
-fn write_named_list_uncompressed(
-    writer: &mut impl Write,
+fn write_named_list_uncompressed<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtList,
@@ -416,8 +419,8 @@ fn write_named_list_uncompressed(
 /// Writes the given tag with an optional name to the provided writer, writing only the raw
 /// NBT data without any compression.
 #[cfg(any(feature = "allow_any_root", feature = "allow_unnamed_root"))]
-fn write_any_nbt_uncompressed(
-    writer: &mut impl Write,
+fn write_any_nbt_uncompressed<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     root_name: Option<&str>,
     root: &NbtTag,
@@ -494,14 +497,14 @@ fn write_tag_body<W: Write>(
         NbtTag::IntArray(value) => {
             raw::write_usize_as_i32(writer, opts, value.len())?;
 
-            for &int in value.iter() {
+            for &int in value {
                 raw::write_i32(writer, opts, int)?;
             }
         }
         NbtTag::LongArray(value) => {
             raw::write_usize_as_i32(writer, opts, value.len())?;
 
-            for &long in value.iter() {
+            for &long in value {
                 raw::write_i64(writer, opts, long)?;
             }
         }
@@ -628,21 +631,25 @@ impl serde::de::Error for NbtIoError {
     }
 }
 
-/// Read the Bedrock Edition NBT header. The first number is the version of `level.dat` format
+/// Read the Bedrock Edition NBT header.
+///
+/// The first number is the version of `level.dat` format
 /// if reading that file, and is otherwise always `8`. The second number is the length
 /// of the NBT file, excluding the header.
-pub fn read_bedrock_header(
-    reader: &mut impl Read,
+pub fn read_bedrock_header<R: Read>(
+    reader: &mut R,
     opts: IoOptions,
 ) -> Result<(i32, i32), NbtIoError> {
     Ok((raw::read_i32(reader, opts)?, raw::read_i32(reader, opts)?))
 }
 
-/// Write the Bedrock Edition NBT header. The first number is the version of `level.dat` format
+/// Write the Bedrock Edition NBT header.
+///
+/// The first number is the version of `level.dat` format
 /// if writing that file, and should otherwise always be `8`. The second number is the length
 /// of the NBT file, excluding the header.
-pub fn write_bedrock_header(
-    writer: &mut impl Write,
+pub fn write_bedrock_header<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     first_num: i32,
     nbt_len: usize,

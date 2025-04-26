@@ -5,10 +5,10 @@ use quote::ToTokens;
 use super::TranslatorTypes;
 
 
-pub fn generate_impl(name: Ident, types: TranslatorTypes) -> TokenStream {
+pub fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStream {
     let source_error = &types.error;
     let source_block_metadata = &types.block;
-    let source_translator = SourceTranslator { types: &types };
+    let source_translator = SourceTranslator { types };
 
     let cow             = Shorthand::Cow;
     let into            = Shorthand::IntoTrait;
@@ -186,6 +186,6 @@ impl ToTokens for SourceTranslator<'_> {
 
         tokens.extend(quote! {
             #translator::<#error, #block, #entity, #item>
-        })
+        });
     }
 }

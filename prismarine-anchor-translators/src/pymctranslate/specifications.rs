@@ -39,7 +39,7 @@ impl SpecificationFile {
     #[inline]
     pub fn from_json(
         json: &str, opts: MappingParseOptions,
-    ) -> Result<SpecificationFile, MappingParseError> {
+    ) -> Result<Self, MappingParseError> {
         parse_specification_file(serde_json::from_str(json)?, opts)
     }
 }
@@ -88,7 +88,7 @@ fn parse_specification_file(
         }
     }
 
-    for (property, (values, index)) in properties.iter_mut() {
+    for (property, (values, index)) in &mut properties {
         let default_value = defaults.remove(&**property)
             .expect("Every property was confirmed to have a default");
         let default_index = values.iter().position(|x| {

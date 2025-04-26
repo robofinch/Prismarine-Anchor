@@ -12,8 +12,9 @@ use super::NbtTag;
 //  ComparableNbtTag
 // ================================================================
 
-/// An NbtTag wrapper which implements `Eq`, `Ord`, and `Hash`. The majority of issues
-/// in implementing these traits arise from `Float` and `Double` tags,
+/// An `NbtTag` wrapper which implements `Eq`, `Ord`, and `Hash`.
+///
+/// The majority of issues in implementing these traits arise from `Float` and `Double` tags,
 /// though `List` and `Compound` tags may not be as performant as others. There are no
 /// recursion limits for comparisons.
 ///
@@ -31,28 +32,28 @@ impl ComparableNbtTag {
 
     /// Check if two tags are equal, using the provided `FloatEquality` comparator.
     #[inline]
-    pub fn equals(&self, other: &ComparableNbtTag, equal: impl FloatEquality) -> bool {
+    pub fn equals<E: FloatEquality>(&self, other: &Self, equal: E) -> bool {
         // See "Main recursive functions" below
         tags_are_equal(&self.0, &other.0, equal)
     }
 
     /// Check if two tags are equal, using the provided `FloatEquality` comparator.
     #[inline]
-    pub fn equals_tag(&self, other: &NbtTag, equal: impl FloatEquality) -> bool {
+    pub fn equals_tag<E: FloatEquality>(&self, other: &NbtTag, equal: E) -> bool {
         // See "Main recursive functions" below
         tags_are_equal(&self.0, other, equal)
     }
 
     /// Compare two tags, using the provided `FloatOrdering` comparator.
     #[inline]
-    pub fn compare(&self, other: &ComparableNbtTag, compare: impl FloatOrdering) -> Ordering {
+    pub fn compare<O: FloatOrdering>(&self, other: &Self, compare: O) -> Ordering {
         // See "Main recursive functions" below
         compare_tags(&self.0, &other.0, compare)
     }
 
     /// Compare two tags, using the provided `FloatOrdering` comparator.
     #[inline]
-    pub fn compare_tag(&self, other: &NbtTag, compare: impl FloatOrdering) -> Ordering {
+    pub fn compare_tag<O: FloatOrdering>(&self, other: &NbtTag, compare: O) -> Ordering {
         // See "Main recursive functions" below
         compare_tags(&self.0, other, compare)
     }
@@ -161,10 +162,11 @@ impl ComparableNbtTag {
     }
 
     #[cfg(feature = "float_cmp")]
-    fn map_floats(
-        &self, map_float: impl Fn(f32) -> f32, map_double: impl Fn(f64) -> f64,
-    ) -> (Self, bool) {
-
+    fn map_floats<F, D>(&self, map_float: F, map_double: D) -> (Self, bool)
+    where
+        F: Fn(f32) -> f32,
+        D: Fn(f64) -> f64,
+    {
         if let NbtTag::Float(f) = self.0 {
             return (Self(NbtTag::Float(map_float(f))), true)
         } else if let NbtTag::Double(d) = self.0 {
@@ -246,7 +248,9 @@ impl Ord for ComparableNbtTag {
 //  Main recursive functions
 // ================================================================
 
-fn tags_are_equal(tag: &NbtTag, other: &NbtTag, equal: impl FloatEquality) -> bool {
+fn tags_are_equal<E: FloatEquality>(
+    tag: &NbtTag, other: &NbtTag, equal: E,
+) -> bool {
     let mut compare_queue = VecDeque::new();
 
     compare_queue.push_back((tag, other));
@@ -310,7 +314,9 @@ fn tags_are_equal(tag: &NbtTag, other: &NbtTag, equal: impl FloatEquality) -> bo
     true
 }
 
-fn compare_tags(tag: &NbtTag, other: &NbtTag, compare: impl FloatOrdering) -> Ordering {
+fn compare_tags<O: FloatOrdering>(
+    tag: &NbtTag, other: &NbtTag, compare: O,
+) -> Ordering {
     match (tag, other) {
         (NbtTag::Byte(n),   NbtTag::Byte(k))  => n.cmp(k),
         (NbtTag::Short(n),  NbtTag::Short(k)) => n.cmp(k),

@@ -125,14 +125,14 @@ impl<'a> Lexer<'a> {
     /// Asserts that the next token is the same type as the provided token.
     pub fn assert_next(
         &mut self,
-        token: Token,
+        token: &Token,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
 
         match self.next(expecting_string).transpose()? {
             // We found a token so check the token type
             Some(td) =>
-                if mem::discriminant(&td.token) == mem::discriminant(&token) {
+                if mem::discriminant(&td.token) == mem::discriminant(token) {
                     Ok(td)
                 } else {
                     Err(SnbtError::unexpected_token(
@@ -153,6 +153,11 @@ impl<'a> Lexer<'a> {
         &mut self,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
+        // Sort of silly that clippy doesn't let me put this closer to the place it matters
+        #![allow(
+            clippy::needless_continue,
+            reason = "in case something is added after the match in a below loop",
+        )]
 
         let start = self.index;
         // Width of *raw input* in chars. The string passed to parse_token
@@ -254,7 +259,9 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                     // A later flush will handle this character
-                    Some(..) => continue,
+                    Some(..) => {
+                        continue;
+                    }
                     // Expected the quote to be matched
                     None => return Err(SnbtError::unmatched_quote(self.raw, start))
                 }
@@ -293,6 +300,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Parses an isolated token
+    #[expect(clippy::fn_params_excessive_bools, reason = "internal function")]
     fn parse_token(
         &mut self,
         token_string: Cow<'_, str>,
@@ -382,7 +390,7 @@ pub struct TokenData {
 impl TokenData {
     #[inline]
     fn new(token: Token, index: usize, char_width: usize) -> Self {
-        TokenData {
+        Self {
             token,
             index,
             char_width,
@@ -440,26 +448,26 @@ pub enum Token {
 impl Token {
     pub fn as_expectation(&self) -> &'static str {
         match self {
-            Token::OpenCurly    => "'{'",
-            Token::ClosedCurly  => "'}'",
-            Token::OpenSquare   => "'['",
-            Token::ClosedSquare => "']'",
-            Token::Comma        => "','",
-            Token::Colon        => "':'",
-            Token::Semicolon    => "';'",
+            Self::OpenCurly    => "'{'",
+            Self::ClosedCurly  => "'}'",
+            Self::OpenSquare   => "'['",
+            Self::ClosedSquare => "']'",
+            Self::Comma        => "','",
+            Self::Colon        => "':'",
+            Self::Semicolon    => "';'",
             _ => "value",
         }
     }
 
     pub fn into_tag(self) -> Result<NbtTag, Self> {
         match self {
-            Token::String { value, .. } => Ok(NbtTag::String(value)),
-            Token::Byte(value)          => Ok(NbtTag::Byte(value)),
-            Token::Short(value)         => Ok(NbtTag::Short(value)),
-            Token::Int(value)           => Ok(NbtTag::Int(value)),
-            Token::Long(value)          => Ok(NbtTag::Long(value)),
-            Token::Float(value)         => Ok(NbtTag::Float(value)),
-            Token::Double(value)        => Ok(NbtTag::Double(value)),
+            Self::String { value, .. } => Ok(NbtTag::String(value)),
+            Self::Byte(value)          => Ok(NbtTag::Byte(value)),
+            Self::Short(value)         => Ok(NbtTag::Short(value)),
+            Self::Int(value)           => Ok(NbtTag::Int(value)),
+            Self::Long(value)          => Ok(NbtTag::Long(value)),
+            Self::Float(value)         => Ok(NbtTag::Float(value)),
+            Self::Double(value)        => Ok(NbtTag::Double(value)),
             tk => Err(tk),
         }
     }
@@ -492,9 +500,13 @@ impl_from_exact!(i16, Short);
 impl_from_exact!(i64, Long);
 
 impl FromExact<Token> for i32 {
+    #[expect(clippy::use_self, reason = "clarity")]
     fn from_exact(tk: Token) -> Result<Self, Token> {
         match tk {
             Token::Int(value) => Ok(value),
+            // Additional information from the i64 being out-of-range is unimportant,
+            // we just return the token on error.
+            #[expect(clippy::map_err_ignore, reason = "error information is unnecessary")]
             Token::UnsuffixedInt(value) => i32::try_from(value).map_err(|_| tk),
             _ => Err(tk),
         }
@@ -515,9 +527,11 @@ fn out_of_range(
 }
 
 impl FromLossless<Token> for i8 {
+    #[expect(clippy::use_self, reason = "clarity")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value) => Ok(value),
+            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
             Token::UnsuffixedInt(value) => i8::try_from(value)
                 .map_err(|_| out_of_range(tk, value, "i8")),
             _ => Err((tk, None)),
@@ -526,10 +540,12 @@ impl FromLossless<Token> for i8 {
 }
 
 impl FromLossless<Token> for i16 {
+    #[expect(clippy::use_self, reason = "clarity")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value)  => Ok(i16::from(value)),
             Token::Short(value) => Ok(value),
+            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
             Token::UnsuffixedInt(value) => i16::try_from(value)
                 .map_err(|_| out_of_range(tk, value, "i16")),
             _ => Err((tk, None)),
@@ -538,11 +554,13 @@ impl FromLossless<Token> for i16 {
 }
 
 impl FromLossless<Token> for i32 {
+    #[expect(clippy::use_self, reason = "clarity")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
         match tk {
             Token::Byte(value)  => Ok(i32::from(value)),
             Token::Short(value) => Ok(i32::from(value)),
             Token::Int(value)   => Ok(value),
+            #[expect(clippy::map_err_ignore, reason = "only possible error is out-of-range i64")]
             Token::UnsuffixedInt(value) => i32::try_from(value)
                 .map_err(|_| out_of_range(tk, value, "i32")),
             _ => Err((tk, None)),
@@ -551,7 +569,9 @@ impl FromLossless<Token> for i32 {
 }
 
 impl FromLossless<Token> for i64 {
+    #[expect(clippy::use_self, reason = "clarity")]
     fn from_lossless(tk: Token) -> Result<Self, (Token, Option<NumericParseError>)> {
+        #[expect(clippy::match_same_arms)]
         match tk {
             Token::Byte(value)          => Ok(i64::from(value)),
             Token::Short(value)         => Ok(i64::from(value)),
@@ -657,7 +677,7 @@ impl AmbiguousWord {
                             char_width,
                         })
                     }
-                (ParseNonFinite::AsDetected, _) | (ParseNonFinite::AsFloat, _) => {
+                (ParseNonFinite::AsDetected, false) | (ParseNonFinite::AsFloat, _) => {
                     if opts.replace_non_finite {
                         Ok(TokenData {
                             token: match self {
@@ -672,7 +692,7 @@ impl AmbiguousWord {
                             index,
                             char_width,
                         })
-                    } else if let SnbtVersion::UpdatedJava = opts.version {
+                    } else if matches!(opts.version, SnbtVersion::UpdatedJava) {
                         Err(SnbtError::invalid_number(
                             input, index, char_width, NumericParseError::NonfiniteFloat
                         ))

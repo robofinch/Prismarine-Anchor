@@ -119,6 +119,7 @@ impl ChunkVersion {
     /// If you know when those chunk versions were used, please reach out!
     #[inline]
     pub fn lowest_game_version(self) -> NumericVersion {
+        #[expect(clippy::match_same_arms, reason = "clarity")]
         match self {
             Self::V0  => NumericVersion::from([0, 9, 0]),
             Self::V1  => NumericVersion::from([0, 9, 2]),

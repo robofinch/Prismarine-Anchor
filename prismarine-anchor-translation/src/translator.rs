@@ -11,6 +11,7 @@ use crate::datatypes::{Block, BlockEntity, BlockOrEntity, BlockPosition, Entity,
 
 
 /// Intended to translate granular game data from one version of the game to another.
+///
 /// Not everything, such as villages, can be translated individually; additional work
 /// may be necessary for the `Translator`'s user in such a case.
 ///
