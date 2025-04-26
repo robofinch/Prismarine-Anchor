@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use std::{ptr, slice, str};
+use std::{slice, str};
 use std::{borrow::Cow, mem::ManuallyDrop};
 use std::io::{Read, Result as IoResult, Write};
 
@@ -26,6 +26,7 @@ pub const fn id_for_tag(tag: Option<&NbtTag>) -> u8 {
         Some(NbtTag::Double(..))     => 0x6,
         Some(NbtTag::ByteArray(..))  => 0x7,
         Some(NbtTag::String(..))     => 0x8,
+        #[expect(clippy::match_same_arms)]
         Some(NbtTag::ByteString(..)) => 0x8,
         Some(NbtTag::List(..))       => 0x9,
         Some(NbtTag::Compound(..))   => 0xA,
@@ -132,11 +133,13 @@ pub fn bytes_from_string(string: &str, opts: IoOptions) -> Cow<'_, [u8]> {
 
 #[inline]
 pub fn read_i32_as_usize<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
+    #[allow(clippy::map_err_ignore, reason = "out-of-range i32 is the only possible error ignored")]
     usize::try_from(read_i32(reader, opts)?).map_err(|_| NbtIoError::ExcessiveLength)
 }
 
 #[inline]
 pub fn read_string_len<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<usize> {
+    #[allow(clippy::map_err_ignore, reason = "out-of-range u32 is the only possible error ignored")]
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian
             => Ok(usize::from(read_u16(reader, opts)?)),
@@ -154,7 +157,7 @@ pub fn read_string<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<String
     Ok(string_from_bytes(bytes.as_slice(), opts)?.into_owned())
 }
 
-pub fn read_string_or_bytes(reader: &mut impl Read, opts: IoOptions) -> NbtResult<NbtTag> {
+pub fn read_string_or_bytes<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResult<NbtTag> {
     let len = read_string_len(reader, opts)?;
     let mut bytes = vec![0; len];
     reader.read_exact(&mut bytes)?;
@@ -255,6 +258,7 @@ pub fn write_f64<W: Write>(writer: &mut W, opts: IoOptions, value: f64) -> IoRes
 
 #[inline]
 pub fn write_usize_as_i32<W: Write>(writer: &mut W, opts: IoOptions, value: usize) -> NbtResult<()> {
+    #[allow(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
     let value = i32::try_from(value).map_err(|_| NbtIoError::ExcessiveLength)?;
     write_i32(writer, opts, value)?;
     Ok(())
@@ -263,6 +267,7 @@ pub fn write_usize_as_i32<W: Write>(writer: &mut W, opts: IoOptions, value: usiz
 #[inline]
 pub fn write_string_len<W: Write>(writer: &mut W, opts: IoOptions, len: usize) -> NbtResult<()> {
     // Error if the length can't be written
+    #[allow(clippy::map_err_ignore, reason = "out-of-range usize is the only possible error ignored")]
     match opts.endianness {
         Endianness::BigEndian | Endianness::LittleEndian => {
             let len = u16::try_from(len).map_err(|_| NbtIoError::ExcessiveLength)?;
@@ -283,8 +288,8 @@ pub fn write_string<W: Write>(writer: &mut W, opts: IoOptions, string: &str) -> 
 }
 
 #[inline]
-pub fn write_byte_string(
-    writer: &mut impl Write,
+pub fn write_byte_string<W: Write>(
+    writer: &mut W,
     opts: IoOptions,
     string: &[u8],
 ) -> NbtResult<()> {
@@ -300,11 +305,11 @@ pub fn write_byte_string(
 pub fn cast_byte_buf_to_signed(buf: Vec<u8>) -> Vec<i8> {
     let mut me = ManuallyDrop::new(buf);
     // Pointer cast is valid because i8 and u8 have the same layout
-    let ptr = me.as_mut_ptr() as *mut i8;
+    let ptr = me.as_mut_ptr().cast::<i8>();
     let length = me.len();
     let capacity = me.capacity();
 
-    // Safety
+    // SAFETY:
     // * `ptr` was allocated by a Vec
     // * i8 has the same size and alignment as u8
     // * `length` and `capacity` came from a valid Vec
@@ -319,7 +324,7 @@ pub fn cast_byte_buf_to_unsigned(buf: Vec<i8>) -> Vec<u8> {
     let length = me.len();
     let capacity = me.capacity();
 
-    // Safety
+    // SAFETY:
     // * `ptr` was allocated by a Vec
     // * u8 has the same size and alignment as i8
     // * `length` and `capacity` came from a valid Vec
@@ -333,7 +338,7 @@ pub fn cast_bytes_to_signed(bytes: &[u8]) -> &[i8] {
     let data = bytes.as_ptr() as *const i8;
     let len = bytes.len();
 
-    // Safety
+    // SAFETY:
     // * `data` is valid for len * 1 bytes
     //     * The entire memory range of `data` is contained in a single
     //       allocated object since it came from a valid slice
@@ -349,7 +354,7 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
     let data = bytes.as_ptr() as *const u8;
     let len = bytes.len();
 
-    // Safety
+    // SAFETY:
     // * `data` is valid for len * 1 bytes
     //     * The entire memory range of `data` is contained in a single
     //       allocated object since it came from a valid slice
@@ -358,6 +363,57 @@ pub fn cast_bytes_to_unsigned(bytes: &[i8]) -> &[u8] {
     // * The constructed reference adopts the lifetime of the provided reference
     // * `len` <= isize::MAX because `len` came from a valid slice
     unsafe { slice::from_raw_parts(data, len) }
+}
+
+pub fn ref_i8_to_ref_u8(byte: &i8) -> &u8 {
+    // TODO: safety
+    unsafe { &*(byte as *const i8 as *const u8) }
+}
+
+/// Convert a mutable reference to a slice of non-zero-sized values to a mutable reference
+/// to the bytes of those values.
+///
+/// # Safety:
+/// Any possible bit pattern with the size and alignment of `T` should be a valid bit pattern
+/// for `T`.
+///
+/// # Panics:
+/// If `T` is a zero-sized type or somehow has an alignment strictly greater than
+/// the alignment of `u8`, the function panics.
+unsafe fn non_zst_slice_to_bytes<T>(data: &mut [T]) -> &mut [u8] {
+    const {
+        if size_of::<T>() == 0 {
+            panic!("non_zst_slice_to_bytes was called on a slice of a zero-sized type");
+        }
+        if align_of::<u8>() > align_of::<T>() {
+            panic!("You managed to run this on hardware where u8 has alignment that's too high")
+        }
+    }
+
+    let ptr = data.as_mut_ptr().cast::<u8>();
+    let t_len = data.len();
+
+    // NOTE:
+    // the byte length of slices and vectors in Rust is in the range
+    // `0..=isize::MAX` for non-ZST types.
+    // Therefore, the below code neither overflows nor exceeds isize::MAX.
+    let byte_len = t_len * size_of::<i32>();
+
+    // SAFETY:
+    // * `ptr` is valid for `t_len * size_of::<T>` bytes, a.k.a. `byte_len * 1` bytes
+    //   which is `byte_len * size_of::<u8>` bytes.
+    //     * The entire memory range of `ptr` is contained in a single
+    //       allocated object since it came from a valid slice (`data`)
+    //     * `ptr` is non-null and aligned correctly for T
+    //        (and thus also u8, which has the lowest alignment requirements).
+    // * `ptr` points to exactly `byte_len` consecutive bytes
+    // * The constructed reference adopts the lifetime of the provided reference
+    // * `byte_len` <= isize::MAX, and as `ptr` and `byte_len` were derived from
+    //   a valid slice, `ptr + byte_len` can't wrap around the address space
+    //   (else `data` would have.. problems)
+    unsafe {
+        slice::from_raw_parts_mut(ptr, byte_len)
+    }
 }
 
 #[inline]
@@ -369,24 +425,42 @@ pub fn read_i32_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
         (0..len).map(|_| reader.read_i32_varint()).collect()
 
     } else {
-        let mut bytes = ManuallyDrop::new(vec![0i32; len]);
+        let mut data = vec![0i32; len];
+        let data_slice = data.as_mut_slice();
 
-        let ptr = bytes.as_mut_ptr() as *mut u8;
-        let length = bytes.len() * 4;
-        let capacity = bytes.capacity() * 4;
+        // SAFETY:
+        // * Any possible pattern of 8 bytes with the alignment of an i32 is a valid
+        //   i32 value.
+        let byte_slice = unsafe { non_zst_slice_to_bytes(data_slice) };
 
-        let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+        reader.read_exact(byte_slice)?;
 
-        reader.read_exact(&mut bytes)?;
+        // After the above read, we have now read all the data into the original `data` Vec.
+        // But endianness might be messed up, since we directly copied the bytes.
 
-        // Safety: the length of the vec is a multiple of 4, and the alignment is 4
         match opts.endianness {
-            Endianness::BigEndian => Ok(unsafe {
-                convert_int_array_in_place::<i32, 4>(bytes, i32::from_be_bytes)
-            }),
-            Endianness::LittleEndian => Ok(unsafe {
-                convert_int_array_in_place::<i32, 4>(bytes, i32::from_le_bytes)
-            }),
+            Endianness::BigEndian => {
+                #[cfg(target_endian = "little")]
+                {
+                    // We need to swap the endianness.
+                    for entry in data.iter_mut() {
+                        *entry = entry.swap_bytes();
+                    }
+                }
+                // If the target is BigEndian, then the data is already in the correct format.
+                Ok(data)
+            }
+            Endianness::LittleEndian => {
+                #[cfg(target_endian = "big")]
+                {
+                    // We need to swap the endianness.
+                    for entry in data.iter_mut() {
+                        *entry = entry.swap_bytes();
+                    }
+                }
+                // If the target is LittleEndian, then the data is already in the correct format.
+                Ok(data)
+            }
             Endianness::NetworkLittleEndian => unreachable!()
         }
     }
@@ -402,64 +476,41 @@ pub fn read_i64_array<R: Read>(reader: &mut R, opts: IoOptions, len: usize) -> I
         (0..len).map(|_| reader.read_i64_varint()).collect()
 
     } else {
-        let mut bytes = ManuallyDrop::new(vec![0i64; len]);
+        let mut data = vec![0i64; len];
+        let data_slice = data.as_mut_slice();
 
-        let ptr = bytes.as_mut_ptr() as *mut u8;
-        let length = bytes.len() * 8;
-        let capacity = bytes.capacity() * 8;
+        // SAFETY:
+        // * Any possible pattern of 8 bytes with the alignment of an i64 is a valid
+        //   i64 value.
+        let byte_slice = unsafe { non_zst_slice_to_bytes(data_slice) };
 
-        let mut bytes = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
+        reader.read_exact(byte_slice)?;
 
-        reader.read_exact(&mut bytes)?;
+        // After the above read, we have now read all the data into the original `data` Vec.
+        // But endianness might be messed up, since we directly copied the bytes.
 
-        // Safety: the length of the vec is a multiple of 8, and the alignment is 8
         match opts.endianness {
-            Endianness::BigEndian => Ok(unsafe {
-                convert_int_array_in_place::<i64, 8>(bytes, i64::from_be_bytes)
-            }),
-            Endianness::LittleEndian => Ok(unsafe {
-                convert_int_array_in_place::<i64, 8>(bytes, i64::from_le_bytes)
-            }),
+            Endianness::BigEndian => {
+                #[cfg(target_endian = "little")]
+                {
+                    for entry in data.iter_mut() {
+                        *entry = entry.swap_bytes();
+                    }
+                }
+                // If the target is BigEndian, then the data is already in the correct format.
+                Ok(data)
+            }
+            Endianness::LittleEndian => {
+                #[cfg(target_endian = "big")]
+                {
+                    for entry in data.iter_mut() {
+                        *entry = entry.swap_bytes();
+                    }
+                }
+                // If the target is LittleEndian, then the data is already in the correct format.
+                Ok(data)
+            }
             Endianness::NetworkLittleEndian => unreachable!()
         }
     }
-}
-
-/// ## Safety
-/// The length of `bytes` must be a multiple of the size of `I` (in bytes),
-/// and the alignment of `bytes` must equal the alignment of `I`.
-#[inline]
-unsafe fn convert_int_array_in_place<I, const SIZE: usize>(
-    mut bytes: Vec<u8>,
-    convert: fn([u8; SIZE]) -> I,
-) -> Vec<I> {
-    let mut buf: [u8; SIZE];
-
-    let mut read = bytes.as_ptr() as *const [u8; SIZE];
-    let mut write = bytes.as_mut_ptr() as *mut I;
-
-    // Note that if something managed to panic here, the state of bytes
-    // might not be correct, but it won't violate memory safety (any 8 bits are a valid u8)
-    unsafe {
-        let end = bytes.as_ptr().add(bytes.len()) as *const [u8; SIZE];
-
-        while read != end {
-            buf = ptr::read(read);
-            ptr::write(write, convert(buf));
-            read = read.add(1);
-            write = write.add(1);
-        }
-    }
-
-    let mut me = ManuallyDrop::new(bytes);
-
-    let ptr = me.as_mut_ptr() as *mut I;
-    let length = me.len();
-    let capacity = me.capacity();
-
-    unsafe { Vec::from_raw_parts(ptr, length / SIZE, capacity / SIZE) }
-}
-
-pub fn ref_i8_to_ref_u8(byte: &i8) -> &u8 {
-    unsafe { &*(byte as *const i8 as *const u8) }
 }
