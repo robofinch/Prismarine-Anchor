@@ -201,6 +201,7 @@ impl MetaData {
 }
 
 impl From<NbtCompound> for MetaData {
+    #[expect(clippy::too_many_lines, reason = "it's well-organized into helper macros")]
     fn from(mut value: NbtCompound) -> Self {
 
         let mut unrecognized: BTreeMap<String, NbtTag> = BTreeMap::new();

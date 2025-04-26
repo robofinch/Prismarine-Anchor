@@ -519,6 +519,114 @@ fn parse_multiblock(
     Ok(MappingFunction::Multiblock(multiblock_entries))
 }
 
+// Parsing `walk_nbt` is more complicated
+#[derive(Serialize, Deserialize)]
+struct WalkInputOptionsJson<'a> {
+    #[serde(borrow)]
+    functions: Option<Vec<FunctionJson<'a>>>,
+
+    r#type: Option<String>,
+    #[serde(borrow)]
+    self_default: Option<Vec<FunctionJson<'a>>>,
+
+    #[serde(borrow)]
+    keys: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
+    #[serde(borrow)]
+    index: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
+    #[serde(borrow)]
+    nested_default: Option<Vec<FunctionJson<'a>>>,
+}
+
+fn parse_walk_input_options(
+    json: WalkInputOptionsJson<'_>, opts: MappingParseOptions,
+) -> Result<NestedWalkInputNbt, MappingParseError> {
+
+    let carry_default = MappingFunction::CarryNbt {
+        outer_name: "".into(),
+        outer_type: NbtContainerType::Compound,
+        path: None,
+        key: None,
+        value_type: None,
+    };
+
+    let self_type = json.r#type.map(|s| nbt_type(&s)).transpose()?;
+
+    let self_default = json.self_default
+        .map(|functions| FunctionJson::parse_multiple(functions, opts))
+        .transpose()?
+        .unwrap_or(Box::new([carry_default]));
+
+    let functions = json.functions
+        .map(|functions| FunctionJson::parse_multiple(functions, opts))
+        .transpose()?
+        .unwrap_or(Box::new([]));
+
+    let (nested, parse_nested_default) = match self_type {
+        Some(NbtType::Compound) => {
+            (
+                if let Some(keys) = json.keys {
+                    let nested = keys.into_iter().map(|(key, options)| {
+                        Ok((
+                            key.into_boxed_str(),
+                            parse_walk_input_options(options, opts)?,
+                        ))
+                    }).collect::<Result<_, MappingParseError>>()?;
+
+                    Some(IndexedNested::String(nested))
+                } else {
+                    None
+                },
+                true,
+            )
+        }
+        Some(NbtType::List | NbtType::ByteArray | NbtType::IntArray | NbtType::LongArray) => {
+            (
+                if let Some(index) = json.index {
+                    let nested = index.into_iter().map(|(index, options)| {
+                        #[expect(clippy::map_err_ignore)]
+                        let index = usize::from_str_radix(&index, 10)
+                            .map_err(|_| MappingParseError::InvalidIndex(index))?;
+
+                        Ok((index, parse_walk_input_options(options, opts)?))
+                    }).collect::<Result<_, MappingParseError>>()?;
+
+                    Some(IndexedNested::Number(nested))
+                } else {
+                    None
+                },
+                true,
+            )
+        }
+        _ => (None, false)
+    };
+
+    let carry_default = MappingFunction::CarryNbt {
+        outer_name: "".into(),
+        outer_type: NbtContainerType::Compound,
+        path: None,
+        key: None,
+        value_type: None,
+    };
+
+    let nested_default = if parse_nested_default {
+        json.nested_default
+            .map(|functions| FunctionJson::parse_multiple(functions, opts))
+            .transpose()?
+            .unwrap_or(Box::new([carry_default]))
+    } else {
+        Box::new([carry_default])
+    };
+
+    Ok(NestedWalkInputNbt {
+        functions,
+        self_type,
+        self_default,
+        nested,
+        nested_default,
+    })
+}
+
+
 fn parse_walk_nbt(
     options_json: &str, path_json: Option<&str>, opts: MappingParseOptions,
 ) -> Result<MappingFunction, MappingParseError> {
@@ -537,115 +645,7 @@ fn parse_walk_nbt(
        Box::new([])
     };
 
-    // Yay defining private structs and functions inside a function
-
-    #[derive(Serialize, Deserialize)]
-    struct WalkInputOptionsJson<'a> {
-        #[serde(borrow)]
-        functions: Option<Vec<FunctionJson<'a>>>,
-
-        r#type: Option<String>,
-        #[serde(borrow)]
-        self_default: Option<Vec<FunctionJson<'a>>>,
-
-        #[serde(borrow)]
-        keys: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
-        #[serde(borrow)]
-        index: Option<HashMap<String, WalkInputOptionsJson<'a>>>,
-        #[serde(borrow)]
-        nested_default: Option<Vec<FunctionJson<'a>>>,
-    }
-
     let json: WalkInputOptionsJson<'_> = serde_json::from_str(options_json)?;
-
-    fn parse_walk_input_options(
-        json: WalkInputOptionsJson<'_>, opts: MappingParseOptions,
-    ) -> Result<NestedWalkInputNbt, MappingParseError> {
-
-        let carry_default = MappingFunction::CarryNbt {
-            outer_name: "".into(),
-            outer_type: NbtContainerType::Compound,
-            path: None,
-            key: None,
-            value_type: None,
-        };
-
-        let self_type = json.r#type.map(|s| nbt_type(&s)).transpose()?;
-
-        let self_default = json.self_default
-            .map(|functions| FunctionJson::parse_multiple(functions, opts))
-            .transpose()?
-            .unwrap_or(Box::new([carry_default]));
-
-        let functions = json.functions
-            .map(|functions| FunctionJson::parse_multiple(functions, opts))
-            .transpose()?
-            .unwrap_or(Box::new([]));
-
-        let (nested, parse_nested_default) = match self_type {
-            Some(NbtType::Compound) => {
-                (
-                    if let Some(keys) = json.keys {
-                        let nested = keys.into_iter().map(|(key, options)| {
-                            Ok((
-                                key.into_boxed_str(),
-                                parse_walk_input_options(options, opts)?,
-                            ))
-                        }).collect::<Result<_, MappingParseError>>()?;
-
-                        Some(IndexedNested::String(nested))
-                    } else {
-                        None
-                    },
-                    true,
-                )
-            }
-            Some(NbtType::List | NbtType::ByteArray | NbtType::IntArray | NbtType::LongArray) => {
-                (
-                    if let Some(index) = json.index {
-                        let nested = index.into_iter().map(|(index, options)| {
-                            #[expect(clippy::map_err_ignore)]
-                            let index = usize::from_str_radix(&index, 10)
-                                .map_err(|_| MappingParseError::InvalidIndex(index))?;
-
-                            Ok((index, parse_walk_input_options(options, opts)?))
-                        }).collect::<Result<_, MappingParseError>>()?;
-
-                        Some(IndexedNested::Number(nested))
-                    } else {
-                        None
-                    },
-                    true,
-                )
-            }
-            _ => (None, false)
-        };
-
-        let carry_default = MappingFunction::CarryNbt {
-            outer_name: "".into(),
-            outer_type: NbtContainerType::Compound,
-            path: None,
-            key: None,
-            value_type: None,
-        };
-
-        let nested_default = if parse_nested_default {
-            json.nested_default
-                .map(|functions| FunctionJson::parse_multiple(functions, opts))
-                .transpose()?
-                .unwrap_or(Box::new([carry_default]))
-        } else {
-            Box::new([carry_default])
-        };
-
-        Ok(NestedWalkInputNbt {
-            functions,
-            self_type,
-            self_default,
-            nested,
-            nested_default,
-        })
-    }
 
     Ok(MappingFunction::WalkInputNbt {
         path,

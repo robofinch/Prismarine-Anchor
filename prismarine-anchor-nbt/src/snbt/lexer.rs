@@ -153,11 +153,6 @@ impl<'a> Lexer<'a> {
         &mut self,
         expecting_string: bool,
     ) -> Result<TokenData, SnbtError> {
-        // Sort of silly that clippy doesn't let me put this closer to the place it matters
-        #![allow(
-            clippy::needless_continue,
-            reason = "in case something is added after the match in a below loop",
-        )]
 
         let start = self.index;
         // Width of *raw input* in chars. The string passed to parse_token
@@ -183,90 +178,8 @@ impl<'a> Lexer<'a> {
             None => unreachable!("slurp_token called on an empty token"),
         };
 
-        let mut raw_token_buffer = Cow::Owned(String::new());
-
-        if quoted {
-            // Don't include the quotes in the final buffer
-            let mut flush_start = start + 1;
-
-            #[inline]
-            fn flush<'a>(raw: &'a str, buffer: &mut Cow<'a, str>, start: usize, end: usize) {
-                if start == end {
-                    return;
-                }
-
-                assert!(
-                    start < end,
-                    "Internal SNBT parsing error: start < end in `flush`"
-                );
-
-                if buffer.is_empty() {
-                    *buffer = Cow::Borrowed(&raw[start .. end]);
-                } else {
-                    buffer.to_mut().push_str(&raw[start .. end]);
-                }
-            }
-
-            loop {
-                // We won't stop until we read at least one character, a closing quote
-                char_width += 1;
-                match self.next_ch() {
-                    Some('\\') => {
-                        if let Some((ch, escape_char_len))
-                            = self.parse_escape_sequence(self.index - 1)?
-                        {
-                            if let Some(ch) = ch {
-                                // An escape sequence was parsed normally
-
-                                // Need to flush before pushing to self.raw_token_buffer
-                                flush(
-                                    self.raw,
-                                    &mut raw_token_buffer,
-                                    flush_start,
-                                    self.index - 1 // Flush everything up to the '\\'
-                                );
-
-                                raw_token_buffer.to_mut().push(ch);
-                                char_width += escape_char_len;
-                                flush_start = self.index;
-
-                            } else {
-                                // Invalid escape sequence, and should be copied verbatim,
-                                // so no need to flush.
-                                char_width += escape_char_len;
-                            }
-
-                        } else {
-                            // Invalid escape sequence, and should be ignored.
-                            flush(
-                                self.raw,
-                                &mut raw_token_buffer,
-                                flush_start,
-                                self.index - 1 // Flush everything up to the '\\'
-                            );
-                            char_width -= 1;
-                            flush_start = self.index;
-                        }
-                    }
-                    Some(ch) if ch == first_ch => {
-                        // Flush remaning characters
-                        flush(
-                            self.raw,
-                            &mut raw_token_buffer,
-                            flush_start,
-                            self.index - 1 // note: first_ch is '\'' or '"' with len_utf8 of 1
-                        );
-                        break;
-                    }
-                    // A later flush will handle this character
-                    Some(..) => {
-                        continue;
-                    }
-                    // Expected the quote to be matched
-                    None => return Err(SnbtError::unmatched_quote(self.raw, start))
-                }
-            }
-
+        let (char_width, raw_token_buffer) = if quoted {
+            self.slurp_quoted_symbol(self.raw, first_ch, start, char_width)?
         } else {
             // Unquoted string.
             // Loop until we reach a character which isn't allowed in the string
@@ -287,8 +200,8 @@ impl<'a> Lexer<'a> {
             // just before the character returned by self.peek_ch().
             //
             // TLDR: in either case self.index is the end index of the unquoted string
-            raw_token_buffer = Cow::Borrowed(&self.raw[start .. self.index]);
-        }
+            (char_width, Cow::Borrowed(&self.raw[start .. self.index]))
+        };
 
         self.parse_token(
             raw_token_buffer,
@@ -297,6 +210,103 @@ impl<'a> Lexer<'a> {
             quoted,
             expecting_string,
         )
+    }
+
+    /// Collect a quoted symbol from the character iterator.
+    // self.raw is passed in separately to avoid borrowing issues
+    fn slurp_quoted_symbol<'b>(
+        &mut self,
+        raw: &'b str,
+        initial_quote: char,
+        start: usize,
+        mut char_width: usize,
+    ) -> Result<(usize, Cow<'b, str>), SnbtError> {
+        // Sort of silly that clippy doesn't let me put this closer to the place it matters
+        #![allow(
+            clippy::needless_continue,
+            reason = "in case something is added after the match in a below loop",
+        )]
+
+        let mut raw_token_buffer = Cow::Owned(String::new());
+        // Don't include the quotes in the final buffer
+        let mut flush_start = start + 1;
+
+        #[inline]
+        fn flush<'a>(raw: &'a str, buffer: &mut Cow<'a, str>, start: usize, end: usize) {
+            if start == end {
+                return;
+            }
+
+            assert!(start < end, "Internal SNBT parsing error: start < end in `flush`");
+
+            if buffer.is_empty() {
+                *buffer = Cow::Borrowed(&raw[start .. end]);
+            } else {
+                buffer.to_mut().push_str(&raw[start .. end]);
+            }
+        }
+
+        loop {
+            // We won't stop until we read at least one character, a closing quote
+            char_width += 1;
+            match self.next_ch() {
+                Some('\\') => {
+                    if let Some((ch, escape_char_len))
+                        = self.parse_escape_sequence(self.index - 1)?
+                    {
+                        if let Some(ch) = ch {
+                            // An escape sequence was parsed normally
+
+                            // Need to flush before pushing to self.raw_token_buffer
+                            flush(
+                                raw,
+                                &mut raw_token_buffer,
+                                flush_start,
+                                self.index - 1, // Flush everything up to the '\\'
+                            );
+
+                            raw_token_buffer.to_mut().push(ch);
+                            char_width += escape_char_len;
+                            flush_start = self.index;
+
+                        } else {
+                            // Invalid escape sequence, and should be copied verbatim,
+                            // so no need to flush.
+                            char_width += escape_char_len;
+                        }
+
+                    } else {
+                        // Invalid escape sequence, and should be ignored.
+                        flush(
+                            raw,
+                            &mut raw_token_buffer,
+                            flush_start,
+                            self.index - 1, // Flush everything up to the '\\'
+                        );
+                        char_width -= 1;
+                        flush_start = self.index;
+                    }
+                }
+                Some(ch) if ch == initial_quote => {
+                    // Flush remaning characters
+                    flush(
+                        raw,
+                        &mut raw_token_buffer,
+                        flush_start,
+                        self.index - 1, // note: first_ch is '\'' or '"' with len_utf8 of 1
+                    );
+                    break;
+                }
+                // A later flush will handle this character
+                Some(..) => {
+                    continue;
+                }
+                // Expected the quote to be matched
+                None => return Err(SnbtError::unmatched_quote(raw, start))
+            }
+        }
+
+        Ok((char_width, raw_token_buffer))
     }
 
     /// Parses an isolated token

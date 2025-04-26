@@ -5,6 +5,10 @@ use quote::ToTokens;
 use super::TranslatorTypes;
 
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "having the quoted impl mostly be in one piece is more readable"
+)]
 pub(crate) fn generate_impl(name: &Ident, types: &TranslatorTypes) -> TokenStream {
     let source_error = &types.error;
     let source_block_metadata = &types.block;

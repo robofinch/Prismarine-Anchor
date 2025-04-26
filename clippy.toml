@@ -1,5 +1,6 @@
 max-fn-params-bools = 1
 max-include-file-size = 1000000
+too-many-lines-threshold = 100
 
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_macros
 disallowed-macros = [

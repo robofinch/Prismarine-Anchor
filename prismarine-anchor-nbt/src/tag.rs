@@ -359,7 +359,8 @@ impl NbtTag {
         self.recursively_format_snbt(&mut String::new(), f, 0, opts)
     }
 
-    #[expect(clippy::write_with_newline)]
+    #[expect(clippy::write_with_newline, clippy::too_many_lines)]
+    // TODO: fix too_many_lines lint, and break parts of this into separate functions
     fn recursively_format_snbt(
         &self,
         indent: &mut String,

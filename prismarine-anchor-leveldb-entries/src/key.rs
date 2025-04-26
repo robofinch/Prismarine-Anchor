@@ -194,6 +194,7 @@ impl DBKey {
         Self::parse_recognized_key(&raw_key).unwrap_or(Self::RawKey(raw_key))
     }
 
+    #[expect(clippy::too_many_lines, reason = "best to contain where raw keys are handled")]
     pub fn parse_recognized_key(raw_key: &[u8]) -> Option<Self> {
         // Try some common prefixes first
         if (raw_key.len() == 12 || raw_key.len() == 16) && raw_key.starts_with(b"digp") {
@@ -377,6 +378,7 @@ impl DBKey {
 
     /// Extend the provided `Vec` with the raw key bytes of a `DBKey`,
     /// using the provided serialization settings.
+    #[expect(clippy::too_many_lines, reason = "best to contain where raw keys are handled")]
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>, opts: KeyToBytesOptions) {
 
         fn extend_village(
@@ -577,7 +579,8 @@ impl DBKey {
             }
         };
 
-        // Look back at the top of the function for context
+        // Look back at the top of the match for context;
+        // a lot of cases would have these lines in common.
         bytes.reserve(13);
         dimensioned_pos.extend_serialized(bytes, opts.write_overworld_id);
         bytes.push(key_tag);

@@ -187,118 +187,101 @@ impl DBEntry {
         }
     }
 
+    // #[expect(clippy::too_many_lines, reason = "it's a giant match, which uses helper functions")]
     pub fn parse_recognized_value(key: DBKey, value: &[u8]) -> ValueParseResult {
+        use ValueParseResult as V;
+
         match key {
             DBKey::Version(chunk_pos) => {
                 if value.len() == 1 {
                     if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
-                        return ValueParseResult::Parsed(Self::Version(chunk_pos, chunk_version));
+                        return V::Parsed(Self::Version(chunk_pos, chunk_version));
                     }
                 }
             }
             DBKey::LegacyVersion(chunk_pos) => {
                 if value.len() == 1 {
                     if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
-                        return ValueParseResult::Parsed(
-                            Self::LegacyVersion(chunk_pos, chunk_version)
-                        );
+                        return V::Parsed(Self::LegacyVersion(chunk_pos, chunk_version));
                     }
                 }
             }
             DBKey::ActorDigestVersion(chunk_pos) => {
                 if value.len() == 1 {
                     if let Ok(digest_version) = ActorDigestVersion::try_from(value[0]) {
-                        return ValueParseResult::Parsed(
-                            Self::ActorDigestVersion(chunk_pos, digest_version),
-                        );
+                        return V::Parsed(Self::ActorDigestVersion(chunk_pos, digest_version));
                     }
                 }
             }
             DBKey::Data3D(chunk_pos) => {
                 if let Some(data_3d) = Data3D::parse(value) {
-                    return ValueParseResult::Parsed(
-                        Self::Data3D(chunk_pos, Box::new(data_3d))
-                    );
+                    return V::Parsed(Self::Data3D(chunk_pos, Box::new(data_3d)));
                 }
             }
             DBKey::Data2D(chunk_pos) => {
                 if let Some(data_2d) = Data2D::parse(value) {
-                    return ValueParseResult::Parsed(
-                        Self::Data2D(chunk_pos, Box::new(data_2d))
-                    );
+                    return V::Parsed(Self::Data2D(chunk_pos, Box::new(data_2d)));
                 }
             }
             DBKey::LegacyData2D(chunk_pos) => {
                 if let Some(legacy_data_2d) = LegacyData2D::parse(value) {
-                    return ValueParseResult::Parsed(
-                        Self::LegacyData2D(chunk_pos, Box::new(legacy_data_2d))
-                    );
+                    return V::Parsed(Self::LegacyData2D(chunk_pos, Box::new(legacy_data_2d)));
                 }
             }
             DBKey::SubchunkBlocks(chunk_pos, y_index) => {
                 if let Some(subchunk_blocks) = SubchunkBlocks::parse(value) {
-                    return ValueParseResult::Parsed(
-                        Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks)
-                    )
+                    return V::Parsed(Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks));
                 }
             }
             DBKey::BlockEntities(chunk_pos) => {
-                // The true is definitely needed.
+                // The `true` is definitely needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
-                    return ValueParseResult::Parsed(Self::BlockEntities(chunk_pos, compounds));
+                    return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             },
             DBKey::LegacyEntities(chunk_pos) => {
-                // TODO: Not sure if true is needed.
+                // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
-                    return ValueParseResult::Parsed(Self::LegacyEntities(chunk_pos, compounds));
+                    return V::Parsed(Self::LegacyEntities(chunk_pos, compounds));
                 }
             },
             DBKey::PendingTicks(chunk_pos) => {
-                // TODO: Not sure if true is needed.
+                // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
-                    return ValueParseResult::Parsed(Self::PendingTicks(chunk_pos, compounds));
+                    return V::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             },
             DBKey::RandomTicks(chunk_pos) => {
-                // TODO: Not sure if true is needed.
+                // TODO: Not sure if `true` is needed.
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
-                    return ValueParseResult::Parsed(Self::RandomTicks(chunk_pos, compounds));
+                    return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             },
             DBKey::MetaDataHash(chunk_pos) => {
                 if let Ok(bytes) = <[u8; 8]>::try_from(value) {
-                    return ValueParseResult::Parsed(
-                        Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes))
-                    );
+                    return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
                 }
             }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
-                return ValueParseResult::Parsed(
-                    Self::CavesAndCliffsBlending(chunk_pos, value.to_vec())
-                );
+                return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, value.to_vec()));
             }
             DBKey::BlendingBiomeHeight(chunk_pos) => {
-                return ValueParseResult::Parsed(
-                    Self::BlendingBiomeHeight(chunk_pos, value.to_vec())
-                );
+                return V::Parsed(Self::BlendingBiomeHeight(chunk_pos, value.to_vec()));
             }
             DBKey::BlendingData(chunk_pos) => {
                 if let Some(blending_data) = BlendingData::parse(value) {
-                    return ValueParseResult::Parsed(
-                        Self::BlendingData(chunk_pos, blending_data)
-                    );
+                    return V::Parsed(Self::BlendingData(chunk_pos, blending_data));
                 }
             }
             DBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
-                    return ValueParseResult::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
+                    return V::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
                 }
                 // TODO: use the error value to log debug information
                 // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
             }
             DBKey::RawKey(key) => {
-                return ValueParseResult::Parsed(Self::RawEntry {
+                return V::Parsed(Self::RawEntry {
                     key,
                     value: value.to_vec(),
                 });
