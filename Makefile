@@ -1,4 +1,4 @@
-all:	clippy check
+all:	clippy check check_web
 
 clippy:
 	cargo clippy --no-default-features
@@ -16,6 +16,7 @@ clippy:
 # serde               = [ "dep:serde" ]
 # derive_serde        = [ "serde/serde_derive"]
 # derive_standard     = []
+# js                  = [ "getrandom/js" ]
 
 # Combinations to check:
 # power set of preserve_order, comparable, float_cmp, serde, allow_any_root
@@ -44,3 +45,10 @@ check:
 	cargo hack check --each-feature --package prismarine-anchor-leveldb-values
 	cargo hack check --feature-powerset --package prismarine-anchor-nbt --depth 2
 	cargo hack check --feature-powerset --package prismarine-anchor-nbt --exclude-features named_escapes,configurable_depth,derive_serde,derive_standard,default
+
+check_web:
+	cargo hack check --target wasm32-unknown-unknown --feature-powerset --package prismarine-anchor-world --features js
+	cargo hack check --target wasm32-unknown-unknown --feature-powerset --package prismarine-anchor-nbt --depth 2 --features js
+	cargo hack check --target wasm32-unknown-unknown --feature-powerset --package prismarine-anchor-nbt --exclude-features named_escapes,configurable_depth,derive_serde,derive_standard,default --features js
+	cargo hack check --target wasm32-unknown-unknown --each-feature --package prismarine-anchor-leveldb-values
+	cargo hack check --target wasm32-unknown-unknown --feature-powerset --exclude prismarine-anchor-nbt --exclude prismarine-anchor-leveldb-values --exclude prismarine-anchor-world

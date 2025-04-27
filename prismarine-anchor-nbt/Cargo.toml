@@ -29,14 +29,12 @@ thiserror   .workspace = true
 varint-rs   .workspace = true
 
 float-cmp       = { workspace = true, optional = true }
+# We don't directly use this, but our deps do, and it may need to have the js feature enabled.
+# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
+getrandom       = { workspace = true, optional = true }
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
 unicode_names2  = { workspace = true, optional = true }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# We don't directly use this, but our deps do, and it needs to have the js feature enabled.
-# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
-getrandom = { workspace = true, features = ["js"] }
 
 # NOTE: whenever a new feature is added, the Makefile might need to be updated.
 [features]
@@ -73,3 +71,9 @@ serde               = [ "dep:serde" ]
 derive_serde        = [ "serde/serde_derive"]
 ## Derives `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash` for various plain-old-data structs.
 derive_standard     = []
+
+# We don't directly use getrandom, but our deps do, and it needs to have the js feature enabled.
+# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
+## Ensures that this crate is compatible with JS and browser WASM.
+## In particular, `getrandom` might not be web-compatible otherwise.
+js                  = [ "getrandom/js" ]

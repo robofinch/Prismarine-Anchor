@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "js"))]
 use std::{thread, time::Duration};
 
 use rusty_leveldb::{Result as StatusResult, Status, StatusCode};
@@ -168,7 +168,11 @@ impl Env for ZipEnv {
         0
     }
     fn sleep_for(&self, _micros: u32) {
-        #[cfg(not(target_arch = "wasm32"))]
+        // This is *technically* a slightly negative feature (as opposed to additive),
+        // but removing this sleep should not cause a compile error.
+        // And if someone is depending on a thread sleep for *correctness*
+        // (and not just efficiency) at runtime... that's not my fault.
+        #[cfg(not(feature = "js"))]
         {
             #[expect(clippy::used_underscore_binding)]
             thread::sleep(Duration::new(0, _micros * 1000));

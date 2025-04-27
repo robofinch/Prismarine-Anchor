@@ -28,13 +28,16 @@ web-time        .workspace = true
 zerocopy         = { workspace = true, features = ["derive"] }
 zip             .workspace = true
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# We don't directly use this, but our deps do, and it needs to have the js feature enabled.
+# We don't directly use this, but our deps do, and it may need to have the js feature enabled.
 # In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
-getrandom = { workspace = true, features = ["js"] }
+getrandom       = { workspace = true, optional = true }
 
 [features]
 default         = ["py_mc_translate"]
 
 py_mc_translate = ["prismarine-anchor-translators/py_mc_translate"]
 minecraft_data  = ["prismarine-anchor-translators/minecraft_data"]
+
+## Ensures that this crate is compatible with JS and browser WASM.
+## In particular, `getrandom` might not be web-compatible otherwise.
+js              = ["getrandom/js"]
