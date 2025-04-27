@@ -1076,12 +1076,15 @@ unsafe impl<'buffer> BufferSpecialization<'buffer> for BufferedCursor<'buffer> {
     where
         'buffer: 'de,
     {
-        let reader_ptr = ptr::from_mut(reader).cast::<Cursor<&'buffer [u8]>>();
+        let reader_ptr = ptr::from_mut::<R>(reader).cast::<Cursor<&'buffer [u8]>>();
         // SAFETY:
         // `R` is assumed to be `Cursor<&'buffer [u8]>`,
-        // and thus an `&mut R` reference, converted to a pointer,
-        // points to a valid (...)
-        // TODO: finish this comment.
+        // and thus an `&mut R` reference, converted to a pointer, satisfies:
+        // * `reader_ptr` is properly aligned for a `Cursor<&'buffer [u8]>` value
+        // * `reader_ptr` is non-null
+        // * `reader_ptr` points to a valid value of type `R` a.k.a. `Cursor<&'buffer [u8]>`
+        // * we inherit the lifetime of the provided `reader: &mut R` reference,
+        //   so aliasing requirements are met.
         let cursor = unsafe { &mut *reader_ptr };
         read_bytes_from_cursor(cursor, len)
     }
