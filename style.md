@@ -1,9 +1,10 @@
 # Style conventions
 - Use `make check` and `make clippy`, there should be no warnings.
-- All lines should have a newline at the end (i.e., the last one),
-  and no line may have trailing whitespace.
+- Any nonempty file should end with a newline, and no line may have trailing whitespace.
   (VSCode can enforce this.)
 - Use `#[expect(..)]`, `todo!()`, `// TODO` comments as needed.
+- Follow other conventions already in the code, like vertically aligning match arms
+  and vertical function parameters.
 - If using `rustfmt`, manually reformat everything afterwards
   (so, use `rustfmt` rarely if ever)
 - The overall layout of a file is:
