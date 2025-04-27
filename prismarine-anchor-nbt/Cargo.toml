@@ -38,12 +38,11 @@ unicode_names2  = { workspace = true, optional = true }
 # In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
 getrandom = { workspace = true, features = ["js"] }
 
+# NOTE: whenever a new feature is added, the Makefile might need to be updated.
 [features]
 default = [ "named_escapes" ]
 # TODO: Need to actually use document_features for the
 # below comments to be visible in the generated docs
-
-# NOTE: whenever a new feature is added, the Makefile might need to be updated.
 
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "dep:indexmap" ]
@@ -54,9 +53,15 @@ float_cmp           = [ "comparable", "dep:float-cmp" ]
 
 ## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
 named_escapes       = [ "dep:unicode_names2" ]
-## Adds NBT IO parsing and writing functions that allow a List to be the root node.
-## Such a root node is sometimes used by Minecraft Bedrock Edition.
-allow_list_root     = []
+## By default, NBT IO functions only support reading and writing named Compound tags to and from
+## bytes (such as NBT files). This feature provides additional IO functions for:
+## - named List tags
+## - named tags of any variant
+## - unnamed tags of any variant
+## Note that a List tag is sometimes used as the root tag by Minecraft Bedrock Edition.
+## Currently, other tag variants and unnamed tags aren't read or written to NBT files.
+## You probably shouldn't do so either, unless you have very good reason to.
+allow_any_root     = []
 ## If enabled, the maximum nesting depth limit used when parsing or writing NBT or SNBT data can
 ## be configured via additional functions for parsing and writing. Note that the default limit
 ## is what Minecraft uses, 512.
@@ -68,16 +73,3 @@ serde               = [ "dep:serde" ]
 derive_serde        = [ "serde/serde_derive"]
 ## Derives `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash` for various plain-old-data structs.
 derive_standard     = []
-
-#! ### Nonstandard Features
-#! The following features add additional parsing and writing functions for NBT bytes
-#! (such as NBT files) that are not used by any version of Minecraft, and probably
-#! not by any other NBT parsing library.
-#! Only use these nonstandard options if you have a reason to; they are included here
-#! because they are simple to implement, and plausibly useful, not because they are important.
-
-## Adds functions that read and write NbtTags of any variant to or from bytes (e.g. a file).
-allow_any_root      = []
-## Adds functions that read and write NbtTags of any variant to or from NBT bytes
-## (e.g. an NBT file) which do not give the root node a name.
-allow_unnamed_root  = [ "allow_any_root" ]

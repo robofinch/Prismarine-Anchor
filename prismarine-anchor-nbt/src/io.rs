@@ -70,7 +70,7 @@ fn read_compound_uncompressed<R: Read>(
 
 /// Reads the given encoding of NBT list data from the given reader,
 /// returning the resulting NBT list and associated root name.
-#[cfg(feature = "allow_list_root")]
+#[cfg(feature = "allow_any_root")]
 pub fn read_list<R: Read>(
     reader: &mut R,
     opts:   IoOptions,
@@ -78,7 +78,7 @@ pub fn read_list<R: Read>(
     compression_wrapper!(read_list_uncompressed, reader, opts)
 }
 
-#[cfg(feature = "allow_list_root")]
+#[cfg(feature = "allow_any_root")]
 fn read_list_uncompressed<R: Read>(
     reader: &mut R,
     opts:   IoOptions,
@@ -123,7 +123,7 @@ fn read_any_nbt_uncompressed<R: Read>(
 
 /// Reads the given encoding of NBT data with no root name from the given reader,
 /// returning the resulting NBT tag.
-#[cfg(feature = "allow_unnamed_root")]
+#[cfg(feature = "allow_any_root")]
 pub fn read_any_unnamed_nbt<R: Read>(
     reader: &mut R,
     opts:   IoOptions,
@@ -131,7 +131,7 @@ pub fn read_any_unnamed_nbt<R: Read>(
     compression_wrapper!(read_any_unnamed_nbt_uncompressed, reader, opts)
 }
 
-#[cfg(feature = "allow_unnamed_root")]
+#[cfg(feature = "allow_any_root")]
 fn read_any_unnamed_nbt_uncompressed<R: Read>(
     reader: &mut R,
     opts:   IoOptions,
@@ -311,9 +311,9 @@ write_with_compression!(
     write_named_compound_uncompressed,
     &NbtCompound,
 );
-#[cfg(feature = "allow_list_root")]
+#[cfg(feature = "allow_any_root")]
 write_with_compression!(write_list_impl, write_named_list_uncompressed, &NbtList);
-#[cfg(any(feature = "allow_any_root", feature = "allow_unnamed_root"))]
+#[cfg(feature = "allow_any_root")]
 write_with_compression!(
     write_any_nbt_unnamed_impl,
     write_any_nbt_uncompressed,
@@ -333,7 +333,7 @@ pub fn write_compound<W: Write>(
 
 /// Writes the provided NBT list tag to the given writer using the indicated encoding.
 /// If no root name is provided, the empty string is used.
-#[cfg(feature = "allow_list_root")]
+#[cfg(feature = "allow_any_root")]
 pub fn write_list<W: Write>(
     writer:    &mut W,
     opts:      IoOptions,
@@ -357,7 +357,7 @@ pub fn write_any_nbt<W: Write>(
 
 /// Write any NBT tag to the provided writer, using the provided encoding. Does not write any root
 /// name for the tag.
-#[cfg(feature = "allow_unnamed_root")]
+#[cfg(feature = "allow_any_root")]
 pub fn write_any_nbt_unnamed<W: Write>(
     writer: &mut W,
     opts:  IoOptions,
@@ -397,7 +397,7 @@ fn write_named_compound_uncompressed<W: Write>(
 
 /// Writes the given NBT list to the provided writer, writing only the raw
 /// NBT data without any compression. If no name is provided, the empty string is used.
-#[cfg(feature = "allow_list_root")]
+#[cfg(feature = "allow_any_root")]
 fn write_named_list_uncompressed<W: Write>(
     writer:    &mut W,
     opts:      IoOptions,
@@ -440,7 +440,7 @@ fn write_named_list_uncompressed<W: Write>(
 
 /// Writes the given tag with an optional name to the provided writer, writing only the raw
 /// NBT data without any compression.
-#[cfg(any(feature = "allow_any_root", feature = "allow_unnamed_root"))]
+#[cfg(feature = "allow_any_root")]
 fn write_any_nbt_uncompressed<W: Write>(
     writer:    &mut W,
     opts:      IoOptions,

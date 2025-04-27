@@ -6,21 +6,19 @@ clippy:
 	cargo clippy --all-features
 
 # NBT features:
+# default             = [ "named_escapes" ]
 # preserve_order      = [ "dep:indexmap" ]
 # comparable          = []
 # float_cmp           = [ "comparable", "dep:float-cmp" ]
 # named_escapes       = [ "dep:unicode_names2" ]
-# allow_list_root     = []
+# allow_any_root      = []
 # configurable_depth  = []
 # serde               = [ "dep:serde" ]
 # derive_serde        = [ "serde/serde_derive"]
 # derive_standard     = []
-# allow_any_root      = []
-# allow_unnamed_root  = [ "allow_any_root" ]
-# Technically also the default feature.
 
 # Combinations to check:
-# power set of preserve_order, comparable, float_cmp, serde, allow_unnamed_root
+# power set of preserve_order, comparable, float_cmp, serde, allow_any_root
 # plus check each feature, with a depth of 2 just in case
 
 # NOTE for VSCode users:
@@ -45,4 +43,4 @@ check:
 	cargo hack check --feature-powerset --exclude prismarine-anchor-nbt --exclude prismarine-anchor-leveldb-values
 	cargo hack check --each-feature --package prismarine-anchor-leveldb-values
 	cargo hack check --feature-powerset --package prismarine-anchor-nbt --depth 2
-	cargo hack check --feature-powerset --package prismarine-anchor-nbt --exclude-features named_escapes,allow_list_root,configurable_depth,derive_serde,derive_standard,allow_any_root,default
+	cargo hack check --feature-powerset --package prismarine-anchor-nbt --exclude-features named_escapes,configurable_depth,derive_serde,derive_standard,default
