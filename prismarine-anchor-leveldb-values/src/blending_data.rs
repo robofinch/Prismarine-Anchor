@@ -39,9 +39,13 @@ impl BlendingData {
                 let i8_data   = value[34] as i8;
 
                 let mut i16_bytes = i16_bytes.iter();
-                let i16_data = array::from_fn(|_| {
-                    // This doesn't panic because the u16_data iter contains
+                let i16_data: [_; 16] = array::from_fn(|_| {
+                    // This doesn't panic because the i16_bytes iter contains
                     // exactly 32 u8's.
+                    #[expect(
+                        clippy::unwrap_used,
+                        reason = "we call `.next().unwrap()` exactly `32 == 16 * 2` times",
+                    )]
                     let entry = i16::from_le_bytes([
                         *i16_bytes.next().unwrap(),
                         *i16_bytes.next().unwrap(),

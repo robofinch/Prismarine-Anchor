@@ -76,6 +76,32 @@ fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
     Some(sum)
 }
 
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[inline]
+fn slice_to_array<const START: usize, const END: usize, T: Copy, const N: usize>(
+    slice: &[T],
+) -> [T; N] {
+    *slice_to_array_ref::<START, END, T, N>(slice)
+}
+
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[inline]
+fn slice_to_array_ref<const START: usize, const END: usize, T, const N: usize>(
+    slice: &[T],
+) -> &[T; N] {
+    const {
+        assert!(
+            START + N == END,
+            "slice_to_array was called with incorrect START/END bounds",
+        );
+    }
+
+    // The slice has the same length as the target array, so `try_into` succeeds
+    #[expect(clippy::unwrap_used, reason = "we checked at compile time that this cannot fail")]
+    slice[START..END].try_into().unwrap()
+}
 
 // ================================
 //      Operation parsing
@@ -247,12 +273,12 @@ impl Lexer<'_> {
                 }
 
                 // Split the UUID into its parts
-                let first:       [char; 8] = uuid_chars[ 0.. 8].try_into().unwrap();
-                let second:      [char; 4] = uuid_chars[ 9..13].try_into().unwrap();
-                let third:       [char; 4] = uuid_chars[14..18].try_into().unwrap();
-                let fourth:      [char; 4] = uuid_chars[19..23].try_into().unwrap();
-                let fifth_start: [char; 4] = uuid_chars[24..28].try_into().unwrap();
-                let fifth_end:   [char; 8] = uuid_chars[28..36].try_into().unwrap();
+                let first:       [char; 8] = slice_to_array::< 0,  8, _, 8>(&uuid_chars);
+                let second:      [char; 4] = slice_to_array::< 9, 13, _, 4>(&uuid_chars);
+                let third:       [char; 4] = slice_to_array::<14, 18, _, 4>(&uuid_chars);
+                let fourth:      [char; 4] = slice_to_array::<19, 23, _, 4>(&uuid_chars);
+                let fifth_start: [char; 4] = slice_to_array::<24, 28, _, 4>(&uuid_chars);
+                let fifth_end:   [char; 8] = slice_to_array::<28, 36, _, 8>(&uuid_chars);
 
                 [
                     chars_to_u32(first),
@@ -263,9 +289,12 @@ impl Lexer<'_> {
             }
             (false, 32) => {
                 // Parse the 32 characters, which should be hex digits, in groups of 8
-
-                [(0..8), (8..16), (16..24), (24..32)]
-                    .map(|s| chars_to_u32(uuid_chars[s].try_into().unwrap()))
+                [
+                    chars_to_u32(slice_to_array::< 0,  8, _, 8>(&uuid_chars)),
+                    chars_to_u32(slice_to_array::< 8, 16, _, 8>(&uuid_chars)),
+                    chars_to_u32(slice_to_array::<16, 24, _, 8>(&uuid_chars)),
+                    chars_to_u32(slice_to_array::<24, 32, _, 8>(&uuid_chars)),
+                ]
             }
             _ => return Err(invalid_uuid()),
         };

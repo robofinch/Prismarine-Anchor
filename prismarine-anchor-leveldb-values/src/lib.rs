@@ -103,6 +103,51 @@ fn all_read(read_position: u64, total_len: usize) -> bool {
     }
 }
 
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[cfg(any(
+    feature = "chunk_position",
+    feature = "data_2d",
+    feature = "data_3d",
+    feature = "legacy_data_2d",
+    feature = "metadata",
+    feature = "subchunk_blocks",
+    feature = "uuid",
+))]
+#[inline]
+fn slice_to_array<const START: usize, const END: usize, T: Copy, const N: usize>(
+    slice: &[T],
+) -> [T; N] {
+    *slice_to_array_ref::<START, END, T, N>(slice)
+}
+
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[cfg(any(
+    feature = "chunk_position",
+    feature = "data_2d",
+    feature = "data_3d",
+    feature = "legacy_data_2d",
+    feature = "metadata",
+    feature = "subchunk_blocks",
+    feature = "uuid",
+))]
+#[inline]
+fn slice_to_array_ref<const START: usize, const END: usize, T, const N: usize>(
+    slice: &[T],
+) -> &[T; N] {
+    const {
+        assert!(
+            START + N == END,
+            "slice_to_array was called with incorrect START/END bounds",
+        );
+    }
+
+    // The slice has the same length as the target array, so `try_into` succeeds
+    #[expect(clippy::unwrap_used, reason = "we checked at compile time that this cannot fail")]
+    slice[START..END].try_into().unwrap()
+}
+
 /// Map an enum into and from two other types using `From` and `TryFrom` (with unit error).
 ///
 /// The two other types should be similar enough that the same value expression works for either;

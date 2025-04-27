@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
+use crate::slice_to_array;
+
 
 /// A 128-bit UUID in the 8-4-4-4-12 hex digit format,
 /// such as `002494ea-22dc-4fec-b590-4ea523338c20`.
@@ -56,12 +58,12 @@ impl UUID {
         }
 
         // Split the UUID into its parts
-        let first:       [char; 8] = uuid_chars[ 0.. 8].try_into().unwrap();
-        let second:      [char; 4] = uuid_chars[ 9..13].try_into().unwrap();
-        let third:       [char; 4] = uuid_chars[14..18].try_into().unwrap();
-        let fourth:      [char; 4] = uuid_chars[19..23].try_into().unwrap();
-        let fifth_start: [char; 4] = uuid_chars[24..28].try_into().unwrap();
-        let fifth_end:   [char; 8] = uuid_chars[28..36].try_into().unwrap();
+        let first:       [char; 8] = slice_to_array::< 0,  8, _, 8>(&uuid_chars);
+        let second:      [char; 4] = slice_to_array::< 9, 13, _, 4>(&uuid_chars);
+        let third:       [char; 4] = slice_to_array::<14, 18, _, 4>(&uuid_chars);
+        let fourth:      [char; 4] = slice_to_array::<19, 23, _, 4>(&uuid_chars);
+        let fifth_start: [char; 4] = slice_to_array::<24, 28, _, 4>(&uuid_chars);
+        let fifth_end:   [char; 8] = slice_to_array::<28, 36, _, 8>(&uuid_chars);
 
         Some(Self([
             chars_to_u32(first)?,

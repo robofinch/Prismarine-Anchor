@@ -134,6 +134,10 @@ fn parse_specification_file(
                 .map_err(MappingParseError::InvalidSnbt)?;
 
             // We know we can call next() exactly twice before getting None
+            #[expect(
+                clippy::unwrap_used,
+                reason = "`identifier.len() == 2`, else we'd have returned with an error above",
+            )]
             Some((
                 NamespacedIdentifier {
                     namespace: identifier.next().unwrap().into_boxed_str(),

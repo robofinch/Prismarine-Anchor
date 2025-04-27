@@ -5,7 +5,7 @@ use std::io::Cursor;
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
 
-use crate::all_read;
+use crate::{all_read, slice_to_array};
 use crate::palettized_storage::{PaletteHeader, PaletteType, PalettizedStorage};
 
 
@@ -92,12 +92,10 @@ impl LegacySubchunkBlocks {
         }
         let value = &value[1..];
 
-        // Converting a slice of length 4096 to an array of length 4096 succeeds.
-        let block_ids = value[0..4096].try_into().unwrap();
+        let block_ids: [u8; 4096] = slice_to_array::<0, 4096, _, 4096>(value);
         let value = &value[4096..];
 
-        // Converting a slice of length 2048 to an array of length 2048 succeeds.
-        let packed_block_data = value[0..2048].try_into().unwrap();
+        let packed_block_data: [u8; 2048] = slice_to_array::<0, 2048, _, 2048>(value);
         let value = &value[2048..];
 
         if !skylight {
@@ -110,8 +108,7 @@ impl LegacySubchunkBlocks {
             });
         }
 
-        // Converting a slice of length 2048 to an array of length 2048 succeeds.
-        let skylight = Some(value[0..2048].try_into().unwrap());
+        let skylight: Option<[u8; 2048]> = Some(slice_to_array::<0, 2048, _, 2048>(value));
         let value = &value[2048..];
 
         if !blocklight {
@@ -124,8 +121,7 @@ impl LegacySubchunkBlocks {
             });
         }
 
-        // Converting a slice of length 2048 to an array of length 2048 succeeds.
-        let blocklight = Some(value[0..2048].try_into().unwrap());
+        let blocklight: Option<[u8; 2048]> = Some(slice_to_array::<0, 2048, _, 2048>(value));
 
         Some(Self {
             version,

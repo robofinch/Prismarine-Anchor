@@ -55,6 +55,7 @@ fn parse_types(attr: &Attribute) -> syn::Result<TranslatorTypes> {
 
     let mut types = types.into_iter();
 
+    #[expect(clippy::unwrap_used, reason = "if this code is reached, `types.len() == 4`")]
     Ok(TranslatorTypes {
         error:  types.next().unwrap(),
         block:  types.next().unwrap(),

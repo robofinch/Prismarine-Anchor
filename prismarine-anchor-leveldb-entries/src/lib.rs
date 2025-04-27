@@ -136,6 +136,33 @@ pub struct EntryToBytesError {
     pub value_error: ValueToBytesError,
 }
 
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[inline]
+fn slice_to_array<const START: usize, const END: usize, T: Copy, const N: usize>(
+    slice: &[T],
+) -> [T; N] {
+    *slice_to_array_ref::<START, END, T, N>(slice)
+}
+
+/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
+/// everywhere.
+#[inline]
+fn slice_to_array_ref<const START: usize, const END: usize, T, const N: usize>(
+    slice: &[T],
+) -> &[T; N] {
+    const {
+        assert!(
+            START + N == END,
+            "slice_to_array was called with incorrect START/END bounds",
+        );
+    }
+
+    // The slice has the same length as the target array, so `try_into` succeeds
+    #[expect(clippy::unwrap_used, reason = "we checked at compile time that this cannot fail")]
+    slice[START..END].try_into().unwrap()
+}
+
 /// For use during development. Instead of printing binary data as entirely binary,
 /// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
 /// with binary data interspersed.

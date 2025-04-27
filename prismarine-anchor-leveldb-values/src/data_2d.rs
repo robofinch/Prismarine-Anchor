@@ -1,5 +1,7 @@
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
 
+use crate::slice_to_array;
+
 
 /// Not written since 1.18.0
 // TODO: exactly when?
@@ -29,16 +31,13 @@ impl Data2D {
             return None;
         }
 
-        // try_into().unwrap() converts a slice of length 512 to an array of length 512,
-        // so cannot fail.
-        let heightmap: [u8; 512] = value[0..512].try_into().unwrap();
+        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);
 
-        // try_into().unwrap() converts a slice of length 512 to an array of length 512,
-        // so cannot fail.
-        let biome_ids: [u8; 256] = value[512..512 + 256].try_into().unwrap();
+        // 768 == 512 + 256
+        let biome_ids: [u8; 256] = slice_to_array::<512, 768, _, 256>(value);
         let biome_ids: [[u8; 16]; 16] = transmute!(biome_ids);
 
         Some(Self {

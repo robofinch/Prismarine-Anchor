@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use zerocopy::transmute;
 
-use crate::all_read;
+use crate::{all_read, slice_to_array};
 use crate::palettized_storage::{
     PaletteHeader, PaletteType, PalettizedStorage,
     read_le_u32s, write_le_u32s,
@@ -25,9 +25,7 @@ impl Data3D {
             return None;
         }
 
-        // The .try_into().unwrap() converts a slice of length 512 into an array of
-        // length 512, which does not fail.
-        let heightmap: [u8; 512] = value[0..512].try_into().unwrap();
+        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);

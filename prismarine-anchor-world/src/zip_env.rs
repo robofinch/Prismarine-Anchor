@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, hash_map::Entry},
     io::{Cursor, Read, Result as IoResult, Seek, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 #[cfg(not(feature = "js"))]
 use std::{thread, time::Duration};
@@ -19,6 +19,20 @@ use thiserror::Error;
 use web_time::{SystemTime, UNIX_EPOCH};
 use zip::{result::ZipError, write::SimpleFileOptions, ZipArchive, ZipWriter};
 
+/// Consolidate where `.unwrap()` is called
+trait LockOrPanic<T> {
+    fn lock_or_panic(&self) -> MutexGuard<'_, T>;
+}
+
+impl<T> LockOrPanic<T> for Mutex<T> {
+    fn lock_or_panic(&self) -> MutexGuard<'_, T> {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "we want to panic if a mutex is poisoned",
+        )]
+        self.lock().unwrap()
+    }
+}
 
 /// `ZipEnv` supports writing or reading an in-memory virtual file system to or from a ZIP archive.
 #[expect(missing_debug_implementations, reason = "contains too much data")]
@@ -42,8 +56,8 @@ impl ZipEnv {
             clippy::iter_over_hash_type,
             reason = "unavoidable, and any order should work for zip",
         )]
-        for (key, entry) in self.0.store.lock().unwrap().iter() {
-            let file = &entry.f.0.lock().unwrap().0;
+        for (key, entry) in self.0.store.lock_or_panic().iter() {
+            let file = &entry.f.0.lock_or_panic().0;
             let is_large = u32::try_from(file.len()).is_err();
             let opts = SimpleFileOptions::default().large_file(is_large);
 
@@ -64,8 +78,8 @@ impl ZipEnv {
             clippy::iter_over_hash_type,
             reason = "unavoidable, and any order should work for zip",
         )]
-        for (key, entry) in self.0.store.lock().unwrap().iter() {
-            let file = &entry.f.0.lock().unwrap().0;
+        for (key, entry) in self.0.store.lock_or_panic().iter() {
+            let file = &entry.f.0.lock_or_panic().0;
             let is_large = u32::try_from(file.len()).is_err();
             let opts = SimpleFileOptions::default().large_file(is_large);
 
@@ -241,7 +255,7 @@ impl MemFileReader {
 // wrapping MemFile in other types.
 impl Read for MemFileReader {
     fn read(&mut self, dst: &mut [u8]) -> IoResult<usize> {
-        let buf = (self.0).0.lock().unwrap();
+        let buf = (self.0).0.lock_or_panic();
         if self.1 >= buf.0.len() {
             // EOF
             return Ok(0);
@@ -264,14 +278,14 @@ struct MemFileWriter(MemFile, usize);
 
 impl MemFileWriter {
     fn new(f: MemFile, append: bool) -> Self {
-        let len = f.0.lock().unwrap().0.len();
+        let len = f.0.lock_or_panic().0.len();
         Self(f, if append { len } else { 0 })
     }
 }
 
 impl Write for MemFileWriter {
     fn write(&mut self, src: &[u8]) -> IoResult<usize> {
-        let mut buf = (self.0).0.lock().unwrap();
+        let mut buf = (self.0).0.lock_or_panic();
         // Write is append.
         if self.1 == buf.0.len() {
             buf.0.extend_from_slice(src);
@@ -297,7 +311,7 @@ impl Write for MemFileWriter {
 
 impl RandomAccess for MemFile {
     fn read_at(&self, off: usize, dst: &mut [u8]) -> StatusResult<usize> {
-        let guard = self.0.lock().unwrap();
+        let guard = self.0.lock_or_panic();
         let buf: &BufferBackedFile = &guard;
         buf.read_at(off, dst)
     }
@@ -325,7 +339,7 @@ impl MemFS {
     /// Open a file. The caller can use the `MemFile` either inside a `MemFileReader` or as
     /// `RandomAccess`.
     fn open(&self, p: &Path, create: bool) -> StatusResult<MemFile> {
-        let mut fs = self.store.lock().unwrap();
+        let mut fs = self.store.lock_or_panic();
         match fs.entry(path_to_string(p)) {
             Entry::Occupied(o) => Ok(o.get().f.clone()),
             Entry::Vacant(v) => {
@@ -352,7 +366,7 @@ impl MemFS {
     fn open_w(&self, p: &Path, append: bool, truncate: bool) -> StatusResult<Box<dyn Write>> {
         let f = self.open(p, true)?;
         if truncate {
-            f.0.lock().unwrap().0.clear();
+            f.0.lock_or_panic().0.clear();
         }
         Ok(Box::new(MemFileWriter::new(f, append)))
     }

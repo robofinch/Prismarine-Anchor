@@ -8,7 +8,7 @@ use prismarine_anchor_leveldb_values::{
 use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
 use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
 
-use super::KeyToBytesOptions;
+use super::{KeyToBytesOptions, slice_to_array};
 
 
 /// The keys in a world's LevelDB database used by Minecraft Bedrock.
@@ -205,8 +205,7 @@ impl DBKey {
                 return Some(Self::ActorDigest(dimensioned_pos));
             }
         } else if raw_key.len() == 19 && raw_key.starts_with(b"actorprefix") {
-            // The unwrap turns a slice of length 8 into an array of length 8, which succeeds.
-            let actorid_bytes: [u8; 8] = raw_key[11..19].try_into().unwrap();
+            let actorid_bytes: [u8; 8] = slice_to_array::<11, 19, _, 8>(raw_key);
 
             return Some(Self::Actor(ActorID::parse(actorid_bytes)));
         }

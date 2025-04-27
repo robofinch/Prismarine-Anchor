@@ -52,3 +52,7 @@ check_web:
 	cargo hack check --target wasm32-unknown-unknown --feature-powerset --package prismarine-anchor-nbt --exclude-features named_escapes,configurable_depth,derive_serde,derive_standard,default --features js
 	cargo hack check --target wasm32-unknown-unknown --each-feature --package prismarine-anchor-leveldb-values
 	cargo hack check --target wasm32-unknown-unknown --feature-powerset --exclude prismarine-anchor-nbt --exclude prismarine-anchor-leveldb-values --exclude prismarine-anchor-world
+
+possible_missing_commas:
+	rg -U '[^,]\n[ ]*\]'
+	rg -U '[^,]\n[ ]*\)'

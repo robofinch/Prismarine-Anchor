@@ -1,4 +1,4 @@
-use crate::dimensions::NumericDimension;
+use crate::{dimensions::NumericDimension, slice_to_array};
 
 
 /// The location of a chunk in a dimension of a world.
@@ -26,20 +26,20 @@ impl DimensionedChunkPos {
         if bytes.len() == 8 {
             Some(Self(
                 ChunkPosition {
-                    x: i32::from_le_bytes(bytes[0..4].try_into().unwrap()),
-                    y: i32::from_le_bytes(bytes[4..8].try_into().unwrap()),
+                    x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
+                    y: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
                 },
                 NumericDimension::OVERWORLD,
             ))
 
         } else if bytes.len() == 12 {
 
-            let dimension_id = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
+            let dimension_id = u32::from_le_bytes(slice_to_array::<8, 12, _, 4>(bytes));
 
             Some(Self(
                 ChunkPosition {
-                    x: i32::from_le_bytes(bytes[0..4].try_into().unwrap()),
-                    y: i32::from_le_bytes(bytes[4..8].try_into().unwrap()),
+                    x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
+                    y: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
                 },
                 NumericDimension::from_bedrock_numeric(dimension_id),
             ))

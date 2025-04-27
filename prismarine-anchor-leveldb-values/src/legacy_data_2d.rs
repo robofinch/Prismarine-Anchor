@@ -3,6 +3,8 @@ use std::array;
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
 use zerocopy::{FromBytes, IntoBytes};
 
+use crate::slice_to_array;
+
 
 /// Not written since 1.0.0
 // TODO: exactly when?
@@ -39,16 +41,13 @@ impl LegacyData2D {
             return None;
         }
 
-        // try_into().unwrap() converts a slice of length 512 to an array of length 512,
-        // so cannot fail.
-        let heightmap: [u8; 512] = value[0..512].try_into().unwrap();
+        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);
 
-        // try_into().unwrap() converts a slice of length 512 to an array of length 512,
-        // so cannot fail.
-        let biomes: [u8; 1024] = value[512..512 + 1024].try_into().unwrap();
+        // 512 + 1024 == 1536
+        let biomes: [u8; 1024] = slice_to_array::<512, 1536, _, 1024>(value);
         let biomes: [[u8; 4]; 256] = transmute!(biomes);
 
         let biome_ids = biomes.map(|[id, ..]| id);

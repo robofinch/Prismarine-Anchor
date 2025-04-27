@@ -336,6 +336,10 @@ impl<'a> Lexer<'a> {
             SnbtVersion::UpdatedJava => {
                 // Check the first character of the string. Note that we checked above
                 // whether token_string is empty, so it's nonempty here.
+                #[expect(
+                    clippy::unwrap_used,
+                    reason = "if `token_string.is_empty()`, then we return early above",
+                )]
                 let ch = token_string.chars().next().unwrap();
                 if starts_unquoted_number(ch) {
                     return self.parse_updated_numeric(start, char_width, &token_string);

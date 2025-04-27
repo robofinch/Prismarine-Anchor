@@ -605,7 +605,7 @@ impl EnabledEscapeSequences {
 
         for escape in [
             ES::B, ES::F, ES::N, ES::R, ES::S, ES::T,
-            ES::UnicodeTwo, ES::UnicodeFour, ES::UnicodeEight, ES::UnicodeNamed
+            ES::UnicodeTwo, ES::UnicodeFour, ES::UnicodeEight, ES::UnicodeNamed,
         ] {
             if enabled_escapes(escape) {
                 bits |= 1 << (escape as u8);

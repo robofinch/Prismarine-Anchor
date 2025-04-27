@@ -13,7 +13,7 @@ use prismarine_anchor_nbt::{
 };
 
 use crate::bijective_enum_map;
-use crate::{all_read, dimensions::NamedDimension};
+use crate::{all_read, dimensions::NamedDimension, slice_to_array};
 
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl LevelChunkMetaDataDictionary {
             return Err(MetaDataParseError::NoHeader);
         }
 
-        let num_entries = u32::from_le_bytes(value[0..4].try_into().unwrap());
+        let num_entries = u32::from_le_bytes(slice_to_array::<0, 4, _, 4>(value));
 
         let mut reader = Cursor::new(&value[4..]);
         let mut map = IndexMap::new();

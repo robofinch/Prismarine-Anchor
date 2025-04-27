@@ -80,6 +80,10 @@ pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Option<Vec<u32>
             .map(|_| {
                 // We know that u32s has length exactly num_u32s * 4,
                 // so these unwraps succeed.
+                #[expect(
+                    clippy::unwrap_used,
+                    reason = "we call `.next().unwrap()` exactly `num_32s * 4` times",
+                )]
                 let block = [
                     u32s.next().unwrap(),
                     u32s.next().unwrap(),
@@ -294,6 +298,10 @@ impl<T> PalettizedSubchunk<T> {
         // to `palette`, so even if it was always the same value, there's at least 1.
         // We know `palette.len() > 0`, and is at most 4096, which is 2^12,
         // so it's less than 2 to the 16. Thus, the below does not panic.
+        #[expect(
+            clippy::unwrap_used,
+            reason = "`new_from_usize` returns `Some` since 0 < palette.len() <= 4096 == (1 << 12)",
+        )]
         let bits_per_index = PaletteBitsPerIndex::new_from_usize(palette.len()).unwrap();
 
         let num_u32s = bits_per_index.num_u32s_for_4096_indices();
@@ -310,6 +318,11 @@ impl<T> PalettizedSubchunk<T> {
 
             // This unwrapping does not panic since we added every value
             // to the BTreeSet which was then converted to a sorted Vec.
+            // Therefore every attempt to search for a value succeeds.
+            #[expect(
+                clippy::unwrap_used,
+                reason = "we inserted everything in `unpacked_data` into `palette`",
+            )]
             let index = palette.binary_search(&value).unwrap();
 
             // index_mask fits in a u32, so this doesn't overflow.
@@ -362,6 +375,10 @@ impl<T> PalettizedSubchunk<T> {
                 bits_per_index,
                 packed_indices: vec![0; num_u32s],
                 // Every value is the same, so we can choose a random one.
+                #[expect(
+                    clippy::unwrap_used,
+                    reason = "`palette.len() == 1`, so we can call `.next().unwrap()` once",
+                )]
                 palette: vec![unpacked_data.into_iter().next().unwrap()],
             };
         }
@@ -370,6 +387,10 @@ impl<T> PalettizedSubchunk<T> {
         // to `palette`, so even if it was always the same value, there's at least 1.
         // We know `palette.len() > 0`, and is at most 4096, which is 2^12,
         // so it's less than 2 to the 16. Thus, the below does not panic.
+        #[expect(
+            clippy::unwrap_used,
+            reason = "`new_from_usize` returns `Some` since 0 < palette.len() <= 4096 == (1 << 12)",
+        )]
         let bits_per_index = PaletteBitsPerIndex::new_from_usize(palette.len()).unwrap();
 
         let num_u32s = bits_per_index.num_u32s_for_4096_indices();
@@ -386,6 +407,10 @@ impl<T> PalettizedSubchunk<T> {
 
             // This unwrapping does not panic since we added every value
             // to the BTreeSet which was then converted to a sorted Vec.
+            #[expect(
+                clippy::unwrap_used,
+                reason = "we inserted everything in `unpacked_data` into `palette`",
+            )]
             let index = palette.binary_search(&value).unwrap();
 
             // index_mask fits in a u32, so this doesn't overflow.
@@ -436,6 +461,10 @@ impl<T> PalettizedSubchunk<T> {
 
         let max_permissible_index = palette.len() - 1;
         // This unwrap does not panic, by the above checks on palette.len().
+        #[expect(
+            clippy::unwrap_used,
+            reason = "`palette.len() <= 4096 = (1 << 12)`, so it fits in 32 bits",
+        )]
         let max_permissible_index = u32::try_from(max_permissible_index).unwrap();
 
         let indices_per_u32 = bits_per_index.indices_per_u32();
@@ -550,7 +579,16 @@ impl<T> PalettizedSubchunk<T> {
         array::from_fn(|_| {
             if num_indices_in_block == 0 {
                 // Since there must be enough blocks for all 4096 indices, this does not panic.
-                u32_block = *packed_ids.next().unwrap();
+                #[expect(
+                    clippy::unwrap_used,
+                    reason = "we should have \
+                    `packed_ids.len() == self.bits_per_index.num_u32s_for_4096_indices()`",
+                )]
+                // The extra block is because the compiler
+                // complained about applying an attribute to an expression
+                {
+                    u32_block = *packed_ids.next().unwrap();
+                };
 
                 // Note that this value is not accurate for the final block, but that's fine,
                 // since the final block is stopped by the 4096-index-limit of array::from_fn
@@ -602,7 +640,11 @@ impl<T> PalettizedSubchunk<T> {
         array::from_fn(|_| {
             array::from_fn(|_| {
                 array::from_fn(|_| {
-                    // This doesn't panic since 4096 == 16^3
+                    // This doesn't panic since 4096 == 16^3 and `unpacked.len() == 4096`
+                    #[expect(
+                        clippy::unwrap_used,
+                        reason = "we call `.next().unwrap()` exactly `4096 == 16*16*16` times",
+                    )]
                     unpacked.next().unwrap()
                 })
             })
