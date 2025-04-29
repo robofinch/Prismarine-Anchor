@@ -71,7 +71,7 @@ metadata                    = [
     "dep:indexmap", "dep:xxhash-rust", "dep:thiserror"
 ]
 finalized_state             = []
-biome_state                 = []
+biome_state                 = ["dep:prismarine-anchor-util"]
 conversion_data             = []
 caves_and_cliffs_blending   = []
 blending_biome_height       = []

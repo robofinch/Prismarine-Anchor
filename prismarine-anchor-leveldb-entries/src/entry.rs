@@ -1,6 +1,7 @@
 use prismarine_anchor_leveldb_values::{
     // actor::ActorID,
     actor_digest_version::ActorDigestVersion,
+    biome_state::BiomeState,
     blending_data::BlendingData,
     chunk_position::DimensionedChunkPos,
     chunk_version::ChunkVersion,
@@ -58,7 +59,7 @@ pub enum DBEntry {
 
     // GenerationSeed(DimensionedChunkPos),
     // FinalizedState(DimensionedChunkPos),
-    // BiomeState(DimensionedChunkPos),
+    BiomeState(DimensionedChunkPos, BiomeState),
 
     // ConversionData(DimensionedChunkPos),
 
@@ -255,6 +256,11 @@ impl DBEntry {
                     return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
                 }
             }
+            DBKey::BiomeState(chunk_pos) => {
+                if let Some(biome_state) = BiomeState::parse(value) {
+                    return V::Parsed(Self::BiomeState(chunk_pos, biome_state))
+                }
+            }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
                 return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, value.to_vec()));
             }
@@ -304,6 +310,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
+            Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(*chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
@@ -327,6 +334,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
+            Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
@@ -353,6 +361,7 @@ impl DBEntry {
             Self::PendingTicks(.., compounds)           => compounds.to_bytes(true)?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes(true)?,
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
+            Self::BiomeState(.., biome_state)           => biome_state.to_bytes(),
             Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),

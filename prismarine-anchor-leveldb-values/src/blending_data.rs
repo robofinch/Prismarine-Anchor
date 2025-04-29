@@ -18,21 +18,18 @@ pub enum BlendingData {
 
 impl BlendingData {
     pub fn parse(value: &[u8]) -> Option<Self> {
-        println!("Parsing blending data");
         // Need at least one byte
         if value.len() < 1 {
             return None;
         }
 
         if value[0] == 0 {
-            println!("Will return None if len > 2");
             match value.len() {
                 1 => Some(Self::Zero),
                 2 => Some(Self::Version { version: value[1] }),
                 _ => None,
             }
         } else if value[0] == 1 {
-            println!("Will return None if len != 2 + 32 + 1");
             if value.len() == 2 + 32 + 1 {
                 let version   = value[1];
                 let i16_bytes = &value[2..34];

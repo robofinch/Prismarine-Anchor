@@ -19,7 +19,7 @@ use thiserror::Error;
 use web_time::{SystemTime, UNIX_EPOCH};
 use zip::{result::ZipError, write::SimpleFileOptions, ZipArchive, ZipWriter};
 
-use prismarine_anchor_util::LockOrPanic;
+use prismarine_anchor_util::LockOrPanic as _;
 
 
 /// `ZipEnv` supports writing or reading an in-memory virtual file system to or from a ZIP archive.
