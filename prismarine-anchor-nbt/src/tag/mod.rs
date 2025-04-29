@@ -71,9 +71,11 @@ pub enum NbtTag {
     String(String),
     /// A "string" tag that may be invalid UTF-8. This **does not** have strong support
     /// in this library; it exists solely to handle strange edge cases.
-    /// The methods in the `io` module support it.
-    /// It is serialized into invalid but human-readable SNBT. When serialized through serde,
+    /// The methods in the `io` and `snbt` modules support it.
+    /// It is serialized into invalid but human-readable SNBT using a syntax similar to
+    /// byte arrays: `[ByteString;1b;2b;2b]`, for instance. When serialized through serde,
     /// it is treated as a `ByteArray` instead.
+    // TODO: provide support for ByteString in the serde module as well.
     ByteString(Vec<u8>),
     /// An NBT tag list.
     List(NbtList),

@@ -12,6 +12,7 @@ use std::mem;
 
 use thiserror::Error;
 
+use crate::raw;
 use crate::{
     settings::{DepthLimit, SnbtParseOptions, SnbtVersion},
     tag::{NbtCompound, NbtList, NbtTag},
@@ -247,9 +248,22 @@ fn parse_list(
 
                     // Determine the primitive type and parse it
                     match string.as_str() {
-                        "b" | "B" => parse_prim_list::<i8>(tokens, open_square),
-                        "i" | "I" => parse_prim_list::<i32>(tokens, open_square),
-                        "l" | "L" => parse_prim_list::<i64>(tokens, open_square),
+                        "b" | "B" => parse_prim_list(tokens, open_square, NbtTag::ByteArray),
+                        "i" | "I" => parse_prim_list(tokens, open_square, NbtTag::IntArray),
+                        "l" | "L" => parse_prim_list(tokens, open_square, NbtTag::LongArray),
+                        "ByteString" => {
+                            if tokens.byte_strings_enabled() {
+                                parse_prim_list(tokens, open_square, |list: Vec<i8>| {
+                                    NbtTag::ByteString(raw::cast_byte_buf_to_unsigned(list))
+                                })
+                            } else {
+                                Err(SnbtError::byte_string(
+                                    tokens.raw(),
+                                    index,
+                                    char_width,
+                                ))
+                            }
+                        }
                         _ => Err(SnbtError::unexpected_token_at(
                             tokens.raw(),
                             index,
@@ -294,13 +308,14 @@ fn parse_list(
     }
 }
 
-fn parse_prim_list<T>(
+fn parse_prim_list<T, F>(
     tokens:      &mut Lexer<'_>,
     open_square: &TokenData,
+    vec_to_tag:  F,
 ) -> Result<NbtTag, SnbtError>
 where
     T: FromExact<TokenData> + FromLossless<TokenData>,
-    NbtTag: From<Vec<T>>,
+    F: FnOnce(Vec<T>) -> NbtTag,
 {
     let mut list: Vec<T> = Vec::new();
     // Zero is used as a niche value so the first iteration of the loop runs correctly
@@ -313,7 +328,7 @@ where
                 token: Token::ClosedSquare,
                 ..
             }) => match comma {
-                Some(0) | None => return Ok(list.into()),
+                Some(0) | None => return Ok(vec_to_tag(list)),
                 // For some reason, even in the updated version, trailing commas are
                 // still not allowed for numeric arrays, if I'm reading the spec correctly.
                 Some(index) => return Err(SnbtError::trailing_comma(tokens.raw(), index)),
@@ -638,6 +653,16 @@ pub enum SnbtError {
         /// The encountered character which should not appear in unquoted strings.
         ch:      char,
     },
+    /// A `ByteString` was encountered but they were not enabled
+    #[error(
+        "the enable_byte_strings setting was false, but a ByteString occurred at column {}, \
+        beginning with {}",
+        index, segment,
+    )]
+    ByteString {
+        segment: String,
+        index:   usize,
+    },
     /// An invalid number.
     #[error(
         "numeric literal at column {} was invalid because {}. Literal began with '{}'",
@@ -737,6 +762,13 @@ impl SnbtError {
             segment: Self::segment(input, index, char_width, 10, 5),
             index,
             ch,
+        }
+    }
+
+    fn byte_string(input: &str, index: usize, char_width: usize) -> Self {
+        Self::ByteString {
+            segment: Self::segment(input, index, char_width, 1, 10),
+            index,
         }
     }
 

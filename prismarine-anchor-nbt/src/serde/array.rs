@@ -8,9 +8,12 @@ use serde::de::{EnumAccess, Error, MapAccess, SeqAccess, Visitor};
 use crate::raw;
 
 
-pub(crate) const BYTE_ARRAY_NICHE: &str = "b_nbt_array";
-pub(crate) const INT_ARRAY_NICHE:  &str = "i_nbt_array";
-pub(crate) const LONG_ARRAY_NICHE: &str = "l_nbt_array";
+pub(crate) const BYTE_ARRAY_NICHE:    &str = "b_nbt_array";
+pub(crate) const INT_ARRAY_NICHE:     &str = "i_nbt_array";
+pub(crate) const LONG_ARRAY_NICHE:    &str = "l_nbt_array";
+// TODO: try to figure out some way to support ByteStrings in the serde impl
+// pub(crate) const BSTRING_ARRAY_NICHE: &str = "s_nbt_array";
+pub(crate) const TYPE_HINT_NICHE:     &str = "__nbt_array_type_hint";
 
 
 #[expect(clippy::too_long_first_doc_paragraph)]
@@ -282,8 +285,6 @@ impl<const N: usize> ArrayNiche for [i64; N] {
 pub(crate) struct TypeHint {
     pub hint: Option<u8>,
 }
-
-pub(crate) const TYPE_HINT_NICHE: &str = "__nbt_array_type_hint";
 
 impl<'de> Deserialize<'de> for TypeHint {
     #[inline]

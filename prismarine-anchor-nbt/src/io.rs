@@ -183,7 +183,7 @@ fn read_tag_body_const<const TAG_ID: u8>(
             NbtTag::ByteArray(raw::cast_byte_buf_to_signed(array))
         }
         STRING_ID => {
-            if opts.allow_invalid_strings {
+            if opts.enable_byte_strings {
                 raw::read_string_or_bytes(reader, opts)?
             } else {
                 NbtTag::String(raw::read_string(reader, opts)?)

@@ -47,6 +47,11 @@ impl<'a> Lexer<'a> {
     }
 
     #[inline]
+    pub fn byte_strings_enabled(&self) -> bool {
+        self.opts.enable_byte_strings
+    }
+
+    #[inline]
     pub fn raw(&self) -> &str {
         self.raw
     }

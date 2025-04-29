@@ -192,6 +192,7 @@ pub fn read_string_or_bytes<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResu
     )
 }
 
+// TODO: what is the point of this function? It seems unnecessary.
 #[cfg(feature = "serde")]
 pub fn read_string_into<'a, R: Read>(
     reader: &mut R,
@@ -328,7 +329,7 @@ pub fn write_byte_string<W: Write>(
     opts:   IoOptions,
     string: &[u8],
 ) -> NbtResult<()> {
-    if opts.allow_invalid_strings {
+    if opts.enable_byte_strings {
         write_string_len(writer, opts, string.len())?;
         writer
             .write_all(string)

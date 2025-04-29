@@ -107,8 +107,8 @@ pub struct IoOptions {
     /// Whether invalid strings should be read as `ByteString`s instead of causing errors to be
     /// thrown.
     ///
-    /// Default: false.
-    pub allow_invalid_strings: bool,
+    /// Default: false for Java, true for Bedrock.
+    pub enable_byte_strings: bool,
     /// The maximum depth that NBT compounds and tags can be recursively nested.
     ///
     /// Default: 512, the limit used by Minecraft.
@@ -120,11 +120,11 @@ impl IoOptions {
     #[inline]
     pub fn java() -> Self {
         Self {
-            endianness:            Endianness::BigEndian,
-            compression:           NbtCompression::GzipCompressed,
-            string_encoding:       StringEncoding::Cesu8,
-            allow_invalid_strings: false,
-            depth_limit:           DepthLimit::default(),
+            endianness:          Endianness::BigEndian,
+            compression:         NbtCompression::GzipCompressed,
+            string_encoding:     StringEncoding::Cesu8,
+            enable_byte_strings: false,
+            depth_limit:         DepthLimit::default(),
         }
     }
 
@@ -141,11 +141,11 @@ impl IoOptions {
     #[inline]
     pub fn bedrock() -> Self {
         Self {
-            endianness:            Endianness::LittleEndian,
-            compression:           NbtCompression::GzipCompressed,
-            string_encoding:       StringEncoding::Utf8,
-            allow_invalid_strings: false,
-            depth_limit:           DepthLimit::default(),
+            endianness:          Endianness::LittleEndian,
+            compression:         NbtCompression::GzipCompressed,
+            string_encoding:     StringEncoding::Utf8,
+            enable_byte_strings: true,
+            depth_limit:         DepthLimit::default(),
         }
     }
 
@@ -163,11 +163,11 @@ impl IoOptions {
     #[inline]
     pub fn bedrock_network_uncompressed() -> Self {
         Self {
-            endianness:            Endianness::NetworkLittleEndian,
-            compression:           NbtCompression::Uncompressed,
-            string_encoding:       StringEncoding::Utf8,
-            allow_invalid_strings: false,
-            depth_limit:           DepthLimit::default(),
+            endianness:          Endianness::NetworkLittleEndian,
+            compression:         NbtCompression::Uncompressed,
+            string_encoding:     StringEncoding::Utf8,
+            enable_byte_strings: true,
+            depth_limit:         DepthLimit::default(),
         }
     }
 }
@@ -299,6 +299,11 @@ pub enum SnbtVersion {
     /// which fit in an i16 or i32, depending on the exact case. No limits are placed on SNBT
     /// string or list lengths here, beyond hardware limitations.
     ///
+    /// Additionally, Bedrock edition sometimes places invalid string data (arbitrary bytes) into
+    /// a string tag, so this library partially supports a syntax for a psuedo-string tag with
+    /// arbitrary bytes, called a `ByteString`; its SNBT syntax is `[ByteString;1b,2b,3b]`,
+    /// for instance.
+    ///
     /// [minecraft.wiki]: https://minecraft.wiki/w/Java_Edition_1.21.5#:~:text=SNBT%20format
     /// [`replace_non_finite`]: SnbtParseOptions::replace_non_finite
     UpdatedJava,
@@ -324,6 +329,11 @@ pub enum SnbtVersion {
     /// say, an unexpected newline in SNBT. Additionally, string and list tags should have lengths
     /// which fit in an i16 or i32, depending on the exact case. No limits are placed on SNBT
     /// string or list lengths here, beyond hardware limitations.
+    ///
+    /// Additionally, Bedrock edition sometimes places invalid string data (arbitrary bytes) into
+    /// a string tag, so this library partially supports a syntax for a psuedo-string tag with
+    /// arbitrary bytes, called a `ByteString`; its SNBT syntax is `[ByteString;1b,2b,3b]`,
+    /// for instance.
     Original,
 }
 
@@ -380,6 +390,13 @@ pub struct SnbtParseOptions {
     ///
     /// Default: `Error`
     pub handle_invalid_escape: HandleInvalidEscape,
+    /// Whether `ByteString` support is enabled, allowing SNBT to pretend to provide a string
+    /// tag containing arbitrary bytes instead of only valid UTF-8. The nonstandard `ByteString`
+    /// SNBT syntax provided here is the same as a `ByteArray`, except prefixed with
+    /// `ByteString;` instead of `B;`.
+    ///
+    /// Default: true.
+    pub enable_byte_strings: bool,
 }
 
 impl SnbtParseOptions {
@@ -394,6 +411,7 @@ impl SnbtParseOptions {
             replace_non_finite:       true,
             enabled_escape_sequences: EnabledEscapeSequences::all_escapes(),
             handle_invalid_escape:    HandleInvalidEscape::Error,
+            enable_byte_strings:      true,
         }
     }
 
@@ -408,6 +426,7 @@ impl SnbtParseOptions {
             replace_non_finite:       true,
             enabled_escape_sequences: EnabledEscapeSequences::no_escapes(),
             handle_invalid_escape:    HandleInvalidEscape::Error,
+            enable_byte_strings:      true,
         }
     }
 }
