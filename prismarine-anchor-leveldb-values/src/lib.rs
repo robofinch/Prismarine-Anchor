@@ -7,6 +7,8 @@ pub mod uuid;
 
 #[cfg(feature = "concatenated_nbt_compounds")]
 pub mod concatenated_nbt_compounds; // For multiple sorts of values
+#[cfg(feature = "nbt_compound_conversion")]
+pub mod nbt_compound_conversion;
 #[cfg(feature = "palettized_storage")]
 pub mod palettized_storage;
 
@@ -70,12 +72,6 @@ pub mod wandering_trader_scheduler;
 pub mod biome_data;
 #[cfg(feature = "mob_events")]
 pub mod mob_events;
-#[cfg(feature = "overworld")]
-pub mod overworld;
-#[cfg(feature = "nether")]
-pub mod nether;
-#[cfg(feature = "the_end")]
-pub mod the_end;
 #[cfg(feature = "position_tracking")]
 pub mod position_tracking;
 #[cfg(feature = "flat_world_layers")]

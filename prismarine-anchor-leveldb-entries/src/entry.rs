@@ -8,10 +8,13 @@ use prismarine_anchor_leveldb_values::{
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
     data_2d::Data2D,
     data_3d::Data3D,
+    finalized_state::FinalizedState,
     legacy_data_2d::LegacyData2D,
     metadata::LevelChunkMetaDataDictionary,
+    nbt_compound_conversion::NbtCompoundConversion as _,
     subchunk_blocks::SubchunkBlocks,
 };
+use prismarine_anchor_nbt::NbtCompound;
 
 // Crazy luck with the alignment
 use crate::{
@@ -58,7 +61,7 @@ pub enum DBEntry {
     MetaDataHash(DimensionedChunkPos, u64),
 
     // GenerationSeed(DimensionedChunkPos),
-    // FinalizedState(DimensionedChunkPos),
+    FinalizedState(DimensionedChunkPos, FinalizedState),
     BiomeState(DimensionedChunkPos, BiomeState),
 
     // ConversionData(DimensionedChunkPos),
@@ -102,9 +105,9 @@ pub enum DBEntry {
     // BiomeData,
     // MobEvents,
 
-    // Overworld,
-    // Nether,
-    // TheEnd,
+    Overworld(NbtCompound),
+    Nether(NbtCompound),
+    TheEnd(NbtCompound),
 
     // PositionTrackingDB(u32),
     // PositionTrackingLastId,
@@ -181,7 +184,7 @@ impl DBEntry {
         }
     }
 
-    // #[expect(clippy::too_many_lines, reason = "it's a giant match, which uses helper functions")]
+    #[expect(clippy::too_many_lines, reason = "it's a giant match, which uses helper functions")]
     pub fn parse_recognized_value(key: DBKey, value: &[u8]) -> ValueParseResult {
         use ValueParseResult as V;
 
@@ -256,9 +259,14 @@ impl DBEntry {
                     return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
                 }
             }
+            DBKey::FinalizedState(chunk_pos) => {
+                if let Some(finalized_state) = FinalizedState::parse(value) {
+                    return V::Parsed(Self::FinalizedState(chunk_pos, finalized_state));
+                }
+            }
             DBKey::BiomeState(chunk_pos) => {
                 if let Some(biome_state) = BiomeState::parse(value) {
-                    return V::Parsed(Self::BiomeState(chunk_pos, biome_state))
+                    return V::Parsed(Self::BiomeState(chunk_pos, biome_state));
                 }
             }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
@@ -278,6 +286,21 @@ impl DBEntry {
                 }
                 // TODO: use the error value to log debug information
                 // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
+            }
+            DBKey::Overworld => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Overworld(nbt));
+                }
+            }
+            DBKey::Nether => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Nether(nbt));
+                }
+            }
+            DBKey::TheEnd => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::TheEnd(nbt));
+                }
             }
             DBKey::RawKey(key) => {
                 return V::Parsed(Self::RawEntry {
@@ -310,11 +333,15 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
+            Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(*chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(*chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::Overworld(_)                      => DBKey::Overworld,
+            Self::Nether(_)                         => DBKey::Nether,
+            Self::TheEnd(_)                         => DBKey::TheEnd,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
         }
@@ -334,11 +361,15 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
+            Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::Overworld(_)                      => DBKey::Overworld,
+            Self::Nether(_)                         => DBKey::Nether,
+            Self::TheEnd(_)                         => DBKey::TheEnd,
             Self::RawEntry { key, .. } => DBKey::RawKey(key),
             Self::RawValue { key, .. } => key,
         }
@@ -361,13 +392,17 @@ impl DBEntry {
             Self::PendingTicks(.., compounds)           => compounds.to_bytes(true)?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes(true)?,
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
-            Self::BiomeState(.., biome_state)           => biome_state.to_bytes(),
+            Self::FinalizedState(.., state)             => state.to_bytes(),
+            Self::BiomeState(.., state)                 => state.to_bytes(),
             Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
             Self::LevelChunkMetaDataDictionary(dict) => {
                 dict.to_bytes(opts.error_on_excessive_length)?
             }
+            Self::Overworld(nbt)                        => nbt.to_bytes()?,
+            Self::Nether(nbt)                           => nbt.to_bytes()?,
+            Self::TheEnd(nbt)                           => nbt.to_bytes()?,
             Self::RawEntry { value, .. } => value.clone(),
             Self::RawValue { value, .. } => value.clone(),
         })

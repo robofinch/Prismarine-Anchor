@@ -33,7 +33,8 @@ zerocopy        = { workspace = true, features = ["derive"], optional = true }
 # This assumption allows testing to be faster; we need only test each feature individually.
 [features]
 all = [
-    "dimensions", "chunk_position", "uuid", "concatenated_nbt_compounds", "palettized_storage",
+    "dimensions", "chunk_position", "uuid",
+    "concatenated_nbt_compounds", "nbt_compound_conversion", "palettized_storage",
     "chunk_version", "actor_digest_version",
     "data_3d", "data_2d", "legacy_data_2d",
     "subchunk_blocks", "legacy_terrain", "legacy_extra_block_data",
@@ -44,13 +45,13 @@ all = [
     "player", "village", "map", "portals",
     "structure_template", "ticking_area", "scoreboard",
     "wandering_trader_scheduler", "biome_data", "mob_events",
-    "overworld", "nether", "the_end",
     "position_tracking", "flat_world_layers"
 ]
 dimensions                  = []
 chunk_position              = ["dimensions", "dep:prismarine-anchor-util"]
 uuid                        = ["dep:prismarine-anchor-util"]
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
+nbt_compound_conversion     = ["dep:prismarine-anchor-nbt"]
 palettized_storage          = ["dep:zerocopy"]
 chunk_version               = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
 actor_digest_version        = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
@@ -70,7 +71,7 @@ metadata                    = [
     "dimensions", "prismarine-anchor-nbt/preserve_order", "dep:prismarine-anchor-util",
     "dep:indexmap", "dep:xxhash-rust", "dep:thiserror"
 ]
-finalized_state             = []
+finalized_state             = ["dep:prismarine-anchor-util"]
 biome_state                 = ["dep:prismarine-anchor-util"]
 conversion_data             = []
 caves_and_cliffs_blending   = []
@@ -89,8 +90,5 @@ scoreboard                  = []
 wandering_trader_scheduler  = []
 biome_data                  = []
 mob_events                  = []
-overworld                   = []
-nether                      = []
-the_end                     = []
 position_tracking           = []
 flat_world_layers           = []

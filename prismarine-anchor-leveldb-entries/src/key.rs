@@ -161,7 +161,8 @@ pub enum DBKey {
     // NBT with a few binary flags
     MobEvents,
 
-    // TODO: what do these do? Are they still used? - probably Limbo data, and who knows what else.
+    // data:
+    // LimboEntities, DragonFight
     Overworld,
     Nether,
     TheEnd,
