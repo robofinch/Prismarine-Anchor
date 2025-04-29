@@ -8,6 +8,7 @@ members = [
     "prismarine-anchor-nbt",
     "prismarine-anchor-translation",
     "prismarine-anchor-translators",
+    "prismarine-anchor-util",
     "prismarine-anchor-world",
 ]
 
@@ -54,6 +55,7 @@ prismarine-anchor-macros          = { version = "0.1.0", path = "./prismarine-an
 prismarine-anchor-nbt             = { version = "0.1.0", path = "./prismarine-anchor-nbt"             }
 prismarine-anchor-translation     = { version = "0.1.0", path = "./prismarine-anchor-translation"     }
 prismarine-anchor-translators     = { version = "0.1.0", path = "./prismarine-anchor-translators"     }
+prismarine-anchor-util            = { version = "0.1.0", path = "./prismarine-anchor-util"            }
 prismarine-anchor-world           = { version = "0.1.0", path = "./prismarine-anchor-world"           }
 
 

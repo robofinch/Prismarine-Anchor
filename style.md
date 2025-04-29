@@ -13,6 +13,7 @@
   - public imports (`pub use` or `pub(visibility) use`)
   - type aliases, followed by constants
   - the rest of the code
+  - test module(s)
 - In most of the code, there should be at most 1 line of whitespace
   between items, but between the above four categories, there should
   be 2 lines of whitespace.

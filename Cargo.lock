@@ -430,6 +430,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-util"
+version = "0.1.0"
+
+[[package]]
 name = "prismarine-anchor-world"
 version = "0.1.0"
 dependencies = [

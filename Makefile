@@ -1,9 +1,12 @@
-all:	clippy check check_web
+all:	clippy test check check_web
 
 clippy:
 	cargo clippy --no-default-features
 	cargo clippy
 	cargo clippy --all-features
+
+test:
+	cargo test
 
 # NBT features:
 # default             = [ "named_escapes" ]
