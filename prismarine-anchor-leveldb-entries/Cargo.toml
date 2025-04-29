@@ -13,6 +13,7 @@ workspace = true
 prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
 prismarine-anchor-nbt               .workspace = true
 prismarine-anchor-translation       .workspace = true
+prismarine-anchor-util              .workspace = true
 
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }

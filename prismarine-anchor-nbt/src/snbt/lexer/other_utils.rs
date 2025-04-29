@@ -1,6 +1,11 @@
 //! Specialized lexing functions for parsing tokens that require
 //! manipulating strings and characters.
 
+use prismarine_anchor_util::{
+    chars_to_u16, chars_to_u32, chars_to_u8,
+    pair_to_u32, slice_to_array,
+};
+
 use crate::snbt::SnbtError;
 use crate::settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion};
 use super::{Lexer, Token, TokenData};
@@ -25,82 +30,6 @@ pub fn allowed_unquoted(c: char) -> bool {
 /// which can be the first character of a valid integer or float tag in SNBT.
 pub fn starts_unquoted_number(c: char) -> bool {
     c.is_ascii_digit() || matches!(c, '-' | '.' | '+')
-}
-
-fn chars_to_u8(chars: [char; 2]) -> Option<u8> {
-    let nibbles = [
-        // The u32's are actually in range of u8, because they're hex digits
-        chars[0].to_digit(16)? as u8,
-        chars[1].to_digit(16)? as u8,
-    ];
-
-    Some((nibbles[0] << 4) + nibbles[1])
-}
-
-fn chars_to_u16(chars: [char; 4]) -> Option<u16> {
-    let nibbles = chars.map(|c| c.to_digit(16));
-
-    let mut sum: u32 = nibbles[0]?;
-    for nibble in nibbles {
-        sum = (sum << 4) + nibble?;
-    }
-
-    // The sum is actually in range of u16, because the nibbles fit in u8's
-    Some(sum as u16)
-}
-
-fn chars_to_u32(chars: [char; 8]) -> Option<u32> {
-    let nibbles = chars.map(|c| c.to_digit(16));
-
-    let mut sum: u32 = 0;
-    for nibble in nibbles {
-        sum = (sum << 4) + nibble?;
-    }
-
-    Some(sum)
-}
-
-fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
-    let upper = chars.0.map(|c| c.to_digit(16));
-    let lower = chars.1.map(|c| c.to_digit(16));
-
-    let mut sum: u32 = 0;
-
-    for nibble in upper {
-        sum = (sum << 4) + nibble?;
-    }
-    for nibble in lower {
-        sum = (sum << 4) + nibble?;
-    }
-
-    Some(sum)
-}
-
-/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
-/// everywhere.
-#[inline]
-fn slice_to_array<const START: usize, const END: usize, T: Copy, const N: usize>(
-    slice: &[T],
-) -> [T; N] {
-    *slice_to_array_ref::<START, END, T, N>(slice)
-}
-
-/// Written for the sake of avoiding code like `slice_or_vec[0..8].try_into().unwrap()`
-/// everywhere.
-#[inline]
-fn slice_to_array_ref<const START: usize, const END: usize, T, const N: usize>(
-    slice: &[T],
-) -> &[T; N] {
-    const {
-        assert!(
-            START + N == END,
-            "slice_to_array was called with incorrect START/END bounds",
-        );
-    }
-
-    // The slice has the same length as the target array, so `try_into` succeeds
-    #[expect(clippy::unwrap_used, reason = "we checked at compile time that this cannot fail")]
-    slice[START..END].try_into().unwrap()
 }
 
 // ================================

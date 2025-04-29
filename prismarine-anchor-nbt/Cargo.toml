@@ -21,6 +21,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+prismarine-anchor-util  .workspace = true
+
 anyhow      .workspace = true
 byteorder   .workspace = true
 cesu8       .workspace = true

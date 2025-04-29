@@ -1,4 +1,6 @@
-use crate::{dimensions::NumericDimension, slice_to_array};
+use prismarine_anchor_util::slice_to_array;
+
+use crate::dimensions::NumericDimension;
 
 
 /// The location of a chunk in a dimension of a world.

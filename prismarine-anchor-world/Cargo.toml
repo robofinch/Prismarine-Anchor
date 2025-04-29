@@ -15,6 +15,7 @@ prismarine-anchor-leveldb-values    = { workspace = true, features = ["chunk_pos
 prismarine-anchor-nbt               .workspace = true
 prismarine-anchor-translation       .workspace = true
 prismarine-anchor-translators       .workspace = true
+prismarine-anchor-util              .workspace = true
 
 anyhow          .workspace = true
 indexmap        .workspace = true

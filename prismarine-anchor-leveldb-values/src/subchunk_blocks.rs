@@ -4,8 +4,9 @@ use std::io::Cursor;
 
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
+use prismarine_anchor_util::slice_to_array;
 
-use crate::{all_read, slice_to_array};
+use crate::all_read;
 use crate::palettized_storage::{PaletteHeader, PaletteType, PalettizedStorage};
 
 

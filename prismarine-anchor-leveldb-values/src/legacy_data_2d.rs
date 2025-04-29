@@ -3,7 +3,7 @@ use std::array;
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
 use zerocopy::{FromBytes, IntoBytes};
 
-use crate::slice_to_array;
+use prismarine_anchor_util::slice_to_array;
 
 
 /// Not written since 1.0.0

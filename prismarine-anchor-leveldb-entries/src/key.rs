@@ -7,8 +7,9 @@ use prismarine_anchor_leveldb_values::{
 };
 use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
 use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
+use prismarine_anchor_util::slice_to_array;
 
-use super::{KeyToBytesOptions, slice_to_array};
+use super::KeyToBytesOptions;
 
 
 /// The keys in a world's LevelDB database used by Minecraft Bedrock.

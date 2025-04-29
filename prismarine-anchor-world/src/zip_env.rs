@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, hash_map::Entry},
     io::{Cursor, Read, Result as IoResult, Seek, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 #[cfg(not(feature = "js"))]
 use std::{thread, time::Duration};
@@ -19,20 +19,8 @@ use thiserror::Error;
 use web_time::{SystemTime, UNIX_EPOCH};
 use zip::{result::ZipError, write::SimpleFileOptions, ZipArchive, ZipWriter};
 
-/// Consolidate where `.unwrap()` is called
-trait LockOrPanic<T> {
-    fn lock_or_panic(&self) -> MutexGuard<'_, T>;
-}
+use prismarine_anchor_util::LockOrPanic;
 
-impl<T> LockOrPanic<T> for Mutex<T> {
-    fn lock_or_panic(&self) -> MutexGuard<'_, T> {
-        #[expect(
-            clippy::unwrap_used,
-            reason = "we want to panic if a mutex is poisoned",
-        )]
-        self.lock().unwrap()
-    }
-}
 
 /// `ZipEnv` supports writing or reading an in-memory virtual file system to or from a ZIP archive.
 #[expect(missing_debug_implementations, reason = "contains too much data")]

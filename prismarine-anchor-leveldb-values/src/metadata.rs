@@ -11,9 +11,10 @@ use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
+use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::slice_to_array;
 
-use crate::bijective_enum_map;
-use crate::{all_read, dimensions::NamedDimension, slice_to_array};
+use crate::{all_read, dimensions::NamedDimension};
 
 
 #[derive(Debug, Clone)]

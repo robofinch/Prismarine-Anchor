@@ -1,6 +1,6 @@
 use prismarine_anchor_translation::datatypes::NumericVersion;
 
-use crate::bijective_enum_map;
+use prismarine_anchor_util::bijective_enum_map;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

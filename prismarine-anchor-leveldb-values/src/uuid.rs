@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::slice_to_array;
+use prismarine_anchor_util::{chars_to_u32, pair_to_u32, slice_to_array};
 
 
 /// A 128-bit UUID in the 8-4-4-4-12 hex digit format,
@@ -26,35 +26,6 @@ impl UUID {
         // The above check doesn't exclude the chance of multibyte chars
         if uuid_chars.len() != 36 {
             return None;
-        }
-
-        // Two utility functions
-
-        fn chars_to_u32(chars: [char; 8]) -> Option<u32> {
-            let nibbles = chars.map(|c| c.to_digit(16));
-
-            let mut sum = 0;
-            for nibble in nibbles {
-                sum = (sum << 4) + nibble?;
-            }
-
-            Some(sum)
-        }
-
-        fn pair_to_u32(chars: ([char; 4], [char; 4])) -> Option<u32> {
-            let upper = chars.0.map(|c| c.to_digit(16));
-            let lower = chars.1.map(|c| c.to_digit(16));
-
-            let mut sum = 0;
-
-            for nibble in upper {
-                sum = (sum << 4) + nibble?;
-            }
-            for nibble in lower {
-                sum = (sum << 4) + nibble?;
-            }
-
-            Some(sum)
         }
 
         // Split the UUID into its parts

@@ -2,7 +2,9 @@ use std::io::Cursor;
 
 use zerocopy::transmute;
 
-use crate::{all_read, slice_to_array};
+use prismarine_anchor_util::slice_to_array;
+
+use crate::all_read;
 use crate::palettized_storage::{
     PaletteHeader, PaletteType, PalettizedStorage,
     read_le_u32s, write_le_u32s,

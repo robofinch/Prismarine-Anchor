@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 prismarine-anchor-nbt           = { workspace = true, optional = true }
 prismarine-anchor-translation   = { workspace = true, optional = true }
+prismarine-anchor-util          = { workspace = true, optional = true }
 
 indexmap        = { workspace = true, optional = true }
 serde           = { workspace = true, optional = true }
@@ -47,16 +48,18 @@ all = [
     "position_tracking", "flat_world_layers"
 ]
 dimensions                  = []
-chunk_position              = ["dimensions"]
-uuid                        = []
+chunk_position              = ["dimensions", "dep:prismarine-anchor-util"]
+uuid                        = ["dep:prismarine-anchor-util"]
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
 palettized_storage          = ["dep:zerocopy"]
-chunk_version               = ["dep:prismarine-anchor-translation"]
-actor_digest_version        = ["dep:prismarine-anchor-translation"]
-data_3d                     = ["palettized_storage", "dep:zerocopy"]
-data_2d                     = ["dep:zerocopy"]
-legacy_data_2d              = ["dep:zerocopy"]
-subchunk_blocks             = ["palettized_storage", "dep:prismarine-anchor-nbt"]
+chunk_version               = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
+actor_digest_version        = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
+data_3d                     = ["palettized_storage", "dep:prismarine-anchor-util", "dep:zerocopy"]
+data_2d                     = ["dep:zerocopy", "dep:prismarine-anchor-util"]
+legacy_data_2d              = ["dep:zerocopy", "dep:prismarine-anchor-util"]
+subchunk_blocks             = [
+    "palettized_storage", "dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util"
+]
 legacy_terrain              = []
 legacy_extra_block_data     = []
 border_blocks               = []
@@ -64,7 +67,7 @@ hardcoded_spawners          = []
 aabb_volumes                = []
 checksums                   = []
 metadata                    = [
-    "dimensions", "prismarine-anchor-nbt/preserve_order",
+    "dimensions", "prismarine-anchor-nbt/preserve_order", "dep:prismarine-anchor-util",
     "dep:indexmap", "dep:xxhash-rust", "dep:thiserror"
 ]
 finalized_state             = []
