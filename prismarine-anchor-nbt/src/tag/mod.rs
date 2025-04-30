@@ -519,8 +519,6 @@ impl NbtTag {
             Self::Long(value)       => Self::write(f, value, ts),
             Self::Float(value)      => write_floating_point!(f, opts, value, ts, "f", f32),
             Self::Double(value)     => write_floating_point!(f, opts, value, ts, "d", f64),
-            // TODO: doesn't there need to be a type suffix on each element in write_list,
-            // not just the header (at least in the older version?)
             Self::ByteArray(value)  => Self::write_prim_list(f, value, indent, ts, ts),
             Self::String(value)     => write!(f, "{}", Self::string_to_snbt(value, opts)),
             Self::ByteString(value) => {
@@ -530,7 +528,7 @@ impl NbtTag {
                     // If you're writing an invalid string to SNBT... well, the output
                     // has to be a valid string. This isn't valid SNBT, but it should be
                     // useful for debugging, I think.
-                    // This is printed as `[ByteString; 1b, 2b, 3b, 3b]`, for instance
+                    // This is printed as `[ByteString; 1B, 2B, 3B, 4B]`, for instance
                     Self::write_prim_list(f, value, indent, "ByteString", "B")
                 }
             }

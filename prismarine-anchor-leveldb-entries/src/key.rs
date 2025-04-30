@@ -24,13 +24,9 @@ pub enum DBKey {
     //  Chunk-specific data
     // ================================
 
-    // TODO: figure out what this is.
-    // Is this the same as the data version? surely not game version?
-    // Is it a different number I'll need mappings for?
     Version(DimensionedChunkPos),
     /// The `Version` key started being used instead in 1.16.100.
     LegacyVersion(DimensionedChunkPos),
-    // TODO: figure out the possible values and what it does, if it's used.
     ActorDigestVersion(DimensionedChunkPos),
 
     /// Biome IDs, and block heightmap
@@ -65,15 +61,16 @@ pub enum DBKey {
     HardcodedSpawners(DimensionedChunkPos),
     // Found in levilamina, key tag value 119 (b'w'). Related to hardcoded spawners, maybe?
     // Apparently something to do with trial chambers... maybe other structures too?
+    // Need a larger sample size to figure out the binary format.
     AabbVolumes(DimensionedChunkPos),
 
     /// xxHash64 checksums of `SubchunkBlocks`, `BlockEntities`, `Entities`, and `Data2D`
     /// values. Not written since 1.18.0.
     Checksums(DimensionedChunkPos),
     /// A hash which is the key in the `LevelChunkMetaDataDictionary` record
-    /// for the NBT metadata of this chunk. ...Probably. Seems to default to something dependent
-    /// on the current game version, presumably the version in level.dat?
-    /// TODO: figure out what's going on with metadata.
+    /// for the NBT metadata of this chunk. Seems like it might default to something dependent
+    /// on the current game or chunk version
+    // TODO: figure out what's going on with metadata.
     MetaDataHash(DimensionedChunkPos),
 
     /// The seed which was used to generate this chunk.
@@ -91,14 +88,13 @@ pub enum DBKey {
     // TODO: figure out what it was
     ConversionData(DimensionedChunkPos),
 
-    // TODO: figure out what these three are
+    // I might never know what `CavesAndCliffsBlending` and `BlendingBiomeHeight` are/do.
     CavesAndCliffsBlending(DimensionedChunkPos),
     BlendingBiomeHeight(DimensionedChunkPos),
-    // Is this still used?
+    // I've managed to parse this.... sort of. Still don't know the details of what it does.
     BlendingData(DimensionedChunkPos),
 
-    /// Actor Digest data
-    // TODO: is this key format actually correct?
+    /// List of the `ActorID`s of actors in this chunk.
     ActorDigest(DimensionedChunkPos),
 
     // ================================
@@ -109,9 +105,8 @@ pub enum DBKey {
     /// Stores the NBT metadata of all chunks. Maps the xxHash64 hash of NBT data
     /// to that NBT data, so that each chunk need only store 8 bytes instead of the entire
     /// NBT; most chunks have the same metadata.
-    // TODO: validate that the 64-bit hashes are indeed xxHash64
     // TODO: if a chunk doesn't have a MetaDataHash, what metadata does it use? the metadata
-    // associated with the current BaseGameVersion, probably?
+    // associated with the current BaseGameVersion, maybe?
     LevelChunkMetaDataDictionary,
 
     // It seems that this is at least used for the Ender Dragon, dunno what else
@@ -121,11 +116,12 @@ pub enum DBKey {
     LocalPlayer,
     /// NBT data of a player with the indicated UUID
     Player(UUID),
-    /// NBT data (TODO: confirm) of a player with the indicted numeric ID, which comes
+    /// NBT data of a player with the indicted numeric ID, which comes
     /// from `clientid.txt`.
     // (based on a number stored in `clientid.txt`, which seems to fit in 64 bits or 63 unsigned).
     LegacyPlayer(i64),
-    // TODO: apparently this exists. What is it? is it an alternative version of ~local_player?
+    // This is NBT data, but I haven't looked closely at it.
+    // Could be an alternative version of ~local_player?
     PlayerServer(UUID),
 
     /// Key has the dimension which the village is in, and the name of the village.
@@ -145,26 +141,23 @@ pub enum DBKey {
     Portals,
 
     StructureTemplate(NamespacedIdentifier),
-    // TODO: make a world with a tickingarea to figure out the key format
     TickingArea(UUID),
     Scoreboard,
-    // TODO: rename to WanderingTraderScheduler if this is what I think it is
     WanderingTraderScheduler,
 
-    // TODO: these seem to have small amounts of metadata. Are they still used?
     // NBT data which effectively maps numeric biome IDs to floats indicating that
     // biome's snow accumulation (the maximum height of snow layers that can naturally
-    // accumulate during snowfall).
+    // accumulate during snowfall), or so I think.
     // TODO: confirm this
     BiomeData,
     // NBT with a few binary flags
     MobEvents,
 
     // data:
-    // LimboEntities, DragonFight
+    // LimboEntities
     Overworld,
     Nether,
-    TheEnd,
+    TheEnd, // This one also has DragonFight
 
     // New and exciting tags, with very little information about them
     PositionTrackingDB(u32),
@@ -213,15 +206,22 @@ impl DBKey {
             return Some(Self::Actor(ActorID::parse(actorid_bytes)));
         }
 
-        // Next, most data is chunk data.
-        // AFAIK only "map_######" can collide with these keys (with a custom dimension number),
-        // or a legacy "player_[ID]" plausibly could, too
-        if (raw_key.len() == 9 || raw_key.len() == 13)
-            && !raw_key.starts_with(b"map")
-            && !raw_key.starts_with(b"player_")
-        {
-            // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents / mVillages)
-            // should never be allowed as tags here, to avoid a collision.
+        // Next, most data is chunk data, so we want to match against that before rarer keys.
+        // AFAIK only "map_######" can collide with these keys (and would end up interpreted as a
+        // chunk in an impossibly far-from-origin position), and a legacy "player_[ID]" plausibly
+        // could have the same issue, too.
+        let not_a_chunk_key = raw_key.starts_with(b"map") || raw_key.starts_with(b"player_");
+
+        if (raw_key.len() == 9 || raw_key.len() == 13) && !not_a_chunk_key {
+            // b'd' (Overworld), b'a' (BiomeData), b's' (mobevents / mVillages),
+            // and b'r' (~local_player)
+            // should never be allowed as tags here, to avoid a collision. We don't check for
+            // them above, since they're a colder path, and we don't strictly need to.
+            // Note that:
+            //    b'a' == 97
+            //    b'd' == 100
+            //    b'r' == 114
+            //    b's' == 115
             let tag = raw_key[raw_key.len() - 1];
             if ((43 <= tag && tag <= 65) && tag != 47) || tag == 118 || tag == 119 {
                 if let Ok(dimensioned_pos) =
@@ -258,9 +258,11 @@ impl DBKey {
                 }
             }
 
-        } else if (raw_key.len() == 10 || raw_key.len() == 14) && !raw_key.starts_with(b"map") {
+        } else if (raw_key.len() == 10 || raw_key.len() == 14) && !not_a_chunk_key {
             // Subchunk keys are slightly different from the others
 
+            // Note that 47 is b'/', and that `scoreboard`, `dimension0`, and `dimension1`
+            // would enter this `else if` block before failing this check.
             if raw_key[raw_key.len() - 2] == 47 {
                 if let Ok(dimensioned_pos) =
                     DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 2])
