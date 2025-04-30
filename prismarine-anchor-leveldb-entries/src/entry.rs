@@ -130,7 +130,7 @@ pub enum DBEntry {
 
     LegacyDimension0(NbtCompound),
     LegacyDimension1(NbtCompound),
-    // dimension2 <- not sure if it exists, since the end probably didn't have structures
+    LegacyDimension2(NbtCompound),
     // idcounts   <- I've only heard of this, not seen this as a key.
 
     RawEntry {
@@ -458,6 +458,11 @@ impl DBEntry {
                     return V::Parsed(Self::LegacyDimension1(nbt));
                 }
             }
+            DBKey::LegacyDimension2 => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyDimension2(nbt));
+                }
+            }
             DBKey::RawKey(key) => {
                 return V::Parsed(Self::RawEntry {
                     key,
@@ -524,6 +529,7 @@ impl DBEntry {
             Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
             Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
             Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
+            Self::LegacyDimension2(_)               => DBKey::LegacyDimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
         }
@@ -578,6 +584,7 @@ impl DBEntry {
             Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
             Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
             Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
+            Self::LegacyDimension2(_)               => DBKey::LegacyDimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key),
             Self::RawValue { key, .. }              => key,
         }
@@ -637,6 +644,7 @@ impl DBEntry {
             Self::LegacyVillages(nbt)                   => nbt.to_bytes()?,
             Self::LegacyDimension0(nbt)                 => nbt.to_bytes()?,
             Self::LegacyDimension1(nbt)                 => nbt.to_bytes()?,
+            Self::LegacyDimension2(nbt)                 => nbt.to_bytes()?,
             Self::RawEntry { value, .. }                => value.clone(),
             Self::RawValue { value, .. }                => value.clone(),
         })

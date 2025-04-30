@@ -175,7 +175,7 @@ pub enum DBKey {
 
     LegacyDimension0,
     LegacyDimension1,
-    // dimension2 <- might not exist
+    LegacyDimension2,
     // idcounts   <- I've only heard of this, not seen this as a key.
 
     RawKey(Vec<u8>),
@@ -377,6 +377,7 @@ impl DBKey {
                 "villages"                      => Self::LegacyVillages,
                 "dimension0"                    => Self::LegacyDimension0,
                 "dimension1"                    => Self::LegacyDimension1,
+                "dimension2"                    => Self::LegacyDimension2,
                 _ => return None,
             });
         }
@@ -598,6 +599,10 @@ impl DBKey {
             }
             &Self::LegacyDimension1 => {
                 bytes.extend(b"dimension1");
+                return;
+            }
+            &Self::LegacyDimension2 => {
+                bytes.extend(b"dimension2");
                 return;
             }
             Self::RawKey(raw_key) => {
