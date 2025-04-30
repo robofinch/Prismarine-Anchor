@@ -47,8 +47,8 @@ pub enum DBKey {
 
     /// NBT data of block entities.
     BlockEntities(DimensionedChunkPos),
-    /// NBT data of entities. The newer format relies on `Actor` keys.
-    LegacyEntities(DimensionedChunkPos),
+    /// NBT data of entities. The newer format relies on `Actor` keys; this is no longer used.
+    Entities(DimensionedChunkPos),
     /// NBT data of pending ticks.
     PendingTicks(DimensionedChunkPos),
     /// NBT data of random ticks
@@ -117,9 +117,10 @@ pub enum DBKey {
     /// NBT data of a player with the indicated UUID
     Player(UUID),
     /// NBT data of a player with the indicted numeric ID, which comes
-    /// from `clientid.txt`.
+    /// from `clientid.txt`. No longer used.
     // (based on a number stored in `clientid.txt`, which seems to fit in 64 bits or 63 unsigned).
-    LegacyPlayer(i64),
+    // Found a value around 1.7 * 2^63. Maybe this is unsigned, let's try that.
+    LegacyPlayer(u64),
     // This is NBT data, but I haven't looked closely at it.
     // Could be an alternative version of ~local_player?
     PlayerServer(UUID),
@@ -165,18 +166,27 @@ pub enum DBKey {
     // BiomeIdsTable
 
     // Other encountered keys from very old versions:
-    FlatWorldLayers,
 
-    LegacyMVillages,
-    LegacyVillages,
+    /// No longer used
+    FlatWorldLayers,
+    /// No longer used
+    LevelSpawnWasFixed, // I've only ever seen this with the string value "True"
+    // idcounts   <- I've only heard of this, not seen this as a key.
+
+    /// No longer used
+    MVillages,
+    /// No longer used
+    Villages,
     // does this actually exist? did someone use it as a name for mVillages?
     // note that the raw key is, allegedly, "VillageManager"
     // LegacyVillageManager,
 
-    LegacyDimension0,
-    LegacyDimension1,
-    LegacyDimension2,
-    // idcounts   <- I've only heard of this, not seen this as a key.
+    /// No longer used
+    Dimension0,
+    /// No longer used
+    Dimension1,
+    /// No longer used
+    Dimension2,
 
     RawKey(Vec<u8>),
 }
@@ -235,7 +245,7 @@ impl DBKey {
                         // 47 is subchunk block data, handled below
                         48  => Self::LegacyTerrain          (dimensioned_pos),
                         49  => Self::BlockEntities          (dimensioned_pos),
-                        50  => Self::LegacyEntities         (dimensioned_pos),
+                        50  => Self::Entities               (dimensioned_pos),
                         51  => Self::PendingTicks           (dimensioned_pos),
                         52  => Self::LegacyExtraBlockData   (dimensioned_pos),
                         53  => Self::BiomeState             (dimensioned_pos),
@@ -328,7 +338,7 @@ impl DBKey {
                 if let Some(uuid) = UUID::new(parts[1]) {
                     return Some(Self::Player(uuid));
 
-                } else if let Ok(id) = i64::from_str_radix(parts[1], 10) {
+                } else if let Ok(id) = u64::from_str_radix(parts[1], 10) {
                     return Some(Self::LegacyPlayer(id));
                 }
 
@@ -373,11 +383,12 @@ impl DBKey {
                 "mobevents"                     => Self::MobEvents,
                 "PositionTrackDB-LastId"        => Self::PositionTrackingLastId,
                 "game_flatworldlayers"          => Self::FlatWorldLayers,
-                "mVillages"                     => Self::LegacyMVillages,
-                "villages"                      => Self::LegacyVillages,
-                "dimension0"                    => Self::LegacyDimension0,
-                "dimension1"                    => Self::LegacyDimension1,
-                "dimension2"                    => Self::LegacyDimension2,
+                "LevelSpawnWasFixed"            => Self::LevelSpawnWasFixed,
+                "mVillages"                     => Self::MVillages,
+                "villages"                      => Self::Villages,
+                "dimension0"                    => Self::Dimension0,
+                "dimension1"                    => Self::Dimension1,
+                "dimension2"                    => Self::Dimension2,
                 _ => return None,
             });
         }
@@ -429,7 +440,7 @@ impl DBKey {
             // 47 is handled below
             &Self::LegacyTerrain          (d_pos) => (d_pos, 48),
             &Self::BlockEntities          (d_pos) => (d_pos, 49),
-            &Self::LegacyEntities         (d_pos) => (d_pos, 50),
+            &Self::Entities               (d_pos) => (d_pos, 50),
             &Self::PendingTicks           (d_pos) => (d_pos, 51),
             &Self::LegacyExtraBlockData   (d_pos) => (d_pos, 52),
             &Self::BiomeState             (d_pos) => (d_pos, 53),
@@ -585,23 +596,27 @@ impl DBKey {
                 bytes.extend(b"game_flatworldlayers");
                 return;
             }
-            &Self::LegacyMVillages => {
+            &Self::LevelSpawnWasFixed => {
+                bytes.extend(b"LevelSpawnWasFixed");
+                return;
+            }
+            &Self::MVillages => {
                 bytes.extend(b"mVillages");
                 return;
             }
-            &Self::LegacyVillages => {
+            &Self::Villages => {
                 bytes.extend(b"villages");
                 return;
             }
-            &Self::LegacyDimension0 => {
+            &Self::Dimension0 => {
                 bytes.extend(b"dimension0");
                 return;
             }
-            &Self::LegacyDimension1 => {
+            &Self::Dimension1 => {
                 bytes.extend(b"dimension1");
                 return;
             }
-            &Self::LegacyDimension2 => {
+            &Self::Dimension2 => {
                 bytes.extend(b"dimension2");
                 return;
             }

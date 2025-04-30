@@ -42,7 +42,7 @@ all = [
     "checksums", "metadata",
     "finalized_state", "biome_state", "conversion_data", "blending_data",
     "actor_digest", "actor",
-    "flat_world_layers"
+    "flat_world_layers", "level_spawn_was_fixed"
 ]
 dimensions                  = []
 chunk_position              = ["dimensions", "dep:prismarine-anchor-util"]
@@ -77,3 +77,4 @@ blending_data               = []
 actor_digest                = ["actor", "dep:prismarine-anchor-util"]
 actor                       = []
 flat_world_layers           = []
+level_spawn_was_fixed       = []

@@ -52,6 +52,8 @@ pub mod actor_digest;
 pub mod actor;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
+#[cfg(feature = "level_spawn_was_fixed")]
+pub mod level_spawn_was_fixed;
 
 
 /// Compare a reader's position to the total length of data that was expected to be read,

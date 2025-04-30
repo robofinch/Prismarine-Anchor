@@ -11,8 +11,10 @@ use prismarine_anchor_leveldb_values::{
     data_3d::Data3D,
     dimensions::NamedDimension,
     finalized_state::FinalizedState,
+    flat_world_layers::FlatWorldLayers,
     hardcoded_spawners::HardcodedSpawners,
     legacy_data_2d::LegacyData2D,
+    level_spawn_was_fixed::LevelSpawnWasFixed,
     metadata::LevelChunkMetaDataDictionary,
     nbt_compound_conversion::NbtCompoundConversion as _,
     subchunk_blocks::SubchunkBlocks,
@@ -55,12 +57,16 @@ pub enum DBEntry {
     // LegacyExtraBlockData(DimensionedChunkPos),
     BlockEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
     // On a super old save, I saw this have the value [3] and fail to parse.
-    LegacyEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
+    // It was in the End dimension. Until I understand what that is, I'm just
+    // going to let it stay as a `RawValue` instead of an `Entities` entry.
+    /// No longer used
+    Entities(DimensionedChunkPos, ConcatenatedNbtCompounds),
     PendingTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
     RandomTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
 
     // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
+    /// No longer used
     HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),
     // AabbVolumes(DimensionedChunkPos), // Not NBT
 
@@ -93,7 +99,8 @@ pub enum DBEntry {
 
     LocalPlayer(NbtCompound),
     Player(UUID, NbtCompound),
-    LegacyPlayer(i64, NbtCompound),
+    /// No longer used
+    LegacyPlayer(u64, NbtCompound),
     PlayerServer(UUID, NbtCompound),
 
     VillageDwellers(NamedDimension, UUID, NbtCompound),
@@ -120,18 +127,28 @@ pub enum DBEntry {
     PositionTrackingLastId(NbtCompound),
     // BiomeIdsTable
 
-    // FlatWorldLayers,
+    // Other encountered keys from old versions:
 
-    // TODO: other encountered keys from very old versions:
-    LegacyMVillages(NbtCompound),
-    LegacyVillages(NbtCompound),
+    // No longer used
+    FlatWorldLayers(FlatWorldLayers),
+    // No longer used
+    LevelSpawnWasFixed(LevelSpawnWasFixed),
+    // No longer used
+    // idcounts   <- I've only heard of this, not seen this as a key.
+
+    /// No longer used
+    MVillages(NbtCompound),
+    /// No longer used
+    Villages(NbtCompound),
     // LegacyVillageManager <- I think I saw some library include this. Probably NBT?
     // note that the raw key is, allegedly, "VillageManager"
 
-    LegacyDimension0(NbtCompound),
-    LegacyDimension1(NbtCompound),
-    LegacyDimension2(NbtCompound),
-    // idcounts   <- I've only heard of this, not seen this as a key.
+    /// No longer used
+    Dimension0(NbtCompound),
+    /// No longer used
+    Dimension1(NbtCompound),
+    /// No longer used
+    Dimension2(NbtCompound),
 
     RawEntry {
         key:   Vec<u8>,
@@ -239,15 +256,21 @@ impl DBEntry {
                     return V::Parsed(Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks));
                 }
             }
+            DBKey::LegacyTerrain(_chunk_pos) => {
+                // TODO
+            }
+            DBKey::LegacyExtraBlockData(_chunk_pos) => {
+                // TODO
+            }
             DBKey::BlockEntities(chunk_pos) => {
                 // Note that block entities definitely have some `ByteString`s
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
                     return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             }
-            DBKey::LegacyEntities(chunk_pos) => {
+            DBKey::Entities(chunk_pos) => {
                 if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
-                    return V::Parsed(Self::LegacyEntities(chunk_pos, compounds));
+                    return V::Parsed(Self::Entities(chunk_pos, compounds));
                 }
             }
             DBKey::PendingTicks(chunk_pos) => {
@@ -260,15 +283,27 @@ impl DBEntry {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             }
+            DBKey::BorderBlocks(_chunk_pos) => {
+                // TODO
+            }
             DBKey::HardcodedSpawners(chunk_pos) => {
                 if let Some(spawners) = HardcodedSpawners::parse(value) {
                     return V::Parsed(Self::HardcodedSpawners(chunk_pos, spawners));
                 }
             }
+            DBKey::AabbVolumes(_chunk_pos) => {
+                // TODO
+            }
+            DBKey::Checksums(_chunk_pos) => {
+                // TODO
+            }
             DBKey::MetaDataHash(chunk_pos) => {
                 if let Ok(bytes) = <[u8; 8]>::try_from(value) {
                     return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
                 }
+            }
+            DBKey::GenerationSeed(_chunk_pos) => {
+                // TODO
             }
             DBKey::FinalizedState(chunk_pos) => {
                 if let Some(finalized_state) = FinalizedState::parse(value) {
@@ -279,6 +314,9 @@ impl DBEntry {
                 if let Some(biome_state) = BiomeState::parse(value) {
                     return V::Parsed(Self::BiomeState(chunk_pos, biome_state));
                 }
+            }
+            DBKey::ConversionData(_chunk_pos) => {
+                // TODO
             }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
                 return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, value.to_vec()));
@@ -438,29 +476,40 @@ impl DBEntry {
                     return V::Parsed(Self::PositionTrackingLastId(nbt));
                 }
             }
-            DBKey::LegacyMVillages => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::LegacyMVillages(nbt));
+            // BiomeIdsTable
+            DBKey::FlatWorldLayers => {
+                if let Some(layers) = FlatWorldLayers::parse(value) {
+                    return V::Parsed(Self::FlatWorldLayers(layers));
                 }
             }
-            DBKey::LegacyVillages => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::LegacyVillages(nbt));
+            DBKey::LevelSpawnWasFixed => {
+                if let Some(fixed) = LevelSpawnWasFixed::parse(value) {
+                    return V::Parsed(Self::LevelSpawnWasFixed(fixed));
                 }
             }
-            DBKey::LegacyDimension0 => {
+            DBKey::MVillages => {
                 if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::LegacyDimension0(nbt));
+                    return V::Parsed(Self::MVillages(nbt));
                 }
             }
-            DBKey::LegacyDimension1 => {
+            DBKey::Villages => {
                 if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::LegacyDimension1(nbt));
+                    return V::Parsed(Self::Villages(nbt));
                 }
             }
-            DBKey::LegacyDimension2 => {
+            DBKey::Dimension0 => {
                 if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::LegacyDimension2(nbt));
+                    return V::Parsed(Self::Dimension0(nbt));
+                }
+            }
+            DBKey::Dimension1 => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Dimension1(nbt));
+                }
+            }
+            DBKey::Dimension2 => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Dimension2(nbt));
                 }
             }
             DBKey::RawKey(key) => {
@@ -469,12 +518,6 @@ impl DBEntry {
                     value: value.to_vec(),
                 });
             }
-            // TODO: explicitly handle every case. This is just to make it compile.
-            // _ => return ValueParseResult::Parsed(DBEntry::RawEntry {
-            //     key: vec![],
-            //     value: vec![],
-            // })
-            _ => {}
         }
 
         ValueParseResult::UnrecognizedValue(key)
@@ -490,7 +533,7 @@ impl DBEntry {
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(*chunk_pos),
             Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(*c_pos, *y),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
-            Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
+            Self::Entities(chunk_pos, ..)           => DBKey::Entities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(*chunk_pos),
@@ -525,11 +568,13 @@ impl DBEntry {
             Self::TheEnd(_)                         => DBKey::TheEnd,
             Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(*id),
             Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
-            Self::LegacyMVillages(_)                => DBKey::LegacyMVillages,
-            Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
-            Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
-            Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
-            Self::LegacyDimension2(_)               => DBKey::LegacyDimension2,
+            Self::FlatWorldLayers(_)                => DBKey::FlatWorldLayers,
+            Self::LevelSpawnWasFixed(_)             => DBKey::LevelSpawnWasFixed,
+            Self::MVillages(_)                      => DBKey::MVillages,
+            Self::Villages(_)                       => DBKey::Villages,
+            Self::Dimension0(_)                     => DBKey::Dimension0,
+            Self::Dimension1(_)                     => DBKey::Dimension1,
+            Self::Dimension2(_)                     => DBKey::Dimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
         }
@@ -545,7 +590,7 @@ impl DBEntry {
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(chunk_pos),
             Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(c_pos, y),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(chunk_pos),
-            Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(chunk_pos),
+            Self::Entities(chunk_pos, ..)           => DBKey::Entities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(chunk_pos),
@@ -580,11 +625,13 @@ impl DBEntry {
             Self::TheEnd(_)                         => DBKey::TheEnd,
             Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(id),
             Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
-            Self::LegacyMVillages(_)                => DBKey::LegacyMVillages,
-            Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
-            Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
-            Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
-            Self::LegacyDimension2(_)               => DBKey::LegacyDimension2,
+            Self::FlatWorldLayers(_)                => DBKey::FlatWorldLayers,
+            Self::LevelSpawnWasFixed(_)             => DBKey::LevelSpawnWasFixed,
+            Self::MVillages(_)                      => DBKey::MVillages,
+            Self::Villages(_)                       => DBKey::Villages,
+            Self::Dimension0(_)                     => DBKey::Dimension0,
+            Self::Dimension1(_)                     => DBKey::Dimension1,
+            Self::Dimension2(_)                     => DBKey::Dimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key),
             Self::RawValue { key, .. }              => key,
         }
@@ -603,7 +650,7 @@ impl DBEntry {
             Self::LegacyData2D(.., data)                => data.to_bytes(),
             Self::SubchunkBlocks(.., blocks)            => blocks.to_bytes()?,
             Self::BlockEntities(.., compounds)          => compounds.to_bytes()?,
-            Self::LegacyEntities(.., compounds)         => compounds.to_bytes()?,
+            Self::Entities(.., compounds)               => compounds.to_bytes()?,
             Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes()?,
             Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(),
@@ -640,11 +687,13 @@ impl DBEntry {
             Self::TheEnd(nbt)                           => nbt.to_bytes()?,
             Self::PositionTrackingDB(_, nbt)            => nbt.to_bytes()?,
             Self::PositionTrackingLastId(nbt)           => nbt.to_bytes()?,
-            Self::LegacyMVillages(nbt)                  => nbt.to_bytes()?,
-            Self::LegacyVillages(nbt)                   => nbt.to_bytes()?,
-            Self::LegacyDimension0(nbt)                 => nbt.to_bytes()?,
-            Self::LegacyDimension1(nbt)                 => nbt.to_bytes()?,
-            Self::LegacyDimension2(nbt)                 => nbt.to_bytes()?,
+            Self::FlatWorldLayers(layers)               => layers.to_bytes(),
+            Self::LevelSpawnWasFixed(fixed)             => fixed.to_bytes(),
+            Self::MVillages(nbt)                        => nbt.to_bytes()?,
+            Self::Villages(nbt)                         => nbt.to_bytes()?,
+            Self::Dimension0(nbt)                       => nbt.to_bytes()?,
+            Self::Dimension1(nbt)                       => nbt.to_bytes()?,
+            Self::Dimension2(nbt)                       => nbt.to_bytes()?,
             Self::RawEntry { value, .. }                => value.clone(),
             Self::RawValue { value, .. }                => value.clone(),
         })
