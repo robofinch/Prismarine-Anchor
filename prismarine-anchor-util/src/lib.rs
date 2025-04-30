@@ -375,6 +375,8 @@ macro_rules! impl_from_enum {
 /// Note that the `clippy::match_wildcard_for_single_variants`
 /// and `non_exhaustive_omitted_patterns` lints
 /// are not explicitly ignored here, so you can lint against them if you want to.
+/// If a pattern is unreachable, a warning will be thrown, as uses of [`bijective_enum_map`]
+/// are probably intended to be bijective.
 #[macro_export]
 macro_rules! impl_enum_try_from {
     { $enum_name:ty, $try_from:ty, $($enum_variant:ident <=> $value:pat),+ $(,)? } => {
@@ -383,10 +385,12 @@ macro_rules! impl_enum_try_from {
 
             #[inline]
             fn try_from(value: $try_from) -> Result<Self, Self::Error> {
-                #![allow(clippy::wildcard_enum_match_arm)]
-                #![allow(unreachable_patterns)]
+                #![allow(clippy::allow_attributes)]
+                #[warn(unreachable_patterns)]
                 Ok(match value {
                     $( $value => Self::$enum_variant ),+,
+                    #[allow(clippy::wildcard_enum_match_arm)]
+                    #[allow(unreachable_patterns)]
                     _ => return Err(()),
                 })
             }
@@ -602,10 +606,30 @@ pub mod compile_fail_tests {
     /// ```
     pub fn _nonempty_but_not_enough_provided() {}
 
-    // Unfortunately, this compiles. Without #[deny(unreachable_patterns)],
-    // there's simply a redundant pattern matching 0. And the macro ignores that lint
-    // in case the wildcard arm is unreachable.
+    /// ```compile_fail
+    /// #![deny(warnings)]
+    ///
+    /// use prismarine_anchor_util::bijective_enum_map;
+    /// #[derive(Debug, PartialEq, Eq)]
+    /// enum AtMostTwo {
+    ///     Zero,
+    ///     One,
+    ///     Two,
+    /// }
+    ///
+    /// bijective_enum_map! {
+    ///     AtMostTwo, u8,
+    ///     Zero <=> 0,
+    ///     One  <=> 1,
+    ///     Two  <=> 0,
+    /// }
+    /// ```
+    pub fn _nonempty_not_injective_warning() {}
+
+    // A warning is printed, but unfortunately, #[deny] doesn't work very well in doctests.
     // /// ```compile_fail
+    // /// #![deny(unreachable_patterns)]
+    // ///
     // /// use prismarine_anchor_util::bijective_enum_map;
     // /// #[derive(Debug, PartialEq, Eq)]
     // /// enum AtMostTwo {
@@ -624,33 +648,32 @@ pub mod compile_fail_tests {
     // /// ```
     // pub fn _nonempty_not_injective() {}
 
-    // Unfortunately, this compiles. Without #[deny(unreachable_patterns)],
-    // there's simply a redundant pattern matching 0. And the macro ignores that lint
-    // in case the wildcard arm is unreachable.
-    // /// ```compile_fail
-    // /// use prismarine_anchor_util::bijective_enum_map;
-    // /// #[derive(Debug, PartialEq, Eq)]
-    // /// enum AtMostTwo {
-    // ///     Zero,
-    // ///     One,
-    // ///     Two,
-    // /// }
-    // ///
-    // /// enum Other {
-    // ///     Uno,
-    // ///     Dos,
-    // /// }
-    // ///
-    // /// bijective_enum_map! {
-    // ///     AtMostTwo, Other,
-    // ///     Zero <=> Other::Uno,
-    // ///     One  <=> Other::Uno,
-    // ///     Two  <=> Other::Dos,
-    // /// }
-    // ///
-    // /// let _ = AtMostTwo::try_from(Other::Uno);
-    // /// ```
-    // pub fn _nonempty_to_enum_not_injective() {}
+    /// ```compile_fail
+    /// #![deny(warnings)]
+    ///
+    /// use prismarine_anchor_util::bijective_enum_map;
+    /// #[derive(Debug, PartialEq, Eq)]
+    /// enum AtMostTwo {
+    ///     Zero,
+    ///     One,
+    ///     Two,
+    /// }
+    ///
+    /// enum Other {
+    ///     Uno,
+    ///     Dos,
+    /// }
+    ///
+    /// bijective_enum_map! {
+    ///     AtMostTwo, Other,
+    ///     Zero <=> Other::Uno,
+    ///     One  <=> Other::Uno,
+    ///     Two  <=> Other::Dos,
+    /// }
+    ///
+    /// let _ = AtMostTwo::try_from(Other::Uno);
+    /// ```
+    pub fn _nonempty_to_enum_not_injective_warning() {}
 
     // Surprisingly, this compiles. It defaults to `&'static str`, as far as I can tell.
     // /// ```compile_fail
