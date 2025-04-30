@@ -26,6 +26,7 @@ impl ActorDigest {
         Some(Self(actor_ids))
     }
 
+    #[inline]
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
         bytes.reserve(self.0.len() * 8);
         for actor_id in &self.0 {
@@ -33,6 +34,7 @@ impl ActorDigest {
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);

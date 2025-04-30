@@ -97,6 +97,7 @@ impl BiomeState {
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);

@@ -49,6 +49,7 @@ impl HardcodedSpawners {
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);
@@ -93,8 +94,11 @@ impl HardcodedSpawner {
         }
     }
 
+    #[inline]
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
-        bytes.reserve(25);
+        // Hypothetically, this would be useful in isolation, but in practice
+        // we already reserve space in `HardcodedSpawners`.
+        // bytes.reserve(25);
         bytes.extend(self.low_corner.x.to_le_bytes());
         bytes.extend(self.low_corner.y.to_le_bytes());
         bytes.extend(self.low_corner.z.to_le_bytes());

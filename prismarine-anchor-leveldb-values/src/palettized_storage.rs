@@ -165,7 +165,7 @@ impl<T> PalettizedStorage<T> {
         }
     }
 
-    // TODO: have the option to error on the special cases
+    // TODO: have the option to error on the special bit size cases
     pub fn extend_serialized<E, F>(
         &self,
         bytes:                    &mut Vec<u8>,
@@ -254,7 +254,7 @@ impl PaletteHeader {
 }
 
 impl From<PaletteHeader> for u8 {
-    #[expect(clippy::use_self, reason = "clarity and brevity")]
+    #[expect(clippy::use_self, reason = "clarity and brevity, it's a u8")]
     #[inline]
     fn from(value: PaletteHeader) -> Self {
         let palette_type   = u8::from(value.palette_type);

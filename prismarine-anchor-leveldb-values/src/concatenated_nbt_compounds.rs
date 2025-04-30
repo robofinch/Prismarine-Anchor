@@ -27,28 +27,21 @@ impl ConcatenatedNbtCompounds {
         Ok(Self(compounds))
     }
 
-    pub fn extend_serialized(
-        &self,
-        bytes:                 &mut Vec<u8>,
-        allow_invalid_strings: bool,
-    ) -> Result<(), NbtIoError> {
+    #[inline]
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
         let mut writer = Cursor::new(bytes);
 
-        let io_options = IoOptions {
-            enable_byte_strings: allow_invalid_strings,
-            ..IoOptions::bedrock_uncompressed()
-        };
-
         for compound in &self.0 {
-            write_compound(&mut writer, io_options, None, compound)?;
+            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, compound)?;
         }
 
         Ok(())
     }
 
-    pub fn to_bytes(&self, allow_invalid_strings: bool) -> Result<Vec<u8>, NbtIoError> {
+    #[inline]
+    pub fn to_bytes(&self) -> Result<Vec<u8>, NbtIoError> {
         let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes, allow_invalid_strings)?;
+        self.extend_serialized(&mut bytes)?;
         Ok(bytes)
     }
 }

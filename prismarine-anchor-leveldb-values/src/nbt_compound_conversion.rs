@@ -11,6 +11,7 @@ pub trait NbtCompoundConversion {
 }
 
 impl NbtCompoundConversion for NbtCompound {
+    #[inline]
     fn parse(value: &[u8]) -> Option<Self> {
         read_compound(
             &mut Cursor::new(value),
@@ -20,6 +21,7 @@ impl NbtCompoundConversion for NbtCompound {
         .map(|(nbt, _)| nbt)
     }
 
+    #[inline]
     fn extend_serialized(&self, mut bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
         write_compound(
             &mut bytes,
@@ -29,6 +31,7 @@ impl NbtCompoundConversion for NbtCompound {
         )
     }
 
+    #[inline]
     fn to_bytes(&self) -> Result<Vec<u8>, NbtIoError> {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes)?;

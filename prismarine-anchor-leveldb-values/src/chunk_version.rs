@@ -153,7 +153,7 @@ impl ChunkVersion {
             Self::V22 => NumericVersion::from([1, 16, 210]),
 
             // Experimental stuff. Also, note that 1.16.300 does not seem to exist.
-            // TODO: all these experimental version values. are probably inaccurate.
+            // TODO: all these experimental version values are probably inaccurate.
 
             // UNKNOWN: presumably somewhere around 1.17
             // V23 seems to be internally called V1_16_300CavesCliffsPart1

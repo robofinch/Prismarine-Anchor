@@ -186,7 +186,9 @@ impl SubchunkBlocksV8 {
         Some(Self { block_layers })
     }
 
-    // TODO: explicitly say that the contents of `bytes` is unspecified if an error is returned.
+    /// The contents of `bytes` is unspecified if an error is returned.
+    /// If there are more than 255 block layers, later block layers (starting at 256)
+    /// are ignored.
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
         // TODO: log error if there's too many block layers
         let layer_len = u8::try_from(self.block_layers.len()).unwrap_or(u8::MAX);
@@ -237,6 +239,8 @@ impl SubchunkBlocksV9 {
         })
     }
 
+    /// If there are more than 255 block layers, later block layers (starting at 256)
+    /// are ignored.
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
         // TODO: log error if there's too many block layers
         let layer_len = u8::try_from(self.block_layers.len()).unwrap_or(u8::MAX);
@@ -282,11 +286,7 @@ fn parse_block_layers(
                     header.bits_per_index,
                     |reader, palette_len| {
                         let mut compounds = Vec::new();
-
-                        let opts = IoOptions {
-                            enable_byte_strings: true,
-                            ..IoOptions::bedrock_uncompressed()
-                        };
+                        let opts = IoOptions::bedrock_uncompressed();
 
                         for _ in 0..palette_len {
                             let (compound, _) = read_compound(reader, opts).ok()?;
@@ -307,17 +307,13 @@ fn parse_block_layers(
     Some(block_layers)
 }
 
+#[inline]
 fn write_block_layers(
     compounds: &[NbtCompound],
     bytes:     &mut Vec<u8>,
 ) -> Result<(), NbtIoError> {
-    let opts = IoOptions {
-        enable_byte_strings: true,
-        ..IoOptions::bedrock_uncompressed()
-    };
-
     for compound in compounds {
-        write_compound(bytes, opts, None, compound)?;
+        write_compound(bytes, IoOptions::bedrock_uncompressed(), None, compound)?;
     }
 
     Ok(())

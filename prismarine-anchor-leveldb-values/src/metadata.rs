@@ -170,6 +170,7 @@ impl LevelChunkMetaDataDictionary {
 }
 
 impl Default for LevelChunkMetaDataDictionary {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -177,21 +178,21 @@ impl Default for LevelChunkMetaDataDictionary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetaData {
-    pub last_saved_base_game_version:       Option<String>,
-    pub original_base_game_version:         Option<String>,
-    pub biome_base_game_version:            Option<String>,
-    pub dimension_name:                     Option<NamedDimension>,
-    pub generation_seed:                    Option<u64>,
-    pub generator_type:                     Option<GeneratorType>,
-    pub world_gen_1_18_applied_below_0:     Option<bool>,
-    pub overworld_1_18_height_extended:     Option<bool>,
-    pub blending_version:                   Option<BlendingVersion>,
-    pub original_dimension_height_range:    Option<Range<i16>>,
-    pub last_saved_dimension_height_range:  Option<Range<i16>>,
-    pub underwater_lava_lake_fixed:         Option<bool>,
-    pub world_gen_below_zero_fixed:         Option<bool>,
-    pub skull_flattening_performed:         Option<bool>,
-    pub unrecognized:                       BTreeMap<String, NbtTag>,
+    pub last_saved_base_game_version:      Option<String>,
+    pub original_base_game_version:        Option<String>,
+    pub biome_base_game_version:           Option<String>,
+    pub dimension_name:                    Option<NamedDimension>,
+    pub generation_seed:                   Option<u64>,
+    pub generator_type:                    Option<GeneratorType>,
+    pub world_gen_1_18_applied_below_0:    Option<bool>,
+    pub overworld_1_18_height_extended:    Option<bool>,
+    pub blending_version:                  Option<BlendingVersion>,
+    pub original_dimension_height_range:   Option<Range<i16>>,
+    pub last_saved_dimension_height_range: Option<Range<i16>>,
+    pub underwater_lava_lake_fixed:        Option<bool>,
+    pub world_gen_below_zero_fixed:        Option<bool>,
+    pub skull_flattening_performed:        Option<bool>,
+    pub unrecognized:                      BTreeMap<String, NbtTag>,
 }
 
 impl MetaData {
@@ -437,38 +438,38 @@ pub enum MetaDataType {
 
 bijective_enum_map! {
     MetaDataType, u8,
-    LastSavedBaseGameVersion        <=> 0,
-    OriginalBaseGameVersion         <=> 1,
-    BiomeBaseGameVersion            <=> 2,
-    DimensionName                   <=> 3,
-    GenerationSeed                  <=> 4,
-    GeneratorType                   <=> 5,
-    WorldGen1_18AppliedBelow0       <=> 6,
-    Overworld1_18HeightExtended     <=> 7,
-    BlendingVersion                 <=> 8,
-    OriginalDimensionHeightRange    <=> 9,
-    LastSavedDimensionHeightRange   <=> 10,
-    UnderwaterLavaLakeFixed         <=> 11,
-    WorldGenBelowZeroFixed          <=> 12,
-    SkullFlatteningPerformed        <=> 13,
+    LastSavedBaseGameVersion      <=> 0,
+    OriginalBaseGameVersion       <=> 1,
+    BiomeBaseGameVersion          <=> 2,
+    DimensionName                 <=> 3,
+    GenerationSeed                <=> 4,
+    GeneratorType                 <=> 5,
+    WorldGen1_18AppliedBelow0     <=> 6,
+    Overworld1_18HeightExtended   <=> 7,
+    BlendingVersion               <=> 8,
+    OriginalDimensionHeightRange  <=> 9,
+    LastSavedDimensionHeightRange <=> 10,
+    UnderwaterLavaLakeFixed       <=> 11,
+    WorldGenBelowZeroFixed        <=> 12,
+    SkullFlatteningPerformed      <=> 13,
 }
 
 bijective_enum_map! {
     MetaDataType, &'static str, &str,
-    LastSavedBaseGameVersion        <=> "LastSavedBaseGameVersion",
-    OriginalBaseGameVersion         <=> "OriginalBaseGameVersion",
-    BiomeBaseGameVersion            <=> "BiomeBaseGameVersion",
-    DimensionName                   <=> "DimensionName",
-    GenerationSeed                  <=> "GenerationSeed",
-    GeneratorType                   <=> "GeneratorType",
-    WorldGen1_18AppliedBelow0       <=> "WorldGen1_18AppliedBelow0",
-    Overworld1_18HeightExtended     <=> "Overworld1_18HeightExtended",
-    BlendingVersion                 <=> "BlendingVersion",
-    OriginalDimensionHeightRange    <=> "OriginalDimensionHeightRange",
-    LastSavedDimensionHeightRange   <=> "LastSavedDimensionHeightRange",
-    UnderwaterLavaLakeFixed         <=> "UnderwaterLavaLakeFixed",
-    WorldGenBelowZeroFixed          <=> "WorldGenBelowZeroFixed",
-    SkullFlatteningPerformed        <=> "SkullFlatteningPerformed",
+    LastSavedBaseGameVersion      <=> "LastSavedBaseGameVersion",
+    OriginalBaseGameVersion       <=> "OriginalBaseGameVersion",
+    BiomeBaseGameVersion          <=> "BiomeBaseGameVersion",
+    DimensionName                 <=> "DimensionName",
+    GenerationSeed                <=> "GenerationSeed",
+    GeneratorType                 <=> "GeneratorType",
+    WorldGen1_18AppliedBelow0     <=> "WorldGen1_18AppliedBelow0",
+    Overworld1_18HeightExtended   <=> "Overworld1_18HeightExtended",
+    BlendingVersion               <=> "BlendingVersion",
+    OriginalDimensionHeightRange  <=> "OriginalDimensionHeightRange",
+    LastSavedDimensionHeightRange <=> "LastSavedDimensionHeightRange",
+    UnderwaterLavaLakeFixed       <=> "UnderwaterLavaLakeFixed",
+    WorldGenBelowZeroFixed        <=> "WorldGenBelowZeroFixed",
+    SkullFlatteningPerformed      <=> "SkullFlatteningPerformed",
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
