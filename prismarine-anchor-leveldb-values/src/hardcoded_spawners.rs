@@ -1,10 +1,11 @@
-use prismarine_anchor_translation::datatypes::BlockPosition;
+use std::num::NonZeroU32;
+
 use prismarine_anchor_util::bijective_enum_map;
 use prismarine_anchor_util::slice_to_array;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HardcodedSpawners(pub Vec<HardcodedSpawner>);
+pub struct HardcodedSpawners(pub Vec<(BlockVolume, HardcodedSpawnerType)>);
 
 impl HardcodedSpawners {
     pub fn parse(value: &[u8]) -> Option<Self> {
@@ -23,10 +24,14 @@ impl HardcodedSpawners {
         let mut value = &value[4..];
         let mut hardcoded_spawners = Vec::with_capacity(num_entries);
         for _ in 0..num_entries {
-            let next_spawner = slice_to_array::<0, 25, _, 25>(value);
+            let volume = slice_to_array::<0, 24, _, 24>(value);
+            let spawner_type = value[24];
             value = &value[25..];
 
-            hardcoded_spawners.push(HardcodedSpawner::parse(next_spawner)?);
+            hardcoded_spawners.push((
+                BlockVolume::parse(volume)?,
+                HardcodedSpawnerType::try_from(spawner_type).ok()?,
+            ));
         }
 
         Some(Self(hardcoded_spawners))
@@ -44,8 +49,9 @@ impl HardcodedSpawners {
 
         bytes.reserve(4 + len_usize * 25);
         bytes.extend(len.to_le_bytes());
-        for harcoded_spawner in self.0.iter().take(len_usize) {
-            harcoded_spawner.extend_serialized(bytes);
+        for (volume, spawner_type) in self.0.iter().take(len_usize) {
+            volume.extend_serialized(bytes);
+            bytes.push(u8::from(*spawner_type));
         }
     }
 
@@ -58,16 +64,17 @@ impl HardcodedSpawners {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HardcodedSpawner {
-    pub low_corner:   BlockPosition,
-    pub high_corner:  BlockPosition,
-    pub spawner_type: HardcodedSpawnerType,
+pub struct BlockVolume {
+    pub low_x:   i32,
+    pub low_y:   i32,
+    pub low_z:   i32,
+    pub width_x: NonZeroU32,
+    pub width_y: NonZeroU32,
+    pub width_z: NonZeroU32,
 }
 
-impl HardcodedSpawner {
-    pub fn parse(value: [u8; 25]) -> Option<Self> {
-        let spawner_type = HardcodedSpawnerType::try_from(value[24]).ok()?;
-
+impl BlockVolume {
+    pub fn parse(value: [u8; 24]) -> Option<BlockVolume> {
         let low_x  = i32::from_le_bytes([value[0],  value[ 1], value[ 2], value[ 3]]);
         let low_y  = i32::from_le_bytes([value[4],  value[ 5], value[ 6], value[ 7]]);
         let low_z  = i32::from_le_bytes([value[8],  value[ 9], value[10], value[11]]);
@@ -76,18 +83,17 @@ impl HardcodedSpawner {
         let high_z = i32::from_le_bytes([value[20], value[21], value[22], value[23]]);
 
         if low_x <= high_x && low_y <= high_y && low_z <= high_z {
+            #[expect(
+                clippy::unwrap_used,
+                reason = "`.saturating_add(1)` ensures that the values are nonzero",
+            )]
             Some(Self {
-                low_corner: BlockPosition {
-                    x: low_x,
-                    y: low_y,
-                    z: low_z,
-                },
-                high_corner: BlockPosition {
-                    x: high_x,
-                    y: high_y,
-                    z: high_z,
-                },
-                spawner_type,
+                low_x,
+                low_y,
+                low_z,
+                width_x: NonZeroU32::new(high_x.abs_diff(low_x).saturating_add(1)).unwrap(),
+                width_y: NonZeroU32::new(high_y.abs_diff(low_y).saturating_add(1)).unwrap(),
+                width_z: NonZeroU32::new(high_z.abs_diff(low_z).saturating_add(1)).unwrap(),
             })
         } else {
             None
@@ -96,16 +102,16 @@ impl HardcodedSpawner {
 
     #[inline]
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
-        // Hypothetically, this would be useful in isolation, but in practice
-        // we already reserve space in `HardcodedSpawners`.
-        // bytes.reserve(25);
-        bytes.extend(self.low_corner.x.to_le_bytes());
-        bytes.extend(self.low_corner.y.to_le_bytes());
-        bytes.extend(self.low_corner.z.to_le_bytes());
-        bytes.extend(self.high_corner.x.to_le_bytes());
-        bytes.extend(self.high_corner.y.to_le_bytes());
-        bytes.extend(self.high_corner.z.to_le_bytes());
-        bytes.push(u8::from(self.spawner_type));
+        let high_x = self.low_x.saturating_add_unsigned(self.width_x.get() - 1);
+        let high_y = self.low_y.saturating_add_unsigned(self.width_y.get() - 1);
+        let high_z = self.low_z.saturating_add_unsigned(self.width_z.get() - 1);
+
+        bytes.extend(self.low_x.to_le_bytes());
+        bytes.extend(self.low_y.to_le_bytes());
+        bytes.extend(self.low_z.to_le_bytes());
+        bytes.extend(high_x.to_le_bytes());
+        bytes.extend(high_y.to_le_bytes());
+        bytes.extend(high_z.to_le_bytes());
     }
 }
 
