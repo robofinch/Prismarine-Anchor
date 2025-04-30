@@ -1,6 +1,6 @@
 use std::num::NonZeroU32;
 
-use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::injective_enum_map;
 use prismarine_anchor_util::slice_to_array;
 
 
@@ -125,7 +125,7 @@ pub enum HardcodedSpawnerType {
     NewerLegacyVillageCat,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     HardcodedSpawnerType, u8,
     NetherFortress        <=> 1,
     WitchHut              <=> 2,

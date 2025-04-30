@@ -244,7 +244,8 @@ impl<T> LockOrPanic<T> for Mutex<T> {
     }
 }
 
-/// Map an enum into and from two other types using `From` and `TryFrom` (with unit error).
+/// Map an enum into and from another type (or two types) using `From` and `TryFrom`
+/// (with unit error).
 ///
 /// The enum type must be specified, followed by the type to map the enum into (`$into`),
 /// optionally followed by the type to try to map into the enum (`$try_from`).
@@ -257,11 +258,19 @@ impl<T> LockOrPanic<T> for Mutex<T> {
 /// two different types is useful for converting into `&'static str` and trying to convert
 /// from `&str`, for example.
 ///
+/// This map is intended to be "injective"; different enum variants should map into different
+/// values, so that they can be mapped back unambiguously. The map may (or may not) also be
+/// "surjective", in which any possible value of the target type is associated with some enum
+/// variant, in which case the `TryFrom` implementation would not be able to fail (but this macro
+/// does not check for surjectivity). If the map is not injective, a compiler warning
+/// from `#[warn(unreachable_patterns)]` *should* be printed, but depending on circumstances
+/// it could be a silent logic error.
+///
 /// # Examples
 ///
 /// ## Nonempty map, into and from the same type:
 /// ```
-/// # use prismarine_anchor_util::bijective_enum_map;
+/// # use prismarine_anchor_util::injective_enum_map;
 /// #[derive(Debug, PartialEq, Eq)]
 /// enum AtMostTwo {
 ///     Zero,
@@ -269,7 +278,7 @@ impl<T> LockOrPanic<T> for Mutex<T> {
 ///     Two,
 /// }
 ///
-/// bijective_enum_map! {
+/// injective_enum_map! {
 ///     AtMostTwo, u8,
 ///     Zero <=> 0,
 ///     One  <=> 1,
@@ -283,19 +292,19 @@ impl<T> LockOrPanic<T> for Mutex<T> {
 ///
 /// ## Empty map, into and from different types:
 /// ```
-/// # use prismarine_anchor_util::bijective_enum_map;
+/// # use prismarine_anchor_util::injective_enum_map;
 /// #[derive(Debug, PartialEq, Eq)]
 /// enum Empty {}
 ///
 /// // The trailing comma is always optional
-/// bijective_enum_map! { Empty, &'static str, &str }
+/// injective_enum_map! { Empty, &'static str, &str }
 ///
 /// assert_eq!(Empty::try_from("42"), Err(()))
 /// ```
 ///
 /// ## Nonempty map, into and from the same type explicitly written twice:
 /// ```
-/// # use prismarine_anchor_util::bijective_enum_map;
+/// # use prismarine_anchor_util::injective_enum_map;
 /// #[derive(Debug, PartialEq, Eq)]
 /// enum Enum {
 ///     One,
@@ -310,7 +319,7 @@ impl<T> LockOrPanic<T> for Mutex<T> {
 ///     Tres,
 /// }
 ///
-/// bijective_enum_map! {
+/// injective_enum_map! {
 ///     Enum, Other, Other,
 ///     One   <=> Other::Uno,
 ///     Two   <=> Other::Dos,
@@ -318,11 +327,12 @@ impl<T> LockOrPanic<T> for Mutex<T> {
 /// }
 ///
 /// assert_eq!(Other::from(Enum::Three), Other::Tres);
-/// // Note that this conversion cannot fail, but `bijective_enum_map` does not know that.
+/// // Note that this conversion cannot fail, but `injective_enum_map` does not know that.
+/// // You could manually implement `From` by unwrapping the result of `try_from`.
 /// assert_eq!(Enum::try_from(Other::Uno), Ok(Enum::One));
 /// ```
 #[macro_export]
-macro_rules! bijective_enum_map {
+macro_rules! injective_enum_map {
     { $enum_name:ty, $into:ty, $try_from:ty, $($body:tt)* } => {
         $crate::impl_from_enum! { $enum_name, $into, $($body)* }
         $crate::impl_enum_try_from! { $enum_name, $try_from, $($body)* }
@@ -344,7 +354,7 @@ macro_rules! bijective_enum_map {
     };
 }
 
-/// Helper macro for [`bijective_enum_map`] which provides a `From` implementation that
+/// Helper macro for [`injective_enum_map`] which provides a `From` implementation that
 /// converts an enum into some type.
 #[macro_export]
 macro_rules! impl_from_enum {
@@ -369,14 +379,17 @@ macro_rules! impl_from_enum {
     };
 }
 
-/// Helper macro for [`bijective_enum_map`] which provides a `TryFrom` implementation that
+/// Helper macro for [`injective_enum_map`] which provides a `TryFrom` implementation that
 /// tries to convert some type into an enum.
 ///
 /// Note that the `clippy::match_wildcard_for_single_variants`
 /// and `non_exhaustive_omitted_patterns` lints
 /// are not explicitly ignored here, so you can lint against them if you want to.
-/// If a pattern is unreachable, a warning will be thrown, as uses of [`bijective_enum_map`]
-/// are probably intended to be bijective.
+///
+/// If a pattern is unreachable, indicating that multiple enum variants were mapped to the same
+/// value (and then one of those copies of a value is unreachable when mapping in the other
+/// direction), a warning will be thrown, as uses of [`injective_enum_map`]
+/// are probably intended to be injective.
 #[macro_export]
 macro_rules! impl_enum_try_from {
     { $enum_name:ty, $try_from:ty, $($enum_variant:ident <=> $value:pat),+ $(,)? } => {
@@ -412,14 +425,14 @@ macro_rules! impl_enum_try_from {
 
 #[cfg(test)]
 mod tests {
-    use super::bijective_enum_map;
+    use super::injective_enum_map;
 
     #[test]
     fn empty_both_specified() {
         #[derive(Debug, PartialEq, Eq)]
         enum Empty {}
 
-        bijective_enum_map! {Empty, u8, u32}
+        injective_enum_map! {Empty, u8, u32}
 
         assert_eq!(Empty::try_from(2_u32), Err(()));
     }
@@ -429,7 +442,7 @@ mod tests {
         #[derive(Debug, PartialEq, Eq)]
         enum Empty {}
 
-        bijective_enum_map! {Empty, u8}
+        injective_enum_map! {Empty, u8}
 
         assert_eq!(Empty::try_from(2_u8), Err(()));
     }
@@ -443,7 +456,7 @@ mod tests {
             Two,
         }
 
-        bijective_enum_map! {
+        injective_enum_map! {
             AtMostTwo, u8, u32,
             Zero <=> 0,
             One  <=> 1,
@@ -464,7 +477,7 @@ mod tests {
             Two,
         }
 
-        bijective_enum_map! {
+        injective_enum_map! {
             AtMostTwo, u32,
             Zero <=> 0,
             One  <=> 1,
@@ -492,7 +505,7 @@ mod tests {
             Tres,
         }
 
-        bijective_enum_map! {
+        injective_enum_map! {
             Enum, Other, Other,
             One   <=> Other::Uno,
             Two   <=> Other::Dos,
@@ -500,7 +513,7 @@ mod tests {
         }
 
         assert_eq!(Other::from(Enum::Three), Other::Tres);
-        // Note that this conversion cannot fail, but `bijective_enum_map` does not know that.
+        // Note that this conversion cannot fail, but `injective_enum_map` does not know that.
         assert_eq!(Enum::try_from(Other::Uno), Ok(Enum::One));
     }
 
@@ -521,7 +534,7 @@ mod tests {
             Cuatro,
         }
 
-        bijective_enum_map! {
+        injective_enum_map! {
             Enum, Other, Other,
             One   <=> Other::Uno,
             Two   <=> Other::Dos,
@@ -543,8 +556,8 @@ mod tests {
             Something,
         }
 
-        bijective_enum_map! {Empty, &'static str, &str}
-        bijective_enum_map! {
+        injective_enum_map! {Empty, &'static str, &str}
+        injective_enum_map! {
             Nonempty, &'static str, &str,
             Something <=> "Something",
         }
@@ -561,46 +574,46 @@ mod tests {
             Something,
         }
 
-        bijective_enum_map!(Empty, u8, u8);
-        bijective_enum_map! { Empty, u16 };
-        bijective_enum_map! {
+        injective_enum_map!(Empty, u8, u8);
+        injective_enum_map! { Empty, u16 };
+        injective_enum_map! {
             Empty, i8, i8,
         };
-        bijective_enum_map! { Empty, i16, };
+        injective_enum_map! { Empty, i16, };
 
-        bijective_enum_map!(Nonempty, u8, u8, Something <=> 0);
-        bijective_enum_map! { Nonempty, u16, Something <=> 0};
-        bijective_enum_map! {
+        injective_enum_map!(Nonempty, u8, u8, Something <=> 0);
+        injective_enum_map! { Nonempty, u16, Something <=> 0};
+        injective_enum_map! {
             Nonempty, i8, i8, Something <=> 0,
         };
-        bijective_enum_map! { Nonempty, i16, Something <=> 0,};
+        injective_enum_map! { Nonempty, i16, Something <=> 0,};
     }
 }
 
 #[cfg(doctest)]
 pub mod compile_fail_tests {
     /// ```compile_fail,E0004
-    /// use prismarine_anchor_util::bijective_enum_map;
+    /// use prismarine_anchor_util::injective_enum_map;
     /// #[derive(Debug, PartialEq, Eq)]
     /// enum Nonempty {
     ///     Something,
     /// }
     ///
-    /// bijective_enum_map! {Nonempty, u8}
+    /// injective_enum_map! {Nonempty, u8}
     ///
     /// assert_eq!(Nonempty::try_from(2_u8), Err(()));
     /// ```
     pub fn _nonempty_but_nothing_provided() {}
 
     /// ```compile_fail,E0004
-    /// use prismarine_anchor_util::bijective_enum_map;
+    /// use prismarine_anchor_util::injective_enum_map;
     /// #[derive(Debug, PartialEq, Eq)]
     /// enum Nonempty {
     ///     Something,
     ///     SomethingElse,
     /// }
     ///
-    /// bijective_enum_map! { Nonempty, u8, Something <=> 0 }
+    /// injective_enum_map! { Nonempty, u8, Something <=> 0 }
     ///
     /// assert_eq!(Nonempty::try_from(2_u8), Err(()));
     /// ```
@@ -609,7 +622,7 @@ pub mod compile_fail_tests {
     /// ```compile_fail
     /// #![deny(warnings)]
     ///
-    /// use prismarine_anchor_util::bijective_enum_map;
+    /// use prismarine_anchor_util::injective_enum_map;
     /// #[derive(Debug, PartialEq, Eq)]
     /// enum AtMostTwo {
     ///     Zero,
@@ -617,7 +630,7 @@ pub mod compile_fail_tests {
     ///     Two,
     /// }
     ///
-    /// bijective_enum_map! {
+    /// injective_enum_map! {
     ///     AtMostTwo, u8,
     ///     Zero <=> 0,
     ///     One  <=> 1,
@@ -630,7 +643,7 @@ pub mod compile_fail_tests {
     // /// ```compile_fail
     // /// #![deny(unreachable_patterns)]
     // ///
-    // /// use prismarine_anchor_util::bijective_enum_map;
+    // /// use prismarine_anchor_util::injective_enum_map;
     // /// #[derive(Debug, PartialEq, Eq)]
     // /// enum AtMostTwo {
     // ///     Zero,
@@ -639,7 +652,7 @@ pub mod compile_fail_tests {
     // /// }
     // ///
     // /// #[deny(unreachable_patterns)]
-    // /// bijective_enum_map! {
+    // /// injective_enum_map! {
     // ///     AtMostTwo, u8,
     // ///     Zero <=> 0,
     // ///     One  <=> 1,
@@ -651,7 +664,7 @@ pub mod compile_fail_tests {
     /// ```compile_fail
     /// #![deny(warnings)]
     ///
-    /// use prismarine_anchor_util::bijective_enum_map;
+    /// use prismarine_anchor_util::injective_enum_map;
     /// #[derive(Debug, PartialEq, Eq)]
     /// enum AtMostTwo {
     ///     Zero,
@@ -664,7 +677,7 @@ pub mod compile_fail_tests {
     ///     Dos,
     /// }
     ///
-    /// bijective_enum_map! {
+    /// injective_enum_map! {
     ///     AtMostTwo, Other,
     ///     Zero <=> Other::Uno,
     ///     One  <=> Other::Uno,
@@ -677,12 +690,12 @@ pub mod compile_fail_tests {
 
     // Surprisingly, this compiles. It defaults to `&'static str`, as far as I can tell.
     // /// ```compile_fail
-    // /// use prismarine_anchor_util::bijective_enum_map;
+    // /// use prismarine_anchor_util::injective_enum_map;
     // /// enum Nonempty {
     // ///     Something,
     // /// }
     // ///
-    // /// bijective_enum_map! {
+    // /// injective_enum_map! {
     // ///     Nonempty, &str,
     // ///     Something <=> "Something",
     // /// }
@@ -693,12 +706,12 @@ pub mod compile_fail_tests {
 
     // Doesn't seem to have a compiler error number
     /// ```compile_fail
-    /// use prismarine_anchor_util::bijective_enum_map;
+    /// use prismarine_anchor_util::injective_enum_map;
     /// enum Nonempty {
     ///     Something,
     /// }
     ///
-    /// bijective_enum_map! {
+    /// injective_enum_map! {
     ///     Nonempty, u8
     ///     Something <=> 0
     /// }

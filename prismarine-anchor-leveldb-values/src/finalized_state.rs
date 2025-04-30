@@ -1,4 +1,4 @@
-use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::injective_enum_map;
 use prismarine_anchor_util::slice_to_array;
 
 
@@ -10,7 +10,7 @@ pub enum FinalizedState {
     Done,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     FinalizedState, u32,
     NeedsInstaticking <=> 0,
     NeedsPopulation   <=> 1,

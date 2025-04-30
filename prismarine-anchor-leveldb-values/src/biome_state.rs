@@ -1,6 +1,6 @@
 #![allow(clippy::len_zero, reason = "clarity")]
 
-use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::injective_enum_map;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -202,7 +202,7 @@ pub enum BytesPerBiome {
     Two,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     BytesPerBiome, u8,
     One <=> 1,
     Two <=> 2,

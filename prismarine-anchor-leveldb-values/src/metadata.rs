@@ -11,7 +11,7 @@ use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
-use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::injective_enum_map;
 use prismarine_anchor_util::slice_to_array;
 
 use crate::{all_read, dimensions::NamedDimension};
@@ -436,7 +436,7 @@ pub enum MetaDataType {
     SkullFlatteningPerformed,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     MetaDataType, u8,
     LastSavedBaseGameVersion      <=> 0,
     OriginalBaseGameVersion       <=> 1,
@@ -454,7 +454,7 @@ bijective_enum_map! {
     SkullFlatteningPerformed      <=> 13,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     MetaDataType, &'static str, &str,
     LastSavedBaseGameVersion      <=> "LastSavedBaseGameVersion",
     OriginalBaseGameVersion       <=> "OriginalBaseGameVersion",
@@ -484,7 +484,7 @@ pub enum BlendingVersion {
     V1_21_60,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     BlendingVersion, i16,
     V1_19_0   <=> 0,
     V1_19_0_1 <=> 1,
@@ -503,7 +503,7 @@ pub enum GeneratorType {
     Flat,
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     GeneratorType, i32,
     Old      <=> 0,
     Infinite <=> 1,

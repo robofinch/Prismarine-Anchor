@@ -1,6 +1,6 @@
 use prismarine_anchor_translation::datatypes::NumericVersion;
 
-use prismarine_anchor_util::bijective_enum_map;
+use prismarine_anchor_util::injective_enum_map;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -210,7 +210,7 @@ impl ChunkVersion {
     }
 }
 
-bijective_enum_map! {
+injective_enum_map! {
     ChunkVersion, u8,
     V0  <=> 0,    V1  <=> 1,    V2  <=> 2,    V3  <=> 3,    V4  <=> 4,
     V5  <=> 5,    V6  <=> 6,    V7  <=> 7,    V8  <=> 8,    V9  <=> 9,
