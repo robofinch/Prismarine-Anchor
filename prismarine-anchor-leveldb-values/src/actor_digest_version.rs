@@ -41,6 +41,6 @@ impl ActorDigestVersion {
 }
 
 bijective_enum_map! {
-    ActorDigestVersion, u8, u8,
+    ActorDigestVersion, u8,
     V1_18_30 <=> 0,
 }

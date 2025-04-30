@@ -436,7 +436,7 @@ pub enum MetaDataType {
 }
 
 bijective_enum_map! {
-    MetaDataType, u8, u8,
+    MetaDataType, u8,
     LastSavedBaseGameVersion        <=> 0,
     OriginalBaseGameVersion         <=> 1,
     BiomeBaseGameVersion            <=> 2,
@@ -484,7 +484,7 @@ pub enum BlendingVersion {
 }
 
 bijective_enum_map! {
-    BlendingVersion, i16, i16,
+    BlendingVersion, i16,
     V1_19_0   <=> 0,
     V1_19_0_1 <=> 1,
     V1_19_0_2 <=> 2,
@@ -503,7 +503,7 @@ pub enum GeneratorType {
 }
 
 bijective_enum_map! {
-    GeneratorType, i32, i32,
+    GeneratorType, i32,
     Old      <=> 0,
     Infinite <=> 1,
     Flat     <=> 2,

@@ -1,5 +1,6 @@
 use prismarine_anchor_leveldb_values::{
     actor::ActorID,
+    actor_digest::ActorDigest,
     actor_digest_version::ActorDigestVersion,
     biome_state::BiomeState,
     blending_data::BlendingData,
@@ -10,6 +11,7 @@ use prismarine_anchor_leveldb_values::{
     data_3d::Data3D,
     dimensions::NamedDimension,
     finalized_state::FinalizedState,
+    hardcoded_spawners::HardcodedSpawners,
     legacy_data_2d::LegacyData2D,
     metadata::LevelChunkMetaDataDictionary,
     nbt_compound_conversion::NbtCompoundConversion as _,
@@ -59,7 +61,7 @@ pub enum DBEntry {
 
     // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
-    // HardcodedSpawners(DimensionedChunkPos), // Not NBT
+    HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),
     // AabbVolumes(DimensionedChunkPos), // Not NBT
 
     // Checksums(DimensionedChunkPos),
@@ -77,7 +79,7 @@ pub enum DBEntry {
     BlendingBiomeHeight(DimensionedChunkPos, Vec<u8>),
     BlendingData(DimensionedChunkPos, BlendingData),
 
-    // ActorDigest(DimensionedChunkPos, Vec<ActorID>),
+    ActorDigest(DimensionedChunkPos, ActorDigest),
 
     // ================================
     //  Data not specific to a chunk
@@ -238,27 +240,29 @@ impl DBEntry {
                 }
             }
             DBKey::BlockEntities(chunk_pos) => {
-                // The `true` is definitely needed.
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
+                // Note that block entities definitely have some `ByteString`s
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
                     return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             }
             DBKey::LegacyEntities(chunk_pos) => {
-                // TODO: Not sure if `true` is needed.
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
                     return V::Parsed(Self::LegacyEntities(chunk_pos, compounds));
                 }
             }
             DBKey::PendingTicks(chunk_pos) => {
-                // TODO: Not sure if `true` is needed.
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
                     return V::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             }
             DBKey::RandomTicks(chunk_pos) => {
-                // TODO: Not sure if `true` is needed.
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value, true) {
+                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
+                }
+            }
+            DBKey::HardcodedSpawners(chunk_pos) => {
+                if let Some(spawners) = HardcodedSpawners::parse(value) {
+                    return V::Parsed(Self::HardcodedSpawners(chunk_pos, spawners));
                 }
             }
             DBKey::MetaDataHash(chunk_pos) => {
@@ -285,6 +289,11 @@ impl DBEntry {
             DBKey::BlendingData(chunk_pos) => {
                 if let Some(blending_data) = BlendingData::parse(value) {
                     return V::Parsed(Self::BlendingData(chunk_pos, blending_data));
+                }
+            }
+            DBKey::ActorDigest(chunk_pos) => {
+                if let Some(digest) = ActorDigest::parse(value) {
+                    return V::Parsed(Self::ActorDigest(chunk_pos, digest));
                 }
             }
             DBKey::Actor(actor_id) => {
@@ -479,12 +488,14 @@ impl DBEntry {
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
+            Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(*chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(*chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
+            Self::ActorDigest(chunk_pos, ..)        => DBKey::ActorDigest(*chunk_pos),
             Self::Actor(actor_id, ..)               => DBKey::Actor(*actor_id),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
             Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
@@ -531,12 +542,14 @@ impl DBEntry {
             Self::LegacyEntities(chunk_pos, ..)     => DBKey::LegacyEntities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
+            Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
+            Self::ActorDigest(chunk_pos, ..)        => DBKey::ActorDigest(chunk_pos),
             Self::Actor(actor_id, ..)               => DBKey::Actor(actor_id),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
             Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
@@ -586,12 +599,14 @@ impl DBEntry {
             Self::LegacyEntities(.., compounds)         => compounds.to_bytes(true)?,
             Self::PendingTicks(.., compounds)           => compounds.to_bytes(true)?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes(true)?,
+            Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(),
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
             Self::FinalizedState(.., state)             => state.to_bytes(),
             Self::BiomeState(.., state)                 => state.to_bytes(),
             Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
+            Self::ActorDigest(.., digest)               => digest.to_bytes(),
             Self::Actor(.., nbt)                        => nbt.to_bytes()?,
             Self::LevelChunkMetaDataDictionary(dict) => {
                 dict.to_bytes(opts.error_on_excessive_length)?

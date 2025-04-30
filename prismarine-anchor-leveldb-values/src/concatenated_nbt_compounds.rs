@@ -7,24 +7,20 @@ use crate::all_read;
 
 
 #[derive(Debug, Clone)]
-pub struct ConcatenatedNbtCompounds(Vec<NbtCompound>);
+pub struct ConcatenatedNbtCompounds(pub Vec<NbtCompound>);
 
 impl ConcatenatedNbtCompounds {
-    pub fn parse(input: &[u8], allow_invalid_strings: bool) -> Result<Self, NbtIoError> {
+    pub fn parse(input: &[u8]) -> Result<Self, NbtIoError> {
         let mut compounds = Vec::new();
 
         let input_len = input.len();
         let mut reader = Cursor::new(input);
 
-        // A few "strings" might be invalid UTF-8 because they're actually just 8 bytes
-        // for an ActorID.
-        let io_options = IoOptions {
-            enable_byte_strings: allow_invalid_strings,
-            ..IoOptions::bedrock_uncompressed()
-        };
-
         while !all_read(reader.position(), input_len) {
-            let (nbt, _) = read_compound(&mut reader, io_options)?;
+            let (nbt, _) = read_compound(
+                &mut reader,
+                IoOptions::bedrock_uncompressed(),
+            )?;
             compounds.push(nbt);
         }
 

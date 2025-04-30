@@ -11,7 +11,7 @@ use crate::dimensions::NumericDimension;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ChunkPosition {
     pub x: i32,
-    pub y: i32,
+    pub z: i32,
 }
 
 /// The location of a chunk in a world, including its dimension.
@@ -29,7 +29,7 @@ impl DimensionedChunkPos {
             Some(Self(
                 ChunkPosition {
                     x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
-                    y: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
+                    z: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
                 },
                 NumericDimension::OVERWORLD,
             ))
@@ -41,7 +41,7 @@ impl DimensionedChunkPos {
             Some(Self(
                 ChunkPosition {
                     x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
-                    y: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
+                    z: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
                 },
                 NumericDimension::from_bedrock_numeric(dimension_id),
             ))
@@ -58,7 +58,7 @@ impl DimensionedChunkPos {
     pub fn extend_serialized(self, bytes: &mut Vec<u8>, write_overworld_id: bool) {
         bytes.reserve(12);
         bytes.extend(self.0.x.to_le_bytes());
-        bytes.extend(self.0.y.to_le_bytes());
+        bytes.extend(self.0.z.to_le_bytes());
         if write_overworld_id || self.1.to_bedrock_numeric() != 0 {
             bytes.extend(self.1.to_bedrock_numeric().to_le_bytes());
         }
