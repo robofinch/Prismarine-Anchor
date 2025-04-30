@@ -50,30 +50,6 @@ pub mod blending_data;
 pub mod actor_digest;
 #[cfg(feature = "actor")]
 pub mod actor;
-#[cfg(feature = "autonomous_entities")]
-pub mod autonomous_entities;
-#[cfg(feature = "player")]
-pub mod player; // Does this include PlayerServer? No clue!
-#[cfg(feature = "village")]
-pub mod village;
-#[cfg(feature = "map")]
-pub mod map;
-#[cfg(feature = "portals")]
-pub mod portals;
-#[cfg(feature = "structure_template")]
-pub mod structure_template;
-#[cfg(feature = "ticking_area")]
-pub mod ticking_area;
-#[cfg(feature = "scoreboard")]
-pub mod scoreboard;
-#[cfg(feature = "wandering_trader_scheduler")]
-pub mod wandering_trader_scheduler;
-#[cfg(feature = "biome_data")]
-pub mod biome_data;
-#[cfg(feature = "mob_events")]
-pub mod mob_events;
-#[cfg(feature = "position_tracking")]
-pub mod position_tracking;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
 

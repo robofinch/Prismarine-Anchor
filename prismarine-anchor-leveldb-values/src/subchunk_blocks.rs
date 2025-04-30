@@ -284,7 +284,7 @@ fn parse_block_layers(
                         let mut compounds = Vec::new();
 
                         let opts = IoOptions {
-                            allow_invalid_strings: true,
+                            enable_byte_strings: true,
                             ..IoOptions::bedrock_uncompressed()
                         };
 
@@ -312,7 +312,7 @@ fn write_block_layers(
     bytes:     &mut Vec<u8>,
 ) -> Result<(), NbtIoError> {
     let opts = IoOptions {
-        allow_invalid_strings: true,
+        enable_byte_strings: true,
         ..IoOptions::bedrock_uncompressed()
     };
 

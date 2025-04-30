@@ -1,5 +1,5 @@
 use prismarine_anchor_leveldb_values::{
-    // actor::ActorID,
+    actor::ActorID,
     actor_digest_version::ActorDigestVersion,
     biome_state::BiomeState,
     blending_data::BlendingData,
@@ -8,19 +8,23 @@ use prismarine_anchor_leveldb_values::{
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
     data_2d::Data2D,
     data_3d::Data3D,
+    dimensions::NamedDimension,
     finalized_state::FinalizedState,
     legacy_data_2d::LegacyData2D,
     metadata::LevelChunkMetaDataDictionary,
     nbt_compound_conversion::NbtCompoundConversion as _,
     subchunk_blocks::SubchunkBlocks,
+    uuid::UUID,
 };
 use prismarine_anchor_nbt::NbtCompound;
+use prismarine_anchor_translation::datatypes::NamespacedIdentifier;
 
 // Crazy luck with the alignment
 use crate::{
     EntryBytes, EntryParseResult, EntryToBytesError, EntryToBytesOptions,
     key::DBKey, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
 };
+
 
 /// The entries in a world's `LevelDB` database used by Minecraft Bedrock,
 /// parsed out of binary, but not necessary into the most useful completely-parsed format.
@@ -48,14 +52,15 @@ pub enum DBEntry {
     // LegacyTerrain(DimensionedChunkPos),
     // LegacyExtraBlockData(DimensionedChunkPos),
     BlockEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
+    // On a super old save, I saw this have the value [3] and fail to parse.
     LegacyEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
     PendingTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
     RandomTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
 
     // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
-    // HardcodedSpawners(DimensionedChunkPos),
-    // AabbVolumes(DimensionedChunkPos),
+    // HardcodedSpawners(DimensionedChunkPos), // Not NBT
+    // AabbVolumes(DimensionedChunkPos), // Not NBT
 
     // Checksums(DimensionedChunkPos),
     MetaDataHash(DimensionedChunkPos, u64),
@@ -72,57 +77,59 @@ pub enum DBEntry {
     BlendingBiomeHeight(DimensionedChunkPos, Vec<u8>),
     BlendingData(DimensionedChunkPos, BlendingData),
 
-    // ActorDigest(DimensionedChunkPos),
+    // ActorDigest(DimensionedChunkPos, Vec<ActorID>),
 
     // ================================
     //  Data not specific to a chunk
     // ================================
 
-    // Actor(ActorID),
+    Actor(ActorID, NbtCompound),
 
     LevelChunkMetaDataDictionary(LevelChunkMetaDataDictionary),
 
-    // AutonomousEntities,
+    AutonomousEntities(NbtCompound),
 
-    // LocalPlayer,
-    // Player(UUID),
-    // LegacyPlayer(i64),
-    // PlayerServer(UUID),
+    LocalPlayer(NbtCompound),
+    Player(UUID, NbtCompound),
+    LegacyPlayer(i64, NbtCompound),
+    PlayerServer(UUID, NbtCompound),
 
-    // VillageDwellers(NamedDimension, UUID),
-    // VillageInfo(NamedDimension, UUID),
-    // VillagePOI(NamedDimension, UUID),
-    // VillagePlayers(NamedDimension, UUID),
+    VillageDwellers(NamedDimension, UUID, NbtCompound),
+    VillageInfo(NamedDimension, UUID, NbtCompound),
+    VillagePOI(NamedDimension, UUID, NbtCompound),
+    VillagePlayers(NamedDimension, UUID, NbtCompound),
 
-    // Map(i64),
-    // Portals,
+    Map(i64, NbtCompound),
+    Portals(NbtCompound),
 
-    // StructureTemplate(NamespacedIdentifier),
-    // TickingArea(UUID),
-    // Scoreboard,
-    // WanderingTraderScheduler,
+    StructureTemplate(NamespacedIdentifier, NbtCompound),
+    TickingArea(UUID, NbtCompound),
+    Scoreboard(NbtCompound),
+    WanderingTraderScheduler(NbtCompound),
 
-    // BiomeData,
-    // MobEvents,
+    BiomeData(NbtCompound),
+    MobEvents(NbtCompound),
 
     Overworld(NbtCompound),
     Nether(NbtCompound),
     TheEnd(NbtCompound),
 
-    // PositionTrackingDB(u32),
-    // PositionTrackingLastId,
+    PositionTrackingDB(u32, NbtCompound),
+    PositionTrackingLastId(NbtCompound),
     // BiomeIdsTable
 
     // FlatWorldLayers,
 
     // TODO: other encountered keys from very old versions:
-    // mVillages
-    // villages
-    // VillageManager <- I think I saw some library include this
-    // dimension0
-    // dimension1
-    // dimension2 <- not sure if it exists, but dimension0 does.
-    // idcounts
+    LegacyMVillages(NbtCompound),
+    LegacyVillages(NbtCompound),
+    // LegacyVillageManager <- I think I saw some library include this. Probably NBT?
+    // note that the raw key is, allegedly, "VillageManager"
+
+    LegacyDimension0(NbtCompound),
+    LegacyDimension1(NbtCompound),
+    // dimension2 <- not sure if it exists, since the end probably didn't have structures
+    // idcounts   <- I've only heard of this, not seen this as a key.
 
     RawEntry {
         key:   Vec<u8>,
@@ -280,12 +287,122 @@ impl DBEntry {
                     return V::Parsed(Self::BlendingData(chunk_pos, blending_data));
                 }
             }
+            DBKey::Actor(actor_id) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Actor(actor_id, nbt));
+                }
+            }
             DBKey::LevelChunkMetaDataDictionary => {
                 if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
                     return V::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
                 }
                 // TODO: use the error value to log debug information
                 // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
+            }
+            DBKey::AutonomousEntities => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::AutonomousEntities(nbt));
+                }
+            }
+            DBKey::LocalPlayer => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LocalPlayer(nbt));
+                }
+            }
+            DBKey::Player(uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Player(uuid, nbt));
+                }
+            }
+            DBKey::LegacyPlayer(client_id) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyPlayer(client_id, nbt));
+                }
+            }
+            DBKey::PlayerServer(uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::PlayerServer(uuid, nbt));
+                }
+            }
+            DBKey::VillageDwellers(dim, uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::VillageDwellers(dim, uuid, nbt));
+                } else {
+                    // Note that `dim` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::VillageDwellers(dim, uuid));
+                }
+            }
+            DBKey::VillageInfo(dim, uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::VillageInfo(dim, uuid, nbt));
+                } else {
+                    // Note that `dim` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::VillageInfo(dim, uuid));
+                }
+            }
+            DBKey::VillagePOI(dim, uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::VillagePOI(dim, uuid, nbt));
+                } else {
+                    // Note that `dim` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::VillagePOI(dim, uuid));
+                }
+            }
+            DBKey::VillagePlayers(dim, uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::VillagePlayers(dim, uuid, nbt));
+                } else {
+                    // Note that `dim` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::VillagePlayers(dim, uuid));
+                }
+            }
+            DBKey::Map(map_id) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Map(map_id, nbt));
+                }
+            }
+            DBKey::Portals => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Portals(nbt));
+                }
+            }
+            DBKey::StructureTemplate(identifier) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::StructureTemplate(identifier, nbt));
+                } else {
+                    // Note that `identifer` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::StructureTemplate(identifier));
+                }
+            }
+            DBKey::TickingArea(uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::TickingArea(uuid, nbt));
+                }
+            }
+            DBKey::Scoreboard => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::Scoreboard(nbt));
+                }
+            }
+            DBKey::WanderingTraderScheduler => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::WanderingTraderScheduler(nbt));
+                }
+            }
+            DBKey::BiomeData => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::BiomeData(nbt));
+                }
+            }
+            DBKey::MobEvents => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::MobEvents(nbt));
+                }
             }
             DBKey::Overworld => {
                 if let Some(nbt) = NbtCompound::parse(value) {
@@ -300,6 +417,36 @@ impl DBEntry {
             DBKey::TheEnd => {
                 if let Some(nbt) = NbtCompound::parse(value) {
                     return V::Parsed(Self::TheEnd(nbt));
+                }
+            }
+            DBKey::PositionTrackingDB(id) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::PositionTrackingDB(id, nbt));
+                }
+            }
+            DBKey::PositionTrackingLastId => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::PositionTrackingLastId(nbt));
+                }
+            }
+            DBKey::LegacyMVillages => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyMVillages(nbt));
+                }
+            }
+            DBKey::LegacyVillages => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyVillages(nbt));
+                }
+            }
+            DBKey::LegacyDimension0 => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyDimension0(nbt));
+                }
+            }
+            DBKey::LegacyDimension1 => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::LegacyDimension1(nbt));
                 }
             }
             DBKey::RawKey(key) => {
@@ -338,10 +485,34 @@ impl DBEntry {
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
+            Self::Actor(actor_id, ..)               => DBKey::Actor(*actor_id),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
+            Self::LocalPlayer(_)                    => DBKey::LocalPlayer,
+            Self::Player(uuid, _)                   => DBKey::Player(*uuid),
+            Self::LegacyPlayer(id, _)               => DBKey::LegacyPlayer(*id),
+            Self::PlayerServer(uuid, _)             => DBKey::PlayerServer(*uuid),
+            Self::VillageDwellers(dim, uuid, _)     => DBKey::VillageDwellers(dim.clone(), *uuid),
+            Self::VillageInfo(dim, uuid, _)         => DBKey::VillageInfo(dim.clone(), *uuid),
+            Self::VillagePOI(dim, uuid, _)          => DBKey::VillagePOI(dim.clone(), *uuid),
+            Self::VillagePlayers(dim, uuid, _)      => DBKey::VillagePlayers(dim.clone(), *uuid),
+            Self::Map(map_id, _)                    => DBKey::Map(*map_id),
+            Self::Portals(_)                        => DBKey::Portals,
+            Self::StructureTemplate(name, _)        => DBKey::StructureTemplate(name.clone()),
+            Self::TickingArea(uuid, _)              => DBKey::TickingArea(*uuid),
+            Self::Scoreboard(_)                     => DBKey::Scoreboard,
+            Self::WanderingTraderScheduler(_)       => DBKey::WanderingTraderScheduler,
+            Self::BiomeData(_)                      => DBKey::BiomeData,
+            Self::MobEvents(_)                      => DBKey::MobEvents,
             Self::Overworld(_)                      => DBKey::Overworld,
             Self::Nether(_)                         => DBKey::Nether,
             Self::TheEnd(_)                         => DBKey::TheEnd,
+            Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(*id),
+            Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
+            Self::LegacyMVillages(_)                => DBKey::LegacyMVillages,
+            Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
+            Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
+            Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
         }
@@ -366,12 +537,36 @@ impl DBEntry {
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
+            Self::Actor(actor_id, ..)               => DBKey::Actor(actor_id),
             Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
+            Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
+            Self::LocalPlayer(_)                    => DBKey::LocalPlayer,
+            Self::Player(uuid, _)                   => DBKey::Player(uuid),
+            Self::LegacyPlayer(id, _)               => DBKey::LegacyPlayer(id),
+            Self::PlayerServer(uuid, _)             => DBKey::PlayerServer(uuid),
+            Self::VillageDwellers(dim, uuid, _)     => DBKey::VillageDwellers(dim, uuid),
+            Self::VillageInfo(dim, uuid, _)         => DBKey::VillageInfo(dim, uuid),
+            Self::VillagePOI(dim, uuid, _)          => DBKey::VillagePOI(dim, uuid),
+            Self::VillagePlayers(dim, uuid, _)      => DBKey::VillagePlayers(dim, uuid),
+            Self::Map(map_id, _)                    => DBKey::Map(map_id),
+            Self::Portals(_)                        => DBKey::Portals,
+            Self::StructureTemplate(name, _)        => DBKey::StructureTemplate(name),
+            Self::TickingArea(uuid, _)              => DBKey::TickingArea(uuid),
+            Self::Scoreboard(_)                     => DBKey::Scoreboard,
+            Self::WanderingTraderScheduler(_)       => DBKey::WanderingTraderScheduler,
+            Self::BiomeData(_)                      => DBKey::BiomeData,
+            Self::MobEvents(_)                      => DBKey::MobEvents,
             Self::Overworld(_)                      => DBKey::Overworld,
             Self::Nether(_)                         => DBKey::Nether,
             Self::TheEnd(_)                         => DBKey::TheEnd,
-            Self::RawEntry { key, .. } => DBKey::RawKey(key),
-            Self::RawValue { key, .. } => key,
+            Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(id),
+            Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
+            Self::LegacyMVillages(_)                => DBKey::LegacyMVillages,
+            Self::LegacyVillages(_)                 => DBKey::LegacyVillages,
+            Self::LegacyDimension0(_)               => DBKey::LegacyDimension0,
+            Self::LegacyDimension1(_)               => DBKey::LegacyDimension1,
+            Self::RawEntry { key, .. }              => DBKey::RawKey(key),
+            Self::RawValue { key, .. }              => key,
         }
     }
 
@@ -397,14 +592,38 @@ impl DBEntry {
             Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
+            Self::Actor(.., nbt)                        => nbt.to_bytes()?,
             Self::LevelChunkMetaDataDictionary(dict) => {
                 dict.to_bytes(opts.error_on_excessive_length)?
             }
+            Self::AutonomousEntities(nbt)               => nbt.to_bytes()?,
+            Self::LocalPlayer(nbt)                      => nbt.to_bytes()?,
+            Self::Player(_, nbt)                        => nbt.to_bytes()?,
+            Self::LegacyPlayer(_, nbt)                  => nbt.to_bytes()?,
+            Self::PlayerServer(_, nbt)                  => nbt.to_bytes()?,
+            Self::VillageDwellers(.., nbt)              => nbt.to_bytes()?,
+            Self::VillageInfo(.., nbt)                  => nbt.to_bytes()?,
+            Self::VillagePOI(.., nbt)                   => nbt.to_bytes()?,
+            Self::VillagePlayers(.., nbt)               => nbt.to_bytes()?,
+            Self::Map(_, nbt)                           => nbt.to_bytes()?,
+            Self::Portals(nbt)                          => nbt.to_bytes()?,
+            Self::StructureTemplate(_, nbt)             => nbt.to_bytes()?,
+            Self::TickingArea(_, nbt)                   => nbt.to_bytes()?,
+            Self::Scoreboard(nbt)                       => nbt.to_bytes()?,
+            Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes()?,
+            Self::BiomeData(nbt)                        => nbt.to_bytes()?,
+            Self::MobEvents(nbt)                        => nbt.to_bytes()?,
             Self::Overworld(nbt)                        => nbt.to_bytes()?,
             Self::Nether(nbt)                           => nbt.to_bytes()?,
             Self::TheEnd(nbt)                           => nbt.to_bytes()?,
-            Self::RawEntry { value, .. } => value.clone(),
-            Self::RawValue { value, .. } => value.clone(),
+            Self::PositionTrackingDB(_, nbt)            => nbt.to_bytes()?,
+            Self::PositionTrackingLastId(nbt)           => nbt.to_bytes()?,
+            Self::LegacyMVillages(nbt)                  => nbt.to_bytes()?,
+            Self::LegacyVillages(nbt)                   => nbt.to_bytes()?,
+            Self::LegacyDimension0(nbt)                 => nbt.to_bytes()?,
+            Self::LegacyDimension1(nbt)                 => nbt.to_bytes()?,
+            Self::RawEntry { value, .. }                => value.clone(),
+            Self::RawValue { value, .. }                => value.clone(),
         })
     }
 

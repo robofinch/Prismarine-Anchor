@@ -19,7 +19,7 @@ impl ConcatenatedNbtCompounds {
         // A few "strings" might be invalid UTF-8 because they're actually just 8 bytes
         // for an ActorID.
         let io_options = IoOptions {
-            allow_invalid_strings,
+            enable_byte_strings: allow_invalid_strings,
             ..IoOptions::bedrock_uncompressed()
         };
 
@@ -39,7 +39,7 @@ impl ConcatenatedNbtCompounds {
         let mut writer = Cursor::new(bytes);
 
         let io_options = IoOptions {
-            allow_invalid_strings,
+            enable_byte_strings: allow_invalid_strings,
             ..IoOptions::bedrock_uncompressed()
         };
 

@@ -41,11 +41,8 @@ all = [
     "border_blocks", "hardcoded_spawners", "aabb_volumes",
     "checksums", "metadata",
     "finalized_state", "biome_state", "conversion_data", "blending_data",
-    "actor_digest", "actor", "autonomous_entities",
-    "player", "village", "map", "portals",
-    "structure_template", "ticking_area", "scoreboard",
-    "wandering_trader_scheduler", "biome_data", "mob_events",
-    "position_tracking", "flat_world_layers"
+    "actor_digest", "actor",
+    "flat_world_layers"
 ]
 dimensions                  = []
 chunk_position              = ["dimensions", "dep:prismarine-anchor-util"]
@@ -79,16 +76,4 @@ blending_biome_height       = []
 blending_data               = []
 actor_digest                = []
 actor                       = []
-autonomous_entities         = []
-player                      = []
-village                     = []
-map                         = []
-portals                     = []
-structure_template          = []
-ticking_area                = []
-scoreboard                  = []
-wandering_trader_scheduler  = []
-biome_data                  = []
-mob_events                  = []
-position_tracking           = []
 flat_world_layers           = []

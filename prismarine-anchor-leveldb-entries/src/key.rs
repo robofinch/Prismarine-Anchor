@@ -61,8 +61,7 @@ pub enum DBKey {
     /// Used in Education Edition
     BorderBlocks(DimensionedChunkPos),
     /// Bounding boxes for structure spawns, such as a Nether Fortress or Pillager Outpost.
-    /// No longer used; structure spawns are no longer saved to the world file at all.
-    // TODO: no longer used as of when?
+    /// No longer used as of 1.21.10.
     HardcodedSpawners(DimensionedChunkPos),
     // Found in levilamina, key tag value 119 (b'w'). Related to hardcoded spawners, maybe?
     // Apparently something to do with trial chambers... maybe other structures too?
@@ -115,7 +114,7 @@ pub enum DBKey {
     // associated with the current BaseGameVersion, probably?
     LevelChunkMetaDataDictionary,
 
-    // TODO: this actually exists. Figure out what it is.
+    // It seems that this is at least used for the Ender Dragon, dunno what else
     AutonomousEntities,
 
     /// NBT data of the world's local player entity.
@@ -172,15 +171,17 @@ pub enum DBKey {
     PositionTrackingLastId,
     // BiomeIdsTable
 
-    /// This key, `game_flatworldlayers`, only seems to be used in very old versions.
+    // Other encountered keys from very old versions:
     FlatWorldLayers,
-    // MVillages,
-    // Dimension0,
-    // Dimension1,
 
-    // TODO: other encountered keys from very old versions:
-    // villages
-    // VillageManager
+    LegacyMVillages,
+    LegacyVillages,
+    // does this actually exist? did someone use it as a name for mVillages?
+    // note that the raw key is, allegedly, "VillageManager"
+    // LegacyVillageManager,
+
+    LegacyDimension0,
+    LegacyDimension1,
     // dimension2 <- might not exist
     // idcounts   <- I've only heard of this, not seen this as a key.
 
@@ -219,7 +220,7 @@ impl DBKey {
             && !raw_key.starts_with(b"map")
             && !raw_key.starts_with(b"player_")
         {
-            // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents)
+            // b'd' (Overworld), b'a' (BiomeData), and b's' (mobevents / mVillages)
             // should never be allowed as tags here, to avoid a collision.
             let tag = raw_key[raw_key.len() - 1];
             if ((43 <= tag && tag <= 65) && tag != 47) || tag == 118 || tag == 119 {
@@ -370,6 +371,10 @@ impl DBKey {
                 "mobevents"                     => Self::MobEvents,
                 "PositionTrackDB-LastId"        => Self::PositionTrackingLastId,
                 "game_flatworldlayers"          => Self::FlatWorldLayers,
+                "mVillages"                     => Self::LegacyMVillages,
+                "villages"                      => Self::LegacyVillages,
+                "dimension0"                    => Self::LegacyDimension0,
+                "dimension1"                    => Self::LegacyDimension1,
                 _ => return None,
             });
         }
@@ -575,6 +580,22 @@ impl DBKey {
             }
             &Self::FlatWorldLayers => {
                 bytes.extend(b"game_flatworldlayers");
+                return;
+            }
+            &Self::LegacyMVillages => {
+                bytes.extend(b"mVillages");
+                return;
+            }
+            &Self::LegacyVillages => {
+                bytes.extend(b"villages");
+                return;
+            }
+            &Self::LegacyDimension0 => {
+                bytes.extend(b"dimension0");
+                return;
+            }
+            &Self::LegacyDimension1 => {
+                bytes.extend(b"dimension1");
                 return;
             }
             Self::RawKey(raw_key) => {
