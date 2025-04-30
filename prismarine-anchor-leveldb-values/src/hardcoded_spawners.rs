@@ -74,7 +74,7 @@ pub struct BlockVolume {
 }
 
 impl BlockVolume {
-    pub fn parse(value: [u8; 24]) -> Option<BlockVolume> {
+    pub fn parse(value: [u8; 24]) -> Option<Self> {
         let low_x  = i32::from_le_bytes([value[0],  value[ 1], value[ 2], value[ 3]]);
         let low_y  = i32::from_le_bytes([value[4],  value[ 5], value[ 6], value[ 7]]);
         let low_z  = i32::from_le_bytes([value[8],  value[ 9], value[10], value[11]]);
