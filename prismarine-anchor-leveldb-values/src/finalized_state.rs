@@ -1,5 +1,6 @@
+use subslice_to_array::SubsliceToArray as _;
+
 use prismarine_anchor_util::injective_enum_map;
-use prismarine_anchor_util::slice_to_array;
 
 
 // Based on rbedrock
@@ -21,7 +22,7 @@ impl FinalizedState {
     #[inline]
     pub fn parse(value: &[u8]) -> Option<Self> {
         if value.len() == 4 {
-            let value = slice_to_array::<0, 4, _, 4>(value);
+            let value = value.subslice_to_array::<0, 4>();
             Self::try_from(u32::from_le_bytes(value)).ok()
         } else {
             None

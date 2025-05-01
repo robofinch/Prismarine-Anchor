@@ -1,6 +1,5 @@
+use subslice_to_array::SubsliceToArray as _;
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
-
-use prismarine_anchor_util::slice_to_array;
 
 
 /// Not written since 1.18.0
@@ -31,13 +30,13 @@ impl Data2D {
             return None;
         }
 
-        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
+        let heightmap: [u8; 512] = value.subslice_to_array::<0, 512>();
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);
 
         // 768 == 512 + 256
-        let biome_ids: [u8; 256] = slice_to_array::<512, 768, _, 256>(value);
+        let biome_ids: [u8; 256] = value.subslice_to_array::<512, 768>();
         let biome_ids: [[u8; 16]; 16] = transmute!(biome_ids);
 
         Some(Self {

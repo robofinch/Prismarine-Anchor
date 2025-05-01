@@ -14,11 +14,12 @@ prismarine-anchor-nbt           = { workspace = true, optional = true }
 prismarine-anchor-translation   = { workspace = true, optional = true }
 prismarine-anchor-util          = { workspace = true, optional = true }
 
-indexmap        = { workspace = true, optional = true }
-serde           = { workspace = true, optional = true }
-thiserror       = { workspace = true, optional = true }
-xxhash-rust     = { workspace = true, optional = true }
-zerocopy        = { workspace = true, features = ["derive"], optional = true }
+indexmap            = { workspace = true, optional = true }
+serde               = { workspace = true, optional = true }
+subslice-to-array   = { workspace = true, optional = true }
+thiserror           = { workspace = true, optional = true }
+xxhash-rust         = { workspace = true, optional = true }
+zerocopy            = { workspace = true, features = ["derive"], optional = true }
 
 # NOTE:
 # All these features are assumed to be independent of each other
@@ -45,36 +46,36 @@ all = [
     "flat_world_layers", "level_spawn_was_fixed"
 ]
 dimensions                  = []
-chunk_position              = ["dimensions", "dep:prismarine-anchor-util"]
+chunk_position              = ["dimensions", "dep:subslice-to-array"]
 uuid                        = ["dep:prismarine-anchor-util"]
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt"]
 nbt_compound_conversion     = ["dep:prismarine-anchor-nbt"]
 palettized_storage          = ["dep:zerocopy"]
 chunk_version               = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
 actor_digest_version        = ["dep:prismarine-anchor-translation", "dep:prismarine-anchor-util"]
-data_3d                     = ["palettized_storage", "dep:prismarine-anchor-util", "dep:zerocopy"]
-data_2d                     = ["dep:zerocopy", "dep:prismarine-anchor-util"]
-legacy_data_2d              = ["dep:zerocopy", "dep:prismarine-anchor-util"]
+data_3d                     = ["palettized_storage", "dep:subslice-to-array", "dep:zerocopy"]
+data_2d                     = ["dep:zerocopy", "dep:subslice-to-array"]
+legacy_data_2d              = ["dep:zerocopy", "dep:subslice-to-array"]
 subchunk_blocks             = [
-    "palettized_storage", "dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util"
+    "palettized_storage", "dep:prismarine-anchor-nbt", "dep:subslice-to-array"
 ]
 legacy_terrain              = []
 legacy_extra_block_data     = []
 border_blocks               = []
-hardcoded_spawners          = ["dep:prismarine-anchor-util"]
+hardcoded_spawners          = ["dep:prismarine-anchor-util", "dep:subslice-to-array"]
 aabb_volumes                = []
-checksums                   = []
+checksums                   = ["dep:indexmap", "dep:subslice-to-array", "dep:xxhash-rust"]
 metadata                    = [
     "dimensions", "prismarine-anchor-nbt/preserve_order", "dep:prismarine-anchor-util",
-    "dep:indexmap", "dep:xxhash-rust", "dep:thiserror"
+    "dep:indexmap", "dep:subslice-to-array", "dep:thiserror", "dep:xxhash-rust"
 ]
-finalized_state             = ["dep:prismarine-anchor-util"]
+finalized_state             = ["dep:prismarine-anchor-util", "dep:subslice-to-array"]
 biome_state                 = ["dep:prismarine-anchor-util"]
 conversion_data             = []
 caves_and_cliffs_blending   = []
 blending_biome_height       = []
 blending_data               = []
-actor_digest                = ["actor", "dep:prismarine-anchor-util"]
+actor_digest                = ["actor", "dep:subslice-to-array"]
 actor                       = []
 flat_world_layers           = []
 level_spawn_was_fixed       = []

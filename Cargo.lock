@@ -360,12 +360,11 @@ dependencies = [
 name = "prismarine-anchor-leveldb-entries"
 version = "0.1.0"
 dependencies = [
- "indexmap",
  "prismarine-anchor-leveldb-values",
  "prismarine-anchor-nbt",
  "prismarine-anchor-translation",
  "prismarine-anchor-util",
- "serde",
+ "subslice-to-array",
  "thiserror",
 ]
 
@@ -378,6 +377,7 @@ dependencies = [
  "prismarine-anchor-translation",
  "prismarine-anchor-util",
  "serde",
+ "subslice-to-array",
  "thiserror",
  "xxhash-rust",
  "zerocopy 0.8.24",
@@ -406,6 +406,7 @@ dependencies = [
  "indexmap",
  "prismarine-anchor-util",
  "serde",
+ "subslice-to-array",
  "thiserror",
  "unicode_names2",
  "varint-rs",
@@ -577,6 +578,12 @@ name = "snap"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
+
+[[package]]
+name = "subslice-to-array"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98ba04499d31d60771397c9d0833cc71171f8cf1448bbfc957bfbe0f0dbdf5f3"
 
 [[package]]
 name = "syn"

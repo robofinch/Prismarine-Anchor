@@ -1,4 +1,4 @@
-use prismarine_anchor_util::slice_to_array;
+use subslice_to_array::SubsliceToArray as _;
 
 use crate::dimensions::NumericDimension;
 
@@ -28,20 +28,20 @@ impl DimensionedChunkPos {
         if bytes.len() == 8 {
             Some(Self(
                 ChunkPosition {
-                    x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
-                    z: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
+                    x: i32::from_le_bytes(bytes.subslice_to_array::<0, 4>()),
+                    z: i32::from_le_bytes(bytes.subslice_to_array::<4, 8>()),
                 },
                 NumericDimension::OVERWORLD,
             ))
 
         } else if bytes.len() == 12 {
 
-            let dimension_id = u32::from_le_bytes(slice_to_array::<8, 12, _, 4>(bytes));
+            let dimension_id = u32::from_le_bytes(bytes.subslice_to_array::<8, 12>());
 
             Some(Self(
                 ChunkPosition {
-                    x: i32::from_le_bytes(slice_to_array::<0, 4, _, 4>(bytes)),
-                    z: i32::from_le_bytes(slice_to_array::<4, 8, _, 4>(bytes)),
+                    x: i32::from_le_bytes(bytes.subslice_to_array::<0, 4>()),
+                    z: i32::from_le_bytes(bytes.subslice_to_array::<4, 8>()),
                 },
                 NumericDimension::from_bedrock_numeric(dimension_id),
             ))

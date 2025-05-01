@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, ops::Range};
 use std::io::{Cursor, Read as _, Write as _};
 
 use indexmap::IndexMap;
+use subslice_to_array::SubsliceToArray as _;
 use thiserror::Error;
 use xxhash_rust::xxh64;
 
@@ -12,7 +13,6 @@ use prismarine_anchor_nbt::{
     settings::{Endianness, IoOptions},
 };
 use prismarine_anchor_util::injective_enum_map;
-use prismarine_anchor_util::slice_to_array;
 
 use crate::{all_read, dimensions::NamedDimension};
 
@@ -56,7 +56,7 @@ impl LevelChunkMetaDataDictionary {
             return Err(MetaDataParseError::NoHeader);
         }
 
-        let num_entries = u32::from_le_bytes(slice_to_array::<0, 4, _, 4>(value));
+        let num_entries = u32::from_le_bytes(value.subslice_to_array::<0, 4>());
 
         let mut reader = Cursor::new(&value[4..]);
         let mut map = IndexMap::new();

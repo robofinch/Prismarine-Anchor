@@ -1,5 +1,7 @@
 use std::str;
 
+use subslice_to_array::SubsliceToArray as _;
+
 use prismarine_anchor_leveldb_values::{
     actor::ActorID,
     chunk_position::DimensionedChunkPos,
@@ -7,7 +9,6 @@ use prismarine_anchor_leveldb_values::{
 };
 use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
 use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
-use prismarine_anchor_util::slice_to_array;
 
 use super::KeyToBytesOptions;
 
@@ -211,7 +212,7 @@ impl DBKey {
                 return Some(Self::ActorDigest(dimensioned_pos));
             }
         } else if raw_key.len() == 19 && raw_key.starts_with(b"actorprefix") {
-            let actorid_bytes: [u8; 8] = slice_to_array::<11, 19, _, 8>(raw_key);
+            let actorid_bytes: [u8; 8] = raw_key.subslice_to_array::<11, 19>();
 
             return Some(Self::Actor(ActorID::parse(actorid_bytes)));
         }
@@ -237,6 +238,8 @@ impl DBKey {
                 if let Ok(dimensioned_pos) =
                     DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 1])
                 {
+                    // These chunk key numeric values are hardcoded twice in this file,
+                    // and a few are also in prismarine-anchor-leveldb-values/src/checksums.rs
                     return Some(match tag {
                         43  => Self::Data3D                 (dimensioned_pos),
                         44  => Self::Version                (dimensioned_pos),
@@ -433,6 +436,8 @@ impl DBKey {
         }
 
         let (dimensioned_pos, key_tag) = match self {
+            // These chunk key numeric values are hardcoded twice in this file,
+            // and a few are also in prismarine-anchor-leveldb-values/src/checksums.rs
             &Self::Data3D                 (d_pos) => (d_pos, 43),
             &Self::Version                (d_pos) => (d_pos, 44),
             &Self::Data2D                 (d_pos) => (d_pos, 45),

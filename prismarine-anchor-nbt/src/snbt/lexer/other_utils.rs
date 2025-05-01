@@ -1,10 +1,9 @@
 //! Specialized lexing functions for parsing tokens that require
 //! manipulating strings and characters.
 
-use prismarine_anchor_util::{
-    chars_to_u16, chars_to_u32, chars_to_u8,
-    pair_to_u32, slice_to_array,
-};
+use subslice_to_array::SubsliceToArray as _;
+
+use prismarine_anchor_util::{chars_to_u16, chars_to_u32, chars_to_u8, pair_to_u32};
 
 use crate::snbt::SnbtError;
 use crate::settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion};
@@ -202,12 +201,12 @@ impl Lexer<'_> {
                 }
 
                 // Split the UUID into its parts
-                let first:       [char; 8] = slice_to_array::< 0,  8, _, 8>(&uuid_chars);
-                let second:      [char; 4] = slice_to_array::< 9, 13, _, 4>(&uuid_chars);
-                let third:       [char; 4] = slice_to_array::<14, 18, _, 4>(&uuid_chars);
-                let fourth:      [char; 4] = slice_to_array::<19, 23, _, 4>(&uuid_chars);
-                let fifth_start: [char; 4] = slice_to_array::<24, 28, _, 4>(&uuid_chars);
-                let fifth_end:   [char; 8] = slice_to_array::<28, 36, _, 8>(&uuid_chars);
+                let first:       [char; 8] = uuid_chars.subslice_to_array::< 0,  8>();
+                let second:      [char; 4] = uuid_chars.subslice_to_array::< 9, 13>();
+                let third:       [char; 4] = uuid_chars.subslice_to_array::<14, 18>();
+                let fourth:      [char; 4] = uuid_chars.subslice_to_array::<19, 23>();
+                let fifth_start: [char; 4] = uuid_chars.subslice_to_array::<24, 28>();
+                let fifth_end:   [char; 8] = uuid_chars.subslice_to_array::<28, 36>();
 
                 [
                     chars_to_u32(first),
@@ -219,10 +218,10 @@ impl Lexer<'_> {
             (false, 32) => {
                 // Parse the 32 characters, which should be hex digits, in groups of 8
                 [
-                    chars_to_u32(slice_to_array::< 0,  8, _, 8>(&uuid_chars)),
-                    chars_to_u32(slice_to_array::< 8, 16, _, 8>(&uuid_chars)),
-                    chars_to_u32(slice_to_array::<16, 24, _, 8>(&uuid_chars)),
-                    chars_to_u32(slice_to_array::<24, 32, _, 8>(&uuid_chars)),
+                    chars_to_u32(uuid_chars.subslice_to_array::<  0,  8>()),
+                    chars_to_u32(uuid_chars.subslice_to_array::<  8, 16>()),
+                    chars_to_u32(uuid_chars.subslice_to_array::< 16, 24>()),
+                    chars_to_u32(uuid_chars.subslice_to_array::< 24, 32>()),
                 ]
             }
             _ => return Err(invalid_uuid()),

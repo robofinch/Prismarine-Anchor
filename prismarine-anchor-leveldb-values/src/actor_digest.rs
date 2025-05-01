@@ -1,4 +1,4 @@
-use prismarine_anchor_util::slice_to_array;
+use subslice_to_array::SubsliceToArray as _;
 
 use crate::actor::ActorID;
 
@@ -17,7 +17,7 @@ impl ActorDigest {
         // We can process `value` in 8-byte chunks
         let mut value = value;
         while !value.is_empty() {
-            let next_actor_id = slice_to_array::<0, 8, _, 8>(value);
+            let next_actor_id = value.subslice_to_array::<0, 8>();
             value = &value[8..];
 
             actor_ids.push(ActorID::parse(next_actor_id));

@@ -1,8 +1,7 @@
 use std::io::Cursor;
 
+use subslice_to_array::SubsliceToArray as _;
 use zerocopy::transmute;
-
-use prismarine_anchor_util::slice_to_array;
 
 use crate::all_read;
 use crate::palettized_storage::{
@@ -27,7 +26,7 @@ impl Data3D {
             return None;
         }
 
-        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
+        let heightmap: [u8; 512] = value.subslice_to_array::<0, 512>();
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);

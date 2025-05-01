@@ -1,9 +1,8 @@
 use std::array;
 
+use subslice_to_array::SubsliceToArray as _;
 use zerocopy::transmute; // Used to convert arrays of arrays into 1D arrays (and back)
 use zerocopy::{FromBytes, IntoBytes};
-
-use prismarine_anchor_util::slice_to_array;
 
 
 /// Not written since 1.0.0
@@ -41,13 +40,13 @@ impl LegacyData2D {
             return None;
         }
 
-        let heightmap: [u8; 512] = slice_to_array::<0, 512, _, 512>(value);
+        let heightmap: [u8; 512] = value.subslice_to_array::<0, 512>();
         let heightmap: [[u8; 2]; 256] = transmute!(heightmap);
         let heightmap = heightmap.map(u16::from_le_bytes);
         let heightmap: [[u16; 16]; 16] = transmute!(heightmap);
 
         // 512 + 1024 == 1536
-        let biomes: [u8; 1024] = slice_to_array::<512, 1536, _, 1024>(value);
+        let biomes: [u8; 1024] = value.subslice_to_array::<512, 1536>();
         let biomes: [[u8; 4]; 256] = transmute!(biomes);
 
         let biome_ids = biomes.map(|[id, ..]| id);

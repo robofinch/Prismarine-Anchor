@@ -1,7 +1,8 @@
 use std::num::NonZeroU32;
 
+use subslice_to_array::SubsliceToArray as _;
+
 use prismarine_anchor_util::injective_enum_map;
-use prismarine_anchor_util::slice_to_array;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,7 +14,7 @@ impl HardcodedSpawners {
             return None;
         }
 
-        let num_entries = u32::from_le_bytes(slice_to_array::<0, 4, _, 4>(value));
+        let num_entries = u32::from_le_bytes(value.subslice_to_array::<0, 4>());
         let num_entries = usize::try_from(num_entries).ok()?;
 
         if value.len() != 4 + num_entries * 25 {
@@ -24,7 +25,7 @@ impl HardcodedSpawners {
         let mut value = &value[4..];
         let mut hardcoded_spawners = Vec::with_capacity(num_entries);
         for _ in 0..num_entries {
-            let volume = slice_to_array::<0, 24, _, 24>(value);
+            let volume = value.subslice_to_array::<0, 24>();
             let spawner_type = value[24];
             value = &value[25..];
 

@@ -23,12 +23,13 @@ workspace = true
 [dependencies]
 prismarine-anchor-util  .workspace = true
 
-anyhow      .workspace = true
-byteorder   .workspace = true
-cesu8       .workspace = true
-flate2      .workspace = true
-thiserror   .workspace = true
-varint-rs   .workspace = true
+anyhow              .workspace = true
+byteorder           .workspace = true
+cesu8               .workspace = true
+flate2              .workspace = true
+subslice-to-array   .workspace = true
+thiserror           .workspace = true
+varint-rs           .workspace = true
 
 float-cmp       = { workspace = true, optional = true }
 # We don't directly use this, but our deps do, and it may need to have the js feature enabled.

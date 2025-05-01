@@ -2,9 +2,10 @@
 
 use std::io::Cursor;
 
+use subslice_to_array::SubsliceToArray as _;
+
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
-use prismarine_anchor_util::slice_to_array;
 
 use crate::all_read;
 use crate::palettized_storage::{PaletteHeader, PaletteType, PalettizedStorage};
@@ -93,10 +94,10 @@ impl LegacySubchunkBlocks {
         }
         let value = &value[1..];
 
-        let block_ids: [u8; 4096] = slice_to_array::<0, 4096, _, 4096>(value);
+        let block_ids: [u8; 4096] = value.subslice_to_array::<0, 4096>();
         let value = &value[4096..];
 
-        let packed_block_data: [u8; 2048] = slice_to_array::<0, 2048, _, 2048>(value);
+        let packed_block_data: [u8; 2048] = value.subslice_to_array::<0, 2048>();
         let value = &value[2048..];
 
         if !skylight {
@@ -109,7 +110,7 @@ impl LegacySubchunkBlocks {
             });
         }
 
-        let skylight: Option<[u8; 2048]> = Some(slice_to_array::<0, 2048, _, 2048>(value));
+        let skylight: Option<[u8; 2048]> = Some(value.subslice_to_array::<0, 2048>());
         let value = &value[2048..];
 
         if !blocklight {
@@ -122,7 +123,7 @@ impl LegacySubchunkBlocks {
             });
         }
 
-        let blocklight: Option<[u8; 2048]> = Some(slice_to_array::<0, 2048, _, 2048>(value));
+        let blocklight: Option<[u8; 2048]> = Some(value.subslice_to_array::<0, 2048>());
 
         Some(Self {
             version,

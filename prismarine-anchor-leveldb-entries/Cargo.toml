@@ -15,6 +15,5 @@ prismarine-anchor-nbt               .workspace = true
 prismarine-anchor-translation       .workspace = true
 prismarine-anchor-util              .workspace = true
 
-indexmap        = { workspace = true, optional = true }
-serde           = { workspace = true, optional = true }
-thiserror       .workspace = true
+subslice-to-array   .workspace = true
+thiserror           .workspace = true
