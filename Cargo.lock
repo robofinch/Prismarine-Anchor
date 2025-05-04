@@ -30,6 +30,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
+name = "bijective-enum-map"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f579474876cbbd08d252854266ed2e43038f0374225c253fbb45f1c383181c6"
+
+[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -372,6 +378,7 @@ dependencies = [
 name = "prismarine-anchor-leveldb-values"
 version = "0.1.0"
 dependencies = [
+ "bijective-enum-map",
  "indexmap",
  "prismarine-anchor-nbt",
  "prismarine-anchor-translation",

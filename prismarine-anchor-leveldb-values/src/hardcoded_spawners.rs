@@ -1,8 +1,7 @@
 use std::num::NonZeroU32;
 
+use bijective_enum_map::injective_enum_map;
 use subslice_to_array::SubsliceToArray as _;
-
-use prismarine_anchor_util::injective_enum_map;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]

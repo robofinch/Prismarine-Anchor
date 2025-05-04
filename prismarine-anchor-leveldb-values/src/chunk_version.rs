@@ -1,6 +1,5 @@
+use bijective_enum_map::injective_enum_map;
 use prismarine_anchor_translation::datatypes::NumericVersion;
-
-use prismarine_anchor_util::injective_enum_map;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

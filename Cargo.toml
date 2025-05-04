@@ -38,10 +38,11 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 panic = "abort"
 
 [profile.dev]
+# TODO: change this back when it becomes public
 # Can't leave this on by default, because it breaks the Windows build.
 # Related: https://github.com/rust-lang/cargo/issues/4897
-# split-debuginfo = "unpacked" # faster debug builds on mac
-# opt-level = 1                # Make debug builds run faster
+split-debuginfo = "unpacked" # faster debug builds on mac
+opt-level = 1                # Make debug builds run faster
 
 [profile.dev.package."*"]
 # Optimize all dependencies even in debug builds (does not affect workspace packages):
@@ -60,6 +61,8 @@ prismarine-anchor-world           = { version = "0.1.0", path = "./prismarine-an
 
 # TODO: bisect the earliest version of tolnay's crates that work here
 anyhow              = "1"
+# This is my own crate! Woo! counting this as external to prismarine anchor, though
+bijective-enum-map  = "0.1.0"
 byteorder           = "1.5.0"
 cesu8               = "1.1.0"
 flate2              = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
@@ -75,7 +78,7 @@ serde               = "1"
 # like r#type was patched in 1.0.73.
 # Overall, hopefully a consumer of crates here would be using up-to-date versions anyway.
 serde_json          = "1.0.73"
-# This is my own crate! Woo! counting this as external to prismarine anchor, though
+# This is also my own crate
 subslice-to-array   = "0.1.2"
 syn                 = "2"
 thiserror           = "2"

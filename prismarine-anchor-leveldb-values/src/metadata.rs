@@ -2,6 +2,7 @@ use std::io;
 use std::{collections::BTreeMap, ops::Range};
 use std::io::{Cursor, Read as _, Write as _};
 
+use bijective_enum_map::injective_enum_map;
 use indexmap::IndexMap;
 use subslice_to_array::SubsliceToArray as _;
 use thiserror::Error;
@@ -12,7 +13,6 @@ use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
-use prismarine_anchor_util::injective_enum_map;
 
 use crate::{all_read, dimensions::NamedDimension};
 

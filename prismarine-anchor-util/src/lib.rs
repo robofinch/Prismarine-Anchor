@@ -1,9 +1,7 @@
-//! Utilities without functionality specific to Prismarine Anchor, which don't particularly
+//! Small utilities without functionality specific to Prismarine Anchor, which don't particularly
 //! fit in other crates in this project.
 
 mod char_conversion;
-// Note that this enum_map module exports three macros
-mod enum_map;
 mod lock_or_panic;
 mod len_u32;
 
