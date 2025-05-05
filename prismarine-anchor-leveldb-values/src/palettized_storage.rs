@@ -1,8 +1,10 @@
 #![expect(clippy::len_zero)]
 
 use std::{array, slice};
-use std::{collections::BTreeSet, convert::Infallible, io::Read};
+use std::{collections::BTreeSet, convert::Infallible, error::Error as StdError};
+use std::io::{Error as IoError, Read};
 
+use thiserror::Error;
 use zerocopy::transmute;
 
 
@@ -65,17 +67,55 @@ pub enum PaletteType {
     Runtime,
 }
 
+#[derive(Error, Debug)]
+pub enum PalettizedStorageParseError<E: StdError> {
+    #[error("A palette parser was expected to return a palette of length 1, but did not")]
+    InvalidPaletteParser,
+    #[error("error while parsing a palette of length {1}: {0}")]
+    PaletteParseError(E, usize),
+    #[error("an error occured while reading a palette's length and converting it to a usize")]
+    PaletteLenError,
+    #[error("an error occurred while checking a nonempty, non-uniform palettized subchunk: {0}")]
+    CheckError(#[from] PalettizedSubchunkCheckError),
+    #[error("an IO error occured while reading indices: {0}")]
+    IndexReadError(#[from] IoError)
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum PalettizedSubchunkCheckError {
+    #[error("a subchunk palette had an invalid length of {0}")]
+    InvalidPaletteLen(usize),
+    #[error("a paletted subchunk was expected to have {expected} u32 blocks, but had {received}")]
+    InvalidPaletteIndicesLen {
+        expected: usize,
+        received: usize,
+    },
+    #[error("a paletted subchunk had index {index}, but the palette had length {palette_len}")]
+    IndexTooLarge {
+        palette_len: usize,
+        index: u32,
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum PaletteHeaderParseError {
+    #[error("invalid bits-per-index for a palette: {0}")]
+    InvalidBitsPerIndex(u8),
+    #[error(transparent)]
+    Io(#[from] IoError),
+}
+
 // ================================
 //  Standalone Functions
 // ================================
 
 /// Attempt to read exactly `num_u32s`-many little-endian `u32`s.
-pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Option<Vec<u32>> {
+pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Result<Vec<u32>, IoError> {
     let mut u32s = vec![0; num_u32s * 4];
-    reader.read_exact(&mut u32s).ok()?;
+    reader.read_exact(&mut u32s)?;
 
     let mut u32s = u32s.into_iter();
-    Some(
+    Ok(
         (0..num_u32s)
             .map(|_| {
                 // We know that u32s has length exactly num_u32s * 4,
@@ -110,27 +150,26 @@ pub fn write_le_u32s(u32s: &[u32], bytes: &mut Vec<u8>) -> Result<(), Infallible
 // ================================
 
 impl<T> PalettizedStorage<T> {
-    // TODO: return a Result instead of an Option
-    // TODO: have the option to not accept the special cases
-    pub fn parse<R, F>(
-        reader:            &mut R,
-        bits_per_index:    HeaderBitsPerIndex,
-        mut parse_palette: F,
-    ) -> Option<Self>
+    pub fn parse<R, F, FError>(
+        reader:                  &mut R,
+        bits_per_index:          HeaderBitsPerIndex,
+        mut parse_palette:       F,
+    ) -> Result<Self, PalettizedStorageParseError<FError>>
     where
         R: Read,
-        F: FnMut(&mut R, usize) -> Option<Vec<T>>,
+        F: FnMut(&mut R, usize) -> Result<Vec<T>, FError>,
+        FError: StdError,
     {
         match bits_per_index {
-            HeaderBitsPerIndex::Empty => Some(Self::Empty),
+            HeaderBitsPerIndex::Empty => Ok(Self::Empty),
             HeaderBitsPerIndex::Uniform => {
                 // There are no indices, and the palette should have length 1
-                let mut palette = parse_palette(reader, 1)?;
+                let mut palette = parse_palette(reader, 1)
+                    .map_err(|err| PalettizedStorageParseError::PaletteParseError(err, 1))?;
                 if palette.len() == 1 {
-                    Some(Self::Uniform(palette.swap_remove(0)))
+                    Ok(Self::Uniform(palette.swap_remove(0)))
                 } else {
-                    // TODO: Log an error, an invalid parse_palette function was provided
-                    None
+                    Err(PalettizedStorageParseError::InvalidPaletteParser)
                 }
             }
             HeaderBitsPerIndex::Palettized(bits_per_index) => {
@@ -139,13 +178,24 @@ impl<T> PalettizedStorage<T> {
                 let packed_indices = read_le_u32s(reader, packed_indices_len)?;
 
                 let mut palette_len = [0; 4];
-                reader.read_exact(&mut palette_len).ok()?;
+
+                #[expect(clippy::map_err_ignore, reason = "exact error probably doesn't matter")]
+                reader.read_exact(&mut palette_len)
+                    .map_err(|_| PalettizedStorageParseError::PaletteLenError)?;
+
                 let palette_len = u32::from_le_bytes(palette_len);
-                let palette_len = usize::try_from(palette_len).ok()?;
 
-                let palette = parse_palette(reader, palette_len)?;
+                #[expect(clippy::map_err_ignore, reason = "exact error probably doesn't matter")]
+                let palette_len = usize::try_from(palette_len)
+                    .map_err(|_| PalettizedStorageParseError::PaletteLenError)?;
 
-                Some(Self::Palettized(PalettizedSubchunk::new_packed_checked(
+                let palette = parse_palette(reader, palette_len)
+                    .map_err(|err| PalettizedStorageParseError::PaletteParseError(
+                        err,
+                        palette_len,
+                    ))?;
+
+                Ok(Self::Palettized(PalettizedSubchunk::new_packed_checked(
                     bits_per_index,
                     packed_indices,
                     palette,
@@ -165,7 +215,6 @@ impl<T> PalettizedStorage<T> {
         }
     }
 
-    // TODO: have the option to error on the special bit size cases
     pub fn extend_serialized<E, F>(
         &self,
         bytes:                    &mut Vec<u8>,
@@ -223,15 +272,20 @@ impl<T> PalettizedStorage<T> {
     #[inline]
     pub fn to_bytes<E, F>(
         &self,
-        palette_type:         PaletteType,
-        reserve:              bool,
-        write_palette_to_vec: F,
+        palette_type:             PaletteType,
+        reserve:                  bool,
+        write_palette_to_vec:     F,
     ) -> Result<Vec<u8>, E>
     where
         F: FnMut(&[T], &mut Vec<u8>) -> Result<(), E>,
     {
         let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes, palette_type, reserve, write_palette_to_vec)?;
+        self.extend_serialized::<E, F>(
+            &mut bytes,
+            palette_type,
+            reserve,
+            write_palette_to_vec,
+        )?;
         Ok(bytes)
     }
 }
@@ -239,14 +293,15 @@ impl<T> PalettizedStorage<T> {
 impl PaletteHeader {
     /// Parses the `PaletteType` and bits per index of the palettized storage,
     /// including special cases.
-    pub fn parse_header<R: Read>(reader: &mut R) -> Option<Self> {
+    pub fn parse_header<R: Read>(reader: &mut R) -> Result<Self, PaletteHeaderParseError> {
         let mut header = [0; 1];
-        reader.read_exact(&mut header).ok()?;
+        reader.read_exact(&mut header)?;
         let header = header[0];
         let palette_type = PaletteType::from(header & 1);
-        let bits_per_index = HeaderBitsPerIndex::parse(header >> 1)?;
+        let bits_per_index = HeaderBitsPerIndex::parse(header >> 1)
+            .ok_or(PaletteHeaderParseError::InvalidBitsPerIndex(header >> 1))?;
 
-        Some(Self {
+        Ok(Self {
             palette_type,
             bits_per_index,
         })
@@ -450,17 +505,21 @@ impl<T> PalettizedSubchunk<T> {
         bits_per_index: PaletteBitsPerIndex,
         packed_indices: Vec<u32>,
         palette:        Vec<T>,
-    ) -> Option<Self> {
+    ) -> Result<Self, PalettizedSubchunkCheckError> {
         if packed_indices.len() != bits_per_index.num_u32s_for_4096_indices() {
-            return None;
+            return Err(PalettizedSubchunkCheckError::InvalidPaletteIndicesLen {
+                expected: bits_per_index.num_u32s_for_4096_indices(),
+                received: packed_indices.len(),
+            });
         }
 
-        if palette.len() == 0 || palette.len() > 4096 {
-            return None;
+        let palette_len = palette.len();
+        if palette_len == 0 || palette_len > 4096 {
+            return Err(PalettizedSubchunkCheckError::InvalidPaletteLen(palette_len));
         }
 
-        let max_permissible_index = palette.len() - 1;
-        // This unwrap does not panic, by the above checks on palette.len().
+        let max_permissible_index = palette_len - 1;
+        // This unwrap does not panic, by the above checks on palette_len.
         #[expect(
             clippy::unwrap_used,
             reason = "`palette.len() <= 4096 = (1 << 12)`, so it fits in 32 bits",
@@ -479,7 +538,10 @@ impl<T> PalettizedSubchunk<T> {
             for _ in 0..bits_per_index.indices_in_last_u32() {
                 let index = last_dword & index_mask;
                 if index > max_permissible_index {
-                    return None;
+                    return Err(PalettizedSubchunkCheckError::IndexTooLarge {
+                        palette_len,
+                        index,
+                    });
                 }
 
                 last_dword >>= u8::from(bits_per_index);
@@ -492,7 +554,10 @@ impl<T> PalettizedSubchunk<T> {
             for _ in 0..indices_per_u32 {
                 let index = dword & index_mask;
                 if index > max_permissible_index {
-                    return None;
+                    return Err(PalettizedSubchunkCheckError::IndexTooLarge {
+                        palette_len,
+                        index,
+                    });
                 }
 
                 dword >>= u8::from(bits_per_index);
@@ -500,7 +565,7 @@ impl<T> PalettizedSubchunk<T> {
         }
 
         // All the checks are done.
-        Some(Self::new_packed_unchecked(
+        Ok(Self::new_packed_unchecked(
             bits_per_index,
             packed_indices,
             palette,

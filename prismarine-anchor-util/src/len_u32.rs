@@ -13,6 +13,7 @@ pub fn saturating_len_u32(len: usize) -> u32 {
 /// Casts a `usize` to `u32`, returning an error if the `usize` is too large.
 #[inline]
 pub fn lossless_len_u32(len: usize) -> Result<u32, ExcessiveLengthError> {
+    #[expect(clippy::map_err_ignore, reason = "can only error if the usize is too large")]
     u32::try_from(len).map_err(|_| ExcessiveLengthError)
 }
 

@@ -69,9 +69,10 @@ flate2              = { version = "1.1.0", default-features = false, features = 
 float-cmp           = { version = "0.10.0", default-features = false, features = ["num-traits"] }
 getrandom           = { version = "0.2", default-features = false }
 indexmap            = { version = "2.7.1", features = ["serde"] }
-rusty-leveldb       = { version = "3.0.2", default-features = false }
+log                 = "0.4.27"
 proc-macro2         = "1"
 quote               = "1"
+rusty-leveldb       = { version = "3.0.2", default-features = false }
 serde               = "1"
 # I'm trying to be as flexible as possible with Tolnay's crates that have
 # a reputation for remaining very stable, though a bug involving raw identifiers

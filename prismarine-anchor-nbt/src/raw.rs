@@ -187,6 +187,7 @@ pub fn read_string_or_bytes<R: Read>(reader: &mut R, opts: IoOptions) -> NbtResu
         if let Ok(string) = string_from_bytes(bytes.as_slice(), opts) {
             NbtTag::String(string.into_owned())
         } else {
+            log::trace!("Reading a ByteString");
             NbtTag::ByteString(bytes)
         },
     )
@@ -329,6 +330,7 @@ pub fn write_byte_string<W: Write>(
     opts:   IoOptions,
     string: &[u8],
 ) -> NbtResult<()> {
+    log::trace!("Writing a ByteString");
     if opts.enable_byte_strings {
         write_string_len(writer, opts, string.len())?;
         writer

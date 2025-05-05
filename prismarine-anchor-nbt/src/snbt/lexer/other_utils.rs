@@ -6,7 +6,7 @@ use subslice_to_array::SubsliceToArray as _;
 use prismarine_anchor_util::{chars_to_u16, chars_to_u32, chars_to_u8, pair_to_u32};
 
 use crate::snbt::SnbtError;
-use crate::settings::{EscapeSequence, HandleInvalidEscape, SnbtVersion};
+use crate::settings::{EscapeSequence, HandleInvalidEscape, SnbtParseOptions, SnbtVersion};
 use super::{Lexer, Token, TokenData};
 
 
@@ -297,12 +297,24 @@ impl Lexer<'_> {
 
         let escapes = self.opts.enabled_escape_sequences;
         let handle_invalid = self.opts.handle_invalid_escape;
+        let version_escapes = match self.snbt_version() {
+            SnbtVersion::UpdatedJava => {
+                SnbtParseOptions::default_updated().enabled_escape_sequences
+            }
+            SnbtVersion::Original => {
+                SnbtParseOptions::default_original().enabled_escape_sequences
+            }
+        };
         // Note that the compiler can inline closures, the below is practically just shorthand.
         let check_supported: _ =
             |escaped: char, escape_type: EscapeSequence, parsed_width: usize| {
                 if escapes.is_enabled(escape_type) {
+                    if !version_escapes.is_enabled(escape_type) {
+                        log::info!("Parsing escape sequence for {escaped} not allowed by default");
+                    }
                     Ok(Some((Some(escaped), parsed_width)))
                 } else {
+                    log::trace!("Encountered invalid escape sequence");
                     match handle_invalid {
                         HandleInvalidEscape::CopyVerbatim => Ok(Some((None, parsed_width))),
                         HandleInvalidEscape::Ignore => Ok(None),

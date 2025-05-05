@@ -1,3 +1,6 @@
+use prismarine_anchor_util::InspectNone as _;
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlatWorldLayers(pub Vec<u32>);
 
@@ -6,8 +9,14 @@ impl FlatWorldLayers {
         // The overall format is something like `b"[7,3,3,2]"`
 
         let value = value
-            .strip_prefix(b"[")?
-            .strip_suffix(b"]")?;
+            .strip_prefix(b"[")
+            .inspect_none(|| log::warn!(
+                "game_flatworldlayers lacked an opening '['",
+            ))?
+            .strip_suffix(b"]")
+            .inspect_none(|| log::warn!(
+                "game_flatworldlayers lacked a closing ']'",
+            ))?;
 
         let layers = value
             .split(|&char_num| char_num == b',')

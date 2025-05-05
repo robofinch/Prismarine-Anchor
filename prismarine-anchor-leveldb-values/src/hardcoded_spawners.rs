@@ -10,6 +10,10 @@ pub struct HardcodedSpawners(pub Vec<(BlockVolume, HardcodedSpawnerType)>);
 impl HardcodedSpawners {
     pub fn parse(value: &[u8]) -> Option<Self> {
         if value.len() < 4 {
+            log::warn!(
+                "HardcodedSpawners had length {}, too short for the 4-byte length header",
+                value.len(),
+            );
             return None;
         }
 
@@ -17,6 +21,13 @@ impl HardcodedSpawners {
         let num_entries = usize::try_from(num_entries).ok()?;
 
         if value.len() != 4 + num_entries * 25 {
+            log::warn!(
+                "HardcodedSpawners with {} entries (according to header) was expected \
+                 to have length {}, but had length {}",
+                num_entries,
+                4 + num_entries * 25,
+                value.len(),
+            );
             return None;
         }
 
@@ -28,9 +39,13 @@ impl HardcodedSpawners {
             let spawner_type = value[24];
             value = &value[25..];
 
+            let spawner_type = HardcodedSpawnerType::try_from(spawner_type)
+                .inspect_err(|_| log::warn!("Invalid HardcodedSpawnerType: {spawner_type}"))
+                .ok()?;
+
             hardcoded_spawners.push((
                 BlockVolume::parse(volume)?,
-                HardcodedSpawnerType::try_from(spawner_type).ok()?,
+                spawner_type,
             ));
         }
 
@@ -96,6 +111,10 @@ impl BlockVolume {
                 width_z: NonZeroU32::new(high_z.abs_diff(low_z).saturating_add(1)).unwrap(),
             })
         } else {
+            log::warn!(
+                "Invalid BlockVolume; x: ({} ..= {}), y: ({} ..= {}), z: ({} ..= {})",
+                low_x, high_x, low_y, high_y, low_z, high_z,
+            );
             None
         }
     }

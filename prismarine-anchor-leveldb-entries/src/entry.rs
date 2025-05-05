@@ -252,7 +252,9 @@ impl DBEntry {
                 }
             }
             DBKey::SubchunkBlocks(chunk_pos, y_index) => {
-                if let Some(subchunk_blocks) = SubchunkBlocks::parse(value) {
+                let subchunk_blocks = SubchunkBlocks::parse(value)
+                    .inspect_err(|err| log::warn!("Error parsing SubchunkBlocks data: {err}"));
+                if let Ok(subchunk_blocks) = subchunk_blocks {
                     return V::Parsed(Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks));
                 }
             }
@@ -264,22 +266,30 @@ impl DBEntry {
             }
             DBKey::BlockEntities(chunk_pos) => {
                 // Note that block entities definitely have some `ByteString`s
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
+                let compounds = ConcatenatedNbtCompounds::parse(value)
+                    .inspect_err(|err| log::warn!("Error parsing BlockEntities: {err}"));
+                if let Ok(compounds) = compounds {
                     return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             }
             DBKey::Entities(chunk_pos) => {
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
+                let compounds = ConcatenatedNbtCompounds::parse(value)
+                    .inspect_err(|err| log::warn!("Error parsing Entities: {err}"));
+                if let Ok(compounds) = compounds {
                     return V::Parsed(Self::Entities(chunk_pos, compounds));
                 }
             }
             DBKey::PendingTicks(chunk_pos) => {
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
+                let compounds = ConcatenatedNbtCompounds::parse(value)
+                    .inspect_err(|err| log::warn!("Error parsing PendingTicks: {err}"));
+                if let Ok(compounds) = compounds {
                     return V::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             }
             DBKey::RandomTicks(chunk_pos) => {
-                if let Ok(compounds) = ConcatenatedNbtCompounds::parse(value) {
+                let compounds = ConcatenatedNbtCompounds::parse(value)
+                    .inspect_err(|err| log::warn!("Error parsing RandomTicks: {err}"));
+                if let Ok(compounds) = compounds {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             }
@@ -340,11 +350,13 @@ impl DBEntry {
                 }
             }
             DBKey::LevelChunkMetaDataDictionary => {
-                if let Ok(dictionary) = LevelChunkMetaDataDictionary::parse(value) {
+                let dictionary = LevelChunkMetaDataDictionary::parse(value)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing LevelChunkMetaDataDictionary: {err}",
+                    ));
+                if let Ok(dictionary) = dictionary {
                     return V::Parsed(Self::LevelChunkMetaDataDictionary(dictionary));
                 }
-                // TODO: use the error value to log debug information
-                // println!("error: {}", LevelChunkMetaDataDictionary::parse(value).unwrap_err());
             }
             DBKey::AutonomousEntities => {
                 if let Some(nbt) = NbtCompound::parse(value) {
@@ -513,12 +525,18 @@ impl DBEntry {
                 }
             }
             DBKey::RawKey(key) => {
+                log::warn!(
+                    "Not parsing value bytes associated with a DBKey that could not be parsed",
+                );
                 return V::Parsed(Self::RawEntry {
                     key,
                     value: value.to_vec(),
                 });
             }
         }
+
+        log::warn!("Could not parse DBEntry value. Run at trace level to see raw bytes.");
+        log::trace!("Unparsed DBEntry value bytes: {value:?}");
 
         ValueParseResult::UnrecognizedValue(key)
     }

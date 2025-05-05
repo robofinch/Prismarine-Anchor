@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use subslice_to_array::SubsliceToArray as _;
 
-use prismarine_anchor_util::{chars_to_u32, pair_to_u32};
+use prismarine_anchor_util::{chars_to_u32, InspectNone as _, pair_to_u32};
 
 
 /// A 128-bit UUID in the 8-4-4-4-12 hex digit format,
@@ -20,6 +20,7 @@ impl UUID {
 
         // Four hyphens, 32 hex digits which are ASCII and are one byte each
         if uuid.len() != 36 {
+            log::warn!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
             return None;
         }
 
@@ -27,6 +28,7 @@ impl UUID {
 
         // The above check doesn't exclude the chance of multibyte chars
         if uuid_chars.len() != 36 {
+            log::warn!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
             return None;
         }
 
@@ -38,12 +40,25 @@ impl UUID {
         let fifth_start: [char; 4] = uuid_chars.subslice_to_array::<24, 28>();
         let fifth_end:   [char; 8] = uuid_chars.subslice_to_array::<28, 36>();
 
-        Some(Self([
-            chars_to_u32(first)?,
-            pair_to_u32((second, third))?,
-            pair_to_u32((fourth, fifth_start))?,
-            chars_to_u32(fifth_end)?,
-        ]))
+        #[inline]
+        fn convert(
+            first:       [char; 8],
+            second:      [char; 4],
+            third:       [char; 4],
+            fourth:      [char; 4],
+            fifth_start: [char; 4],
+            fifth_end:   [char; 8],
+        ) -> Option<UUID> {
+            Some(UUID([
+                chars_to_u32(first)?,
+                pair_to_u32((second, third))?,
+                pair_to_u32((fourth, fifth_start))?,
+                chars_to_u32(fifth_end)?,
+            ]))
+        }
+
+        convert(first, second, third, fourth, fifth_start, fifth_end)
+            .inspect_none(|| log::warn!("Failed to parse UUID: {uuid}"))
     }
 
     /// Extend the provided bytes with this UUID serialized into a byte string in the

@@ -27,6 +27,8 @@ anyhow              .workspace = true
 byteorder           .workspace = true
 cesu8               .workspace = true
 flate2              .workspace = true
+# TODO: add more thorough tracing and info
+log                 .workspace = true
 subslice-to-array   .workspace = true
 thiserror           .workspace = true
 varint-rs           .workspace = true

@@ -38,7 +38,7 @@ impl Data3D {
         let remaining_len = value.len() - 512;
 
         while !all_read(reader.position(), remaining_len) {
-            let header = PaletteHeader::parse_header(&mut reader)?;
+            let header = PaletteHeader::parse_header(&mut reader).ok()?;
             match header.palette_type {
                 PaletteType::Persistent => {
                     // Unlike with SubchunkBlocks, only Runtime is usually used for Data3D,
@@ -50,7 +50,7 @@ impl Data3D {
                         &mut reader,
                         header.bits_per_index,
                         read_le_u32s,
-                    )?);
+                    ).ok()?);
                 }
             }
         }

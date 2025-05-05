@@ -503,8 +503,6 @@ pub enum HandleInvalidEscape {
 #[derive(Debug, Clone, Copy)]
 pub struct SnbtWriteOptions {
     /// Version of the SNBT format used. Currently has no effect on writing NBT to SNBT.
-    // TODO: add warning and error logging throughout the crate, such as
-    // warnings if escape sequences are used in the `Original` version.
     pub version: SnbtVersion,
     /// The maximum depth that NBT compounds and tags can be recursively nested.
     ///

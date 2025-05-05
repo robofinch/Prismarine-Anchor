@@ -117,8 +117,8 @@ pub enum ValueToBytesError {
 impl From<MetaDataWriteError> for ValueToBytesError {
     fn from(value: MetaDataWriteError) -> Self {
         match value {
-            MetaDataWriteError::DictionaryLength => Self::DictionaryLength,
-            MetaDataWriteError::NbtError(err)    => Self::NbtIoError(err),
+            MetaDataWriteError::ExcessiveLength => Self::DictionaryLength,
+            MetaDataWriteError::NbtError(err)   => Self::NbtIoError(err),
         }
     }
 }

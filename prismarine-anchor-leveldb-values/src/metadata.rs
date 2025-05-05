@@ -13,6 +13,7 @@ use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
+use prismarine_anchor_util::{len_u32, ExcessiveLengthError};
 
 use crate::{all_read, dimensions::NamedDimension};
 
@@ -83,14 +84,12 @@ impl LevelChunkMetaDataDictionary {
                 });
             }
 
-            // println!("Checking for duplicate...");
             // Reject if there's a duplicate hash
             if map.insert(hash, metadata).is_some() {
                 return Err(MetaDataParseError::DuplicateHash(hash));
             }
         }
 
-        // println!("Checking for excess...");
         // Reject if there was excess data
         if !all_read(reader.position(), reader.into_inner().len()) {
             return Err(MetaDataParseError::ExcessData);
@@ -99,32 +98,11 @@ impl LevelChunkMetaDataDictionary {
         Ok(Self(map))
     }
 
-    fn len(&self, error_on_excessive_length: bool) -> Result<(u32, usize), MetaDataWriteError> {
-        if size_of::<usize>() >= size_of::<u32>() {
-            let len = match u32::try_from(self.0.len()) {
-                Ok(len) => len,
-                Err(_) => {
-                    if error_on_excessive_length {
-                        return Err(MetaDataWriteError::DictionaryLength);
-                    } else {
-                        u32::MAX
-                    }
-                }
-            };
-
-            // This cast from u32 to usize won't overflow
-            Ok((len, len as usize))
-        } else {
-            // This cast from usize to u32 won't overflow
-            Ok((self.0.len() as u32, self.0.len()))
-        }
-    }
-
     pub fn to_bytes(
         &self,
         error_on_excessive_length: bool,
     ) -> Result<Vec<u8>, MetaDataWriteError> {
-        let (len, len_usize) = self.len(error_on_excessive_length)?;
+        let (len, len_usize) = len_u32(self.0.len(), !error_on_excessive_length)?;
 
         let mut writer = Cursor::new(Vec::new());
         writer
@@ -148,7 +126,7 @@ impl LevelChunkMetaDataDictionary {
         self,
         error_on_excessive_length: bool,
     ) -> Result<Vec<u8>, MetaDataWriteError> {
-        let (len, len_usize) = self.len(error_on_excessive_length)?;
+        let (len, len_usize) = len_u32(self.0.len(), !error_on_excessive_length)?;
 
         let mut writer = Cursor::new(Vec::new());
         writer
@@ -514,8 +492,6 @@ injective_enum_map! {
 pub enum MetaDataParseError {
     #[error("the metadata dictionary was shorter than the required 4 byte header")]
     NoHeader,
-    #[error("the number of metadata entries could not fit in a u32")]
-    DictionaryLength,
     #[error("the hash value {0} appeared twice in a metadata dictionary")]
     DuplicateHash(u64),
     #[error("all entries of a metadata dictionary were parsed, but excess data was provided")]
@@ -536,9 +512,15 @@ pub enum MetaDataParseError {
 #[derive(Error, Debug)]
 pub enum MetaDataWriteError {
     #[error("the number of metadata entries could not fit in a u32")]
-    DictionaryLength,
+    ExcessiveLength,
     #[error("NBT error while writing metadata dictionary to NBT: {0}")]
     NbtError(#[from] NbtIoError),
+}
+
+impl From<ExcessiveLengthError> for MetaDataWriteError {
+    fn from(_value: ExcessiveLengthError) -> Self {
+        Self::ExcessiveLength
+    }
 }
 
 #[derive(Error, Debug)]

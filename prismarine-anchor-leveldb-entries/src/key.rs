@@ -396,6 +396,8 @@ impl DBKey {
             });
         }
 
+        log::warn!("Could not parse DBKey. Run at trace level to see raw bytes.");
+        log::trace!("Unparsed DBKey bytes: {raw_key:?}");
         None
     }
 

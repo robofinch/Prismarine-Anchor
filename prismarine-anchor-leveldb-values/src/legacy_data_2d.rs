@@ -37,6 +37,7 @@ impl LegacyData2D {
 
     pub fn parse(value: &[u8]) -> Option<Self> {
         if value.len() != 512 + 1024 {
+            log::warn!("LegacyData2D didn't have length 1536. Received length: {}", value.len());
             return None;
         }
 

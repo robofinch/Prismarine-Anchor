@@ -15,5 +15,6 @@ prismarine-anchor-nbt               .workspace = true
 prismarine-anchor-translation       .workspace = true
 prismarine-anchor-util              .workspace = true
 
+log                 .workspace = true
 subslice-to-array   .workspace = true
 thiserror           .workspace = true

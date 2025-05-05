@@ -11,6 +11,7 @@ impl LevelSpawnWasFixed {
         } else if value == b"False" {
             Some(Self(false))
         } else {
+            log::warn!("LevelSpawnWasFixed was not True or False; bytes: {value:?}");
             None
         }
     }
