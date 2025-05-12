@@ -7,11 +7,10 @@ disallowed-macros = [
     'dbg',
     'std::unimplemented',
 
-    # TODO: set up logging, and prohibit these.
-    # 'std::eprint',
-    # 'std::eprintln',
-    # 'std::print',
-    # 'std::println',
+    'std::eprint',
+    'std::eprintln',
+    'std::print',
+    'std::println',
 ]
 
 # Note: some of the below is copied from egui's repo, and is not very relevant yet.

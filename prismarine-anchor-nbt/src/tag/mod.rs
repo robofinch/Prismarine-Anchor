@@ -449,7 +449,11 @@ impl NbtTag {
             // Converting to a string should be infallible; we can't simply error out.
             // Instead, unfortunately, we must just print something that
             // hopefully indicates the issue.
-            // TODO: log error message
+            log::warn!(
+                "Depth limit of {} reached; could not add {} tag",
+                opts.depth_limit.0,
+                recursive_tag_name,
+            );
 
             let err_msg_str = format!(
                 "Depth limit of {} reached; could not add {} tag",

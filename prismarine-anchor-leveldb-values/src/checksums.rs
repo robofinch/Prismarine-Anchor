@@ -39,7 +39,7 @@ impl Checksums {
         Some(Self(checksums))
     }
 
-    // TODO: compute checksum for provide value
+    // TODO: compute checksum for provided value
     // compute checksum for provided DBEntry <- needs to be done on DBEntry side
     // add checksum for provided value
     // add checksum for provided DBEntry <- needs to be done on DBEntry side

@@ -38,9 +38,10 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 panic = "abort"
 
 [profile.dev]
+# TODO: change this back
 # Can't leave this on by default, because it breaks the Windows build.
 # Related: https://github.com/rust-lang/cargo/issues/4897
-# split-debuginfo = "unpacked" # faster debug builds on mac
+split-debuginfo = "unpacked" # faster debug builds on mac
 opt-level = 1                # Make debug builds run faster
 
 [profile.dev.package."*"]

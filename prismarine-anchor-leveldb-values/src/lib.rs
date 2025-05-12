@@ -67,27 +67,27 @@ pub struct ValueToBytesOptions {
     pub handle_excessive_length: HandleExcessiveLength,
 }
 
-// TODO: implement BitPerfect
-
-/// Control whether non-semantically-important data is parsed or serialized to bytes.
+/// Control whether semantically-unimportant data is parsed or serialized to bytes.
 /// (Semantically-important data is always parsed and serialized.)
 ///
 /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
 /// for `BitPerfect` to fully function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataFidelity {
-    /// Preserve all data, including semantically unimportant data like padding bits.
-    /// Also preserves the order of all entries in likely-unordered key-value maps; currently,
-    /// this only affects `AabbVolumes`, which in the `Semantic` fidelity is sorted (in line
-    /// with observed data from Minecraft saves).
+    /// Preserve all data, including semantically unimportant data like padding bits, and preserves
+    /// the order of all entries in likely-unordered key-value maps.
+    ///
+    /// Currently, this only affects `AabbVolumes`, which in the `Semantic` fidelity is sorted
+    /// (in line with observed data from Minecraft saves), but in the future, the `Semantic`
+    /// setting *could* ignore semantically unimportant data.
     ///
     /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
     /// for this option to fully function.
     BitPerfect,
-    /// Preserve all semantically important data. This does not read padding bits, and writes
-    /// zeroes as padding bits. The order of entries in most key-value maps is preserved,
-    /// except the entries in the maps of `AabbVolumes` are sorted by key (in line with observed
-    /// data from Minecraft saves).
+    /// Preserve all semantically important data. Currently, padding bits in `PalettizedStorage`
+    /// (when read/written from/to the packed index representation) and the order of entries
+    /// in most key-value maps is still preserved, except the entries in the maps of `AabbVolumes`
+    /// are sorted by key (in line with observed data from Minecraft saves).
     Semantic,
 }
 

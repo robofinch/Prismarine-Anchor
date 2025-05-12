@@ -20,6 +20,7 @@ use super::KeyToBytesOptions;
 ///
 /// [minecraft.wiki]: https://minecraft.wiki/w/Bedrock_Edition_level_format#Chunk_key_format
 // TODO: are "since 1.18.0" and "since 1.0.0" the precise versions that something changed?
+// TODO: improve documentation
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DBKey {
     // ================================
@@ -72,7 +73,7 @@ pub enum DBKey {
     /// A hash which is the key in the `LevelChunkMetaDataDictionary` record
     /// for the NBT metadata of this chunk. Seems like it might default to something dependent
     /// on the current game or chunk version
-    // TODO: figure out what's going on with metadata.
+    // TODO: figure out if it's allowed to be missing.
     MetaDataHash(DimensionedChunkPos),
 
     /// The seed which was used to generate this chunk.

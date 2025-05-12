@@ -15,10 +15,6 @@ pub(super) fn new_leveldb<P: AsRef<Path>>(
     create_if_missing: bool,
     compressor:        DBCompressor,
 ) -> Result<DB, Status> {
-
-    // TODO: this is a debug print
-    println!("{:?}", db_path.as_ref());
-
     // These compressor settings are based off of rusty-leveldb's MCPE example
     let mut compressors = CompressorList::new();
     compressors.set_with_id(0, NoneCompressor);

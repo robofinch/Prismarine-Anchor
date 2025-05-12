@@ -319,6 +319,8 @@ impl From<PaletteHeader> for u8 {
 impl<T> PalettizedSubchunk<T> {
     /// The provided data should be for one subchunk in YZX order (Y increments first).
     /// Intended for use when `T` is `Copy`.
+    ///
+    /// Any needed padding bits will be zeroes.
     pub fn new_unpacked_flattened_copy(unpacked_data: [T; 4096]) -> Self
     where
         T: Ord + Copy,
@@ -400,6 +402,8 @@ impl<T> PalettizedSubchunk<T> {
 
     /// The provided data should be for one subchunk in YZX order (Y increments first).
     /// If `T` is `Copy`, it is more efficient to use `new_unpacked_flattened_copy`.
+    ///
+    /// Any needed padding bits will be zeroes.
     pub fn new_unpacked_flattened(unpacked_data: [T; 4096]) -> Self
     where
         T: Ord,
@@ -579,7 +583,7 @@ impl<T> PalettizedSubchunk<T> {
     /// `packed_indices` has length exactly `bits_per_index.num_u32s_for_4096_indices()`;
     ///
     /// `palette` has length greater than the maximum index in `packed_indices`,
-    /// and is at most `4096`.
+    /// and is at most `4096`;
     #[inline]
     pub fn new_packed_unchecked(
         bits_per_index: PaletteBitsPerIndex,
@@ -674,6 +678,8 @@ impl<T> PalettizedSubchunk<T> {
     /// The provided data should be for one subchunk,
     /// where Y is the innermost index, Z is the middle index, and X is the outermost index.
     /// In other words, the correct indexing order should be `unpacked_data[X][Z][Y]`.
+    ///
+    /// Any needed padding bits will be zeroes.
     pub fn new_unpacked(unpacked_data: [[[T; 16]; 16]; 16]) -> Self
     where
         T: Ord,
@@ -719,6 +725,8 @@ impl PalettizedSubchunk<u32> {
     /// The provided data should be for one subchunk,
     /// where Y is the innermost index, Z is the middle index, and X is the outermost index.
     /// In other words, the correct indexing order should be `unpacked_data[X][Z][Y]`.
+    ///
+    /// Any needed padding bits will be zeroes.
     #[inline]
     pub fn new_unpacked_u32s(unpacked_data: [[[u32; 16]; 16]; 16]) -> Self {
         Self::new_unpacked_flattened(transmute!(unpacked_data))
