@@ -4,6 +4,7 @@ use prismarine_anchor_leveldb_values::{
     actor_digest_version::ActorDigestVersion,
     biome_state::BiomeState,
     blending_data::BlendingData,
+    checksums::Checksums,
     chunk_position::DimensionedChunkPos,
     chunk_version::ChunkVersion,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
@@ -70,7 +71,7 @@ pub enum DBEntry {
     HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),
     // AabbVolumes(DimensionedChunkPos), // Not NBT
 
-    // Checksums(DimensionedChunkPos),
+    Checksums(DimensionedChunkPos, Checksums),
     MetaDataHash(DimensionedChunkPos, u64),
 
     // GenerationSeed(DimensionedChunkPos),
@@ -103,10 +104,10 @@ pub enum DBEntry {
     LegacyPlayer(u64, NbtCompound),
     PlayerServer(UUID, NbtCompound),
 
-    VillageDwellers(NamedDimension, UUID, NbtCompound),
-    VillageInfo(NamedDimension, UUID, NbtCompound),
-    VillagePOI(NamedDimension, UUID, NbtCompound),
-    VillagePlayers(NamedDimension, UUID, NbtCompound),
+    VillageDwellers(Option<NamedDimension>, UUID, NbtCompound),
+    VillageInfo(    Option<NamedDimension>, UUID, NbtCompound),
+    VillagePOI(     Option<NamedDimension>, UUID, NbtCompound),
+    VillagePlayers( Option<NamedDimension>, UUID, NbtCompound),
 
     Map(i64, NbtCompound),
     Portals(NbtCompound),
@@ -304,8 +305,10 @@ impl DBEntry {
             DBKey::AabbVolumes(_chunk_pos) => {
                 // TODO
             }
-            DBKey::Checksums(_chunk_pos) => {
-                // TODO
+            DBKey::Checksums(chunk_pos) => {
+                if let Some(checksums) = Checksums::parse(value) {
+                    return V::Parsed(Self::Checksums(chunk_pos, checksums));
+                }
             }
             DBKey::MetaDataHash(chunk_pos) => {
                 if let Ok(bytes) = <[u8; 8]>::try_from(value) {
@@ -555,6 +558,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(*chunk_pos),
+            Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(*chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(*chunk_pos),
@@ -612,6 +616,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(chunk_pos),
+            Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(chunk_pos),
@@ -655,8 +660,6 @@ impl DBEntry {
         }
     }
 
-    /// If `error_on_excessive_length` is true and this is a `LevelChunkMetaDataDictionary`
-    /// entry whose number of values is too large to fit in a u32, then an error is returned.
     pub fn to_value_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, ValueToBytesError> {
         #[expect(clippy::match_same_arms, reason = "clarity")]
         Ok(match self {
@@ -671,7 +674,8 @@ impl DBEntry {
             Self::Entities(.., compounds)               => compounds.to_bytes()?,
             Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes()?,
-            Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(),
+            Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(opts)?,
+            Self::Checksums(.., checksums)              => checksums.to_bytes(opts)?,
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
             Self::FinalizedState(.., state)             => state.to_bytes(),
             Self::BiomeState(.., state)                 => state.to_bytes(),
@@ -680,9 +684,7 @@ impl DBEntry {
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
             Self::ActorDigest(.., digest)               => digest.to_bytes(),
             Self::Actor(.., nbt)                        => nbt.to_bytes()?,
-            Self::LevelChunkMetaDataDictionary(dict) => {
-                dict.to_bytes(opts.error_on_excessive_length)?
-            }
+            Self::LevelChunkMetaDataDictionary(dict)    => dict.to_bytes(opts)?,
             Self::AutonomousEntities(nbt)               => nbt.to_bytes()?,
             Self::LocalPlayer(nbt)                      => nbt.to_bytes()?,
             Self::Player(_, nbt)                        => nbt.to_bytes()?,

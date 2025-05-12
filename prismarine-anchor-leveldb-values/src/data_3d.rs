@@ -3,7 +3,8 @@ use std::io::Cursor;
 use subslice_to_array::SubsliceToArray as _;
 use zerocopy::transmute;
 
-use crate::all_read;
+use prismarine_anchor_util::u64_equals_usize;
+
 use crate::palettized_storage::{
     PaletteHeader, PaletteType, PalettizedStorage,
     read_le_u32s, write_le_u32s,
@@ -37,7 +38,7 @@ impl Data3D {
 
         let remaining_len = value.len() - 512;
 
-        while !all_read(reader.position(), remaining_len) {
+        while !u64_equals_usize(reader.position(), remaining_len) {
             let header = PaletteHeader::parse_header(&mut reader).ok()?;
             match header.palette_type {
                 PaletteType::Persistent => {

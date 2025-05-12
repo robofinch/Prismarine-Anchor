@@ -1,3 +1,5 @@
+use crate::OverworldElision;
+
 /// A dimension of a Minecraft world, such as the Overworld.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Dimension {
@@ -225,3 +227,37 @@ pub struct CustomDimensionNumber(pub i32);
 // Box<str> because it shouldn't be changed much if ever.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CustomDimensionName(pub Box<str>);
+
+impl OverworldElision {
+    pub fn maybe_elide_id(
+        self,
+        dimension_id: Option<NumericDimension>,
+    ) -> Option<NumericDimension> {
+        match self {
+            Self::AlwaysElide => match dimension_id {
+                None | Some(NumericDimension::OVERWORLD) => None,
+                Some(other_dimension) => Some(other_dimension),
+            }
+            Self::AlwaysWrite => {
+                Some(dimension_id.unwrap_or(NumericDimension::OVERWORLD))
+            }
+            Self::MatchElision => dimension_id,
+        }
+    }
+
+    pub fn maybe_elide_name(
+        self,
+        dimension_name: Option<&NamedDimension>,
+    ) -> Option<&NamedDimension> {
+        match self {
+            Self::AlwaysElide => match dimension_name {
+                None | Some(&NamedDimension::OVERWORLD) => None,
+                Some(other_dimension) => Some(other_dimension),
+            }
+            Self::AlwaysWrite => {
+                Some(dimension_name.unwrap_or(&NamedDimension::OVERWORLD))
+            }
+            Self::MatchElision => dimension_name,
+        }
+    }
+}

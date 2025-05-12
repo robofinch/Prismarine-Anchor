@@ -3,6 +3,8 @@ use std::num::NonZeroU32;
 use bijective_enum_map::injective_enum_map;
 use subslice_to_array::SubsliceToArray as _;
 
+use crate::ValueToBytesOptions;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HardcodedSpawners(pub Vec<(BlockVolume, HardcodedSpawnerType)>);
@@ -40,7 +42,7 @@ impl HardcodedSpawners {
             value = &value[25..];
 
             let spawner_type = HardcodedSpawnerType::try_from(spawner_type)
-                .inspect_err(|_| log::warn!("Invalid HardcodedSpawnerType: {spawner_type}"))
+                .inspect_err(|()| log::warn!("Invalid HardcodedSpawnerType: {spawner_type}"))
                 .ok()?;
 
             hardcoded_spawners.push((
@@ -52,15 +54,15 @@ impl HardcodedSpawners {
         Some(Self(hardcoded_spawners))
     }
 
-    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
-        let (len, len_usize) = if size_of::<usize>() >= size_of::<u32>() {
-            // Casting a u32 to a usize cannot overflow
-            let len_u32 = u32::try_from(self.0.len()).unwrap_or(u32::MAX);
-            (len_u32, len_u32 as usize)
-        } else {
-            // Casting a usize to a u32 cannot overflow
-            (self.0.len() as u32, self.0.len())
-        };
+    pub fn extend_serialized(
+        &self,
+        bytes: &mut Vec<u8>,
+        opts: ValueToBytesOptions,
+    ) -> Result<(), SpawnersToBytesError> {
+        let (len, len_usize) = opts
+            .handle_excessive_length
+            .length_to_u32(self.0.len())
+            .ok_or(SpawnersToBytesError::ExcessiveLength)?;
 
         bytes.reserve(4 + len_usize * 25);
         bytes.extend(len.to_le_bytes());
@@ -68,13 +70,18 @@ impl HardcodedSpawners {
             volume.extend_serialized(bytes);
             bytes.push(u8::from(*spawner_type));
         }
+
+        Ok(())
     }
 
     #[inline]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(
+        &self,
+        opts: ValueToBytesOptions,
+    ) -> Result<Vec<u8>, SpawnersToBytesError> {
         let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes);
-        bytes
+        self.extend_serialized(&mut bytes, opts)?;
+        Ok(bytes)
     }
 }
 
@@ -111,10 +118,13 @@ impl BlockVolume {
                 width_z: NonZeroU32::new(high_z.abs_diff(low_z).saturating_add(1)).unwrap(),
             })
         } else {
-            log::warn!(
-                "Invalid BlockVolume; x: ({} ..= {}), y: ({} ..= {}), z: ({} ..= {})",
-                low_x, high_x, low_y, high_y, low_z, high_z,
-            );
+            #[expect(clippy::uninlined_format_args, reason = "line length")]
+            {
+                log::warn!(
+                    "Invalid BlockVolume; x: ({} ..= {}), y: ({} ..= {}), z: ({} ..= {})",
+                    low_x, high_x, low_y, high_y, low_z, high_z,
+                );
+            };
             None
         }
     }
@@ -152,4 +162,9 @@ injective_enum_map! {
     LegacyVillageCat      <=> 4,
     PillagerOutpost       <=> 5,
     NewerLegacyVillageCat <=> 6,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SpawnersToBytesError {
+    ExcessiveLength,
 }

@@ -359,6 +359,7 @@ dependencies = [
  "prismarine-anchor-translation",
  "prismarine-anchor-world",
  "rusty-leveldb",
+ "subslice-to-array",
  "xxhash-rust",
 ]
 
@@ -388,6 +389,7 @@ dependencies = [
  "serde",
  "subslice-to-array",
  "thiserror",
+ "vecmap-rs",
  "xxhash-rust",
  "zerocopy 0.8.24",
 ]
@@ -684,6 +686,12 @@ name = "varint-rs"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f54a172d0620933a27a4360d3db3e2ae0dd6cceae9730751a036bbf182c4b23"
+
+[[package]]
+name = "vecmap-rs"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67cfc542f75493f412a51c02af26f58f710ab0e2204d264135054377244276be"
 
 [[package]]
 name = "wasi"

@@ -207,6 +207,8 @@ impl ChunkVersion {
             Self::V41 => NumericVersion::from([1, 21, 40]),
         }
     }
+
+    // TODO: metadata about what each version *means*
 }
 
 injective_enum_map! {

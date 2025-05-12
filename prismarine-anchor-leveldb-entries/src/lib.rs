@@ -4,67 +4,94 @@ mod key;
 
 use thiserror::Error;
 
-use prismarine_anchor_leveldb_values::metadata::MetaDataWriteError;
+use prismarine_anchor_leveldb_values::{
+    checksums::ChecksumsToBytesError, hardcoded_spawners::SpawnersToBytesError, metadata::MetaDictToBytesError, DataFidelity, HandleExcessiveLength, OverworldElision, ValueParseOptions, ValueToBytesOptions
+};
 use prismarine_anchor_nbt::io::NbtIoError;
+use prismarine_anchor_translation::datatypes::NumericVersion;
 
 
 pub use self::{entry::DBEntry, key::DBKey};
 
-
 // Note in case the LevelDB part didn't make it obvious: this is for Minecraft Bedrock.
 
 
-/// Settings for converting a `DBKey` into raw key bytes for use in a LevelDB.
-///
-/// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
-/// numeric IDs written when a `NumericDimension` is serialized.
-/// Likewise, if `write_overworld_name` is false, then only non-Overworld dimensions
-/// will have their names written when a `NamedDimension` is serialized.
-///
-/// The best choice is
-/// - `write_overworld_id = false` for all current versions (up to at least 1.21.51), and
-/// - `write_overworld_name = false` for any version below 1.20.40, and conversely
-/// - `write_overworld_name = true` for any version at or above 1.20.40.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct KeyToBytesOptions {
-    pub write_overworld_id:   bool,
-    pub write_overworld_name: bool,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryBytes {
+    pub key:   Vec<u8>,
+    pub value: Vec<u8>,
 }
 
-/// Settings for converting a `DBEntry` into raw value bytes for use in a LevelDB.
-///
-/// If `error_on_excessive_length` is true, then if a `LevelChunkMetaDataDictionary` with more
-/// than 2^32 values is attempted to be written to bytes, an error is returned. If false,
-/// the dictionary is silently truncated to 2^32 values if such a thing occurs.
-///
-/// It should probably be set to `true` unless you have cause to write weirdly massive data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ValueToBytesOptions {
-    pub error_on_excessive_length: bool,
+pub struct EntryParseOptions {
+    /// The data fidelity of entry values; does not affect keys.
+    pub value_fidelity: DataFidelity,
+}
+
+impl From<EntryParseOptions> for ValueParseOptions {
+    fn from(opts: EntryParseOptions) -> Self {
+        Self {
+            data_fidelity: opts.value_fidelity,
+        }
+    }
+}
+
+/// Settings for converting a `DBKey` into raw key bytes for use in a LevelDB.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyToBytesOptions {
+    pub write_overworld_id:   OverworldElision,
+    pub write_overworld_name: OverworldElision,
+}
+
+impl KeyToBytesOptions {
+    /// This provides options corresponding to Minecraft's behavior up to at least 1.21.51
+    // TODO: is this tied to something like chunk version?
+    pub fn for_version(version: NumericVersion) -> Self {
+        if version < NumericVersion::from([1, 20, 40]) {
+            Self {
+                write_overworld_id:   OverworldElision::AlwaysElide,
+                write_overworld_name: OverworldElision::AlwaysElide,
+            }
+        } else {
+            Self {
+                write_overworld_id:   OverworldElision::AlwaysElide,
+                write_overworld_name: OverworldElision::AlwaysWrite,
+            }
+        }
+    }
 }
 
 /// Settings for converting a `DBEntry`
 /// into raw key and value bytes for use in a LevelDB.
 ///
-/// If `write_overworld_id` is false, then only non-Overworld dimensions will have their
-/// numeric IDs written when a `NumericDimension` is serialized.
-/// Likewise, if `write_overworld_name` is false, then only non-Overworld dimensions
-/// will have their names written when a `NamedDimension` is serialized.
-///
-/// If `error_on_excessive_length` is true, then if a `LevelChunkMetaDataDictionary` with more
-/// than 2^32 values is attempted to be written to bytes, an error is returned. If false,
-/// the dictionary is silently truncated to 2^32 values if such a thing occurs.
-///
 /// The best choice is
-/// - `write_overworld_id = false` for all current versions (up to at least 1.21.51), and
-/// - `write_overworld_name = false` for any version below 1.20.40, and conversely
-/// - `write_overworld_name = true` for any version at or above 1.20.40.
-/// - `error_on_excessive_length = true`, unless you have cause to write weirdly massive data.
+/// - `write_overworld_id = AlwaysElide` for all current versions (up to at least 1.21.51),
+/// - `write_overworld_name = AlwaysElide` for any version below 1.20.40, and conversely
+/// - `write_overworld_name = AlwaysWrite` for any version at or above 1.20.40.
+/// - `handle_excessive_length = ReturnError`, unless you have cause to write weirdly massive data.
+/// - `value_fidelity = DataFidelity::Semantic`, unless running tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntryToBytesOptions {
-    pub write_overworld_id:        bool,
-    pub write_overworld_name:      bool,
-    pub error_on_excessive_length: bool,
+    pub write_overworld_id:      OverworldElision,
+    pub write_overworld_name:    OverworldElision,
+    pub handle_excessive_length: HandleExcessiveLength,
+    /// The data fidelity of entry values; does not affect keys.
+    pub value_fidelity:          DataFidelity,
+}
+
+impl EntryToBytesOptions {
+    pub fn for_version(version: NumericVersion) -> Self {
+        let KeyToBytesOptions {
+            write_overworld_id,
+            write_overworld_name,
+        } = KeyToBytesOptions::for_version(version);
+        Self {
+            write_overworld_id,
+            write_overworld_name,
+            handle_excessive_length: HandleExcessiveLength::ReturnError,
+            value_fidelity:          DataFidelity::Semantic,
+        }
+    }
 }
 
 impl From<EntryToBytesOptions> for KeyToBytesOptions {
@@ -79,7 +106,8 @@ impl From<EntryToBytesOptions> for KeyToBytesOptions {
 impl From<EntryToBytesOptions> for ValueToBytesOptions {
     fn from(opts: EntryToBytesOptions) -> Self {
         Self {
-            error_on_excessive_length: opts.error_on_excessive_length,
+            handle_excessive_length: opts.handle_excessive_length,
+            data_fidelity:           opts.value_fidelity,
         }
     }
 }
@@ -112,21 +140,35 @@ pub enum ValueToBytesError {
     NbtIoError(#[from] NbtIoError),
     #[error("there were too many metadata entries in a LevelChunkMetaDataDictionary")]
     DictionaryLength,
+    #[error("there were too many entries in a Checksums value")]
+    ChecksumsLength,
+    #[error("there were too many entries in a HarcodedSpawners value")]
+    SpawnersLength,
 }
 
-impl From<MetaDataWriteError> for ValueToBytesError {
-    fn from(value: MetaDataWriteError) -> Self {
+impl From<ChecksumsToBytesError> for ValueToBytesError {
+    fn from(value: ChecksumsToBytesError) -> Self {
         match value {
-            MetaDataWriteError::ExcessiveLength => Self::DictionaryLength,
-            MetaDataWriteError::NbtError(err)   => Self::NbtIoError(err),
+            ChecksumsToBytesError::ExcessiveLength => Self::ChecksumsLength,
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct EntryBytes {
-    pub key:   Vec<u8>,
-    pub value: Vec<u8>,
+impl From<SpawnersToBytesError> for ValueToBytesError {
+    fn from(value: SpawnersToBytesError) -> Self {
+        match value {
+            SpawnersToBytesError::ExcessiveLength => Self::SpawnersLength,
+        }
+    }
+}
+
+impl From<MetaDictToBytesError> for ValueToBytesError {
+    fn from(value: MetaDictToBytesError) -> Self {
+        match value {
+            MetaDictToBytesError::ExcessiveLength => Self::DictionaryLength,
+            MetaDictToBytesError::NbtError(err)   => Self::NbtIoError(err),
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -141,7 +183,7 @@ pub struct EntryToBytesError {
 /// with binary data interspersed.
 ///
 /// For example:
-/// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
+/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
 fn print_debug(value: &[u8]) {
     #![allow(dead_code)]
     #![allow(clippy::all)]

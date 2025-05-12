@@ -2,8 +2,7 @@ use std::io::Cursor;
 
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
-
-use crate::all_read;
+use prismarine_anchor_util::u64_equals_usize;
 
 
 #[derive(Debug, Clone)]
@@ -16,7 +15,7 @@ impl ConcatenatedNbtCompounds {
         let input_len = input.len();
         let mut reader = Cursor::new(input);
 
-        while !all_read(reader.position(), input_len) {
+        while !u64_equals_usize(reader.position(), input_len) {
             let (nbt, _) = read_compound(
                 &mut reader,
                 IoOptions::bedrock_uncompressed(),

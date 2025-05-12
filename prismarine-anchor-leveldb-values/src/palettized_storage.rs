@@ -1,5 +1,3 @@
-#![expect(clippy::len_zero)]
-
 use std::{array, slice};
 use std::{collections::BTreeSet, convert::Infallible, error::Error as StdError};
 use std::io::{Error as IoError, Read};
@@ -110,7 +108,7 @@ pub enum PaletteHeaderParseError {
 // ================================
 
 /// Attempt to read exactly `num_u32s`-many little-endian `u32`s.
-pub fn read_le_u32s<R: Read>(reader: &mut R, num_u32s: usize) -> Result<Vec<u32>, IoError> {
+pub fn read_le_u32s<R: Read>(mut reader: R, num_u32s: usize) -> Result<Vec<u32>, IoError> {
     let mut u32s = vec![0; num_u32s * 4];
     reader.read_exact(&mut u32s)?;
 
@@ -150,14 +148,14 @@ pub fn write_le_u32s(u32s: &[u32], bytes: &mut Vec<u8>) -> Result<(), Infallible
 // ================================
 
 impl<T> PalettizedStorage<T> {
-    pub fn parse<R, F, FError>(
-        reader:                  &mut R,
+    pub fn parse<'a, R, F, FError>(
+        reader:                  &'a mut R,
         bits_per_index:          HeaderBitsPerIndex,
         mut parse_palette:       F,
     ) -> Result<Self, PalettizedStorageParseError<FError>>
     where
         R: Read,
-        F: FnMut(&mut R, usize) -> Result<Vec<T>, FError>,
+        F: FnMut(&'a mut R, usize) -> Result<Vec<T>, FError>,
         FError: StdError,
     {
         match bits_per_index {
@@ -175,7 +173,7 @@ impl<T> PalettizedStorage<T> {
             HeaderBitsPerIndex::Palettized(bits_per_index) => {
                 let packed_indices_len = bits_per_index.num_u32s_for_4096_indices();
 
-                let packed_indices = read_le_u32s(reader, packed_indices_len)?;
+                let packed_indices = read_le_u32s::<&mut R>(reader, packed_indices_len)?;
 
                 let mut palette_len = [0; 4];
 
@@ -293,7 +291,7 @@ impl<T> PalettizedStorage<T> {
 impl PaletteHeader {
     /// Parses the `PaletteType` and bits per index of the palettized storage,
     /// including special cases.
-    pub fn parse_header<R: Read>(reader: &mut R) -> Result<Self, PaletteHeaderParseError> {
+    pub fn parse_header<R: Read>(mut reader: R) -> Result<Self, PaletteHeaderParseError> {
         let mut header = [0; 1];
         reader.read_exact(&mut header)?;
         let header = header[0];

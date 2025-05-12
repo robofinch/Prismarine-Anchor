@@ -1,5 +1,6 @@
 use std::str;
 
+use prismarine_anchor_leveldb_values::OverworldElision;
 use subslice_to_array::SubsliceToArray as _;
 
 use prismarine_anchor_leveldb_values::{
@@ -128,16 +129,16 @@ pub enum DBKey {
 
     /// Key has the dimension which the village is in, and the name of the village.
     // TODO: should have entity IDs of village dwellers. Verify.
-    VillageDwellers(NamedDimension, UUID),
+    VillageDwellers(Option<NamedDimension>, UUID),
     /// Key has the dimension which the village is in, and the name of the village.
     // Village bounding box, and possibly other information TODO: figure out what
-    VillageInfo(NamedDimension, UUID),
+    VillageInfo(Option<NamedDimension>, UUID),
     /// Key has the dimension which the village is in, and the name of the village.
     // villager - workstation mappings. Bed mappings aren't stored, apparently.
-    VillagePOI(NamedDimension, UUID),
+    VillagePOI(Option<NamedDimension>, UUID),
     /// Key has the dimension which the village is in, and the name of the village.
     // Probably tracking player reputation or something? Idk. TODO: figure it out
-    VillagePlayers(NamedDimension, UUID),
+    VillagePlayers(Option<NamedDimension>, UUID),
 
     Map(i64),
     Portals,
@@ -298,13 +299,13 @@ impl DBKey {
                 && parts[0] == "VILLAGE"
                 && ["DWELLERS", "INFO", "PLAYERS", "POI"].contains(&parts[parts.len() - 1])
             {
-                // Villages
+                // VILLAGE_[DIMENSION]?_[UUID]_[VARIANT]
                 if let Some(uuid) = UUID::new(parts[parts.len() - 2]) {
                     let dimension = if parts.len() == 4 {
                         // Dimension included
-                        NamedDimension::from_bedrock_name(parts[1])
+                        Some(NamedDimension::from_bedrock_name(parts[1]))
                     } else {
-                        NamedDimension::OVERWORLD
+                        None
                     };
 
                     // Note that len is 3 or 4, so this doesn't overflow or panic
@@ -411,14 +412,18 @@ impl DBKey {
 
         fn extend_village(
             bytes:                &mut Vec<u8>,
-            dimension:            &NamedDimension,
+            dimension:            &Option<NamedDimension>,
             uuid:                 &UUID,
-            write_overworld_name: bool,
+            write_overworld_name: OverworldElision,
             variant:              &'static [u8],
         ) {
-            if write_overworld_name || dimension != &NamedDimension::OVERWORLD {
+            let dimension_name = write_overworld_name
+                .maybe_elide_name(dimension.as_ref());
 
-                let dimension = dimension.as_bedrock_name().as_bytes();
+            if let Some(dimension_name) = dimension_name {
+                let dimension = dimension_name
+                    .as_bedrock_name()
+                    .as_bytes();
 
                 bytes.reserve(b"VILLAGE".len() + 3 + variant.len() + dimension.len() + 36);
                 bytes.extend(b"VILLAGE_");

@@ -7,8 +7,8 @@ use thiserror::Error;
 
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
+use prismarine_anchor_util::u64_equals_usize;
 
-use crate::all_read;
 use crate::palettized_storage::{
     PaletteHeader, PaletteHeaderParseError, PaletteType,
     PalettizedStorage, PalettizedStorageParseError,
@@ -219,15 +219,21 @@ impl SubchunkBlocksV8 {
                     )?;
 
                     match &block_layer {
-                        PalettizedStorage::Empty      => return Err(V8ParseError::EmptyPalette),
-                        PalettizedStorage::Uniform(_) => return Err(V8ParseError::UniformPalette),
-                        _                             => block_layers.push(block_layer),
+                        PalettizedStorage::Empty => {
+                            return Err(V8ParseError::EmptyPalette)
+                        }
+                        PalettizedStorage::Uniform(_) => {
+                            return Err(V8ParseError::UniformPalette)
+                        }
+                        PalettizedStorage::Palettized(_) => {
+                            block_layers.push(block_layer);
+                        }
                     }
                 }
             }
         }
 
-        if all_read(reader.position(), total_len) {
+        if u64_equals_usize(reader.position(), total_len) {
             Ok(Self { block_layers })
         } else {
             Err(V8ParseError::NotAllRead)
@@ -321,7 +327,7 @@ impl SubchunkBlocksV9 {
             }
         }
 
-        if all_read(reader.position(), total_len) {
+        if u64_equals_usize(reader.position(), total_len) {
             Ok(Self {
                 y_index,
                 block_layers,

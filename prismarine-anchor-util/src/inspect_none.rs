@@ -4,12 +4,11 @@ pub trait InspectNone {
 
 impl<T> InspectNone for Option<T> {
     fn inspect_none<F: FnOnce()>(self, f: F) -> Self {
-        match self {
-            Some(value) => Some(value),
-            None => {
-                f();
-                None
-            }
+        if let Some(value) = self {
+            Some(value)
+        } else {
+            f();
+            None
         }
     }
 }

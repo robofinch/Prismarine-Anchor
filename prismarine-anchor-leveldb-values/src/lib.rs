@@ -56,33 +56,146 @@ pub mod flat_world_layers;
 pub mod level_spawn_was_fixed;
 
 
-/// Compare a reader's position to the total length of data that was expected to be read,
-/// to check if everything was read.
-#[cfg(any(
-    feature = "concatenated_nbt_compounds",
-    feature = "data_3d",
-    feature = "metadata",
-    feature = "subchunk_blocks",
-))]
-#[inline]
-fn all_read(read_position: u64, total_len: usize) -> bool {
-    // The as casts don't overflow because we check the size.
-    if size_of::<usize>() <= size_of::<u64>() {
-        let total_len = total_len as u64;
-        read_position == total_len
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValueParseOptions {
+    pub data_fidelity: DataFidelity,
+}
 
-    } else {
-        let read_len = read_position as usize;
-        read_len == total_len
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValueToBytesOptions {
+    pub data_fidelity:           DataFidelity,
+    pub handle_excessive_length: HandleExcessiveLength,
+}
+
+// TODO: implement BitPerfect
+
+/// Control whether non-semantically-important data is parsed or serialized to bytes.
+/// (Semantically-important data is always parsed and serialized.)
+///
+/// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
+/// for `BitPerfect` to fully function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataFidelity {
+    /// Preserve all data, including semantically unimportant data like padding bits.
+    /// Also preserves the order of all entries in likely-unordered key-value maps; currently,
+    /// this only affects `AabbVolumes`, which in the `Semantic` fidelity is sorted (in line
+    /// with observed data from Minecraft saves).
+    ///
+    /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
+    /// for this option to fully function.
+    BitPerfect,
+    /// Preserve all semantically important data. This does not read padding bits, and writes
+    /// zeroes as padding bits. The order of entries in most key-value maps is preserved,
+    /// except the entries in the maps of `AabbVolumes` are sorted by key (in line with observed
+    /// data from Minecraft saves).
+    Semantic,
+}
+
+/// How to handle lists or maps whose number of entries is too large to fit in a u32.
+///
+/// If set to `ReturnError`, then if a list with a length that needs to be
+/// written into a `u32` in the byte representation (e.g. `Checksums` or
+/// `LevelChunkMetaDataDictionary` data) with more than 2^32 values is attempted to be written
+/// to bytes, an error is returned.
+/// If `SilentlyTruncate`, the list is silently truncated to 2^32 values if such a thing occurs.
+///
+/// Note that this does *not* affect `SubchunkBlocks` data; if there are more than 255
+/// block layers in `SubchunkBlocks` data, then only the first 255 layers will be written;
+/// no error is ever returned (and to begin with, there should never be anywhere near that many
+/// layers).
+///
+/// It should probably be set to `ReturnError` unless you have cause to write weirdly massive data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandleExcessiveLength {
+    ReturnError,
+    SilentlyTruncate,
+}
+
+impl HandleExcessiveLength {
+    /// Given a `usize` length, attempts to cast it to a `u32`. If `self` is `ReturnError`
+    /// and the conversion fails, then an error is returned; otherwise, the value is saturated
+    /// to `u32::MAX` instead.
+    ///
+    /// Both a `u32` and `usize` are returned, to handle the case that the `usize` length
+    /// must be truncated.
+    pub fn length_to_u32(self, len: usize) -> Option<(u32, usize)> {
+        if size_of::<usize>() >= size_of::<u32>() {
+            let len = match u32::try_from(len) {
+                Ok(len) => len,
+                Err(_) => match self {
+                    Self::ReturnError      => return None,
+                    Self::SilentlyTruncate => u32::MAX,
+                }
+            };
+
+            // This cast from u32 to usize won't overflow
+            Some((len, len as usize))
+        } else {
+            // This cast from usize to u32 won't overflow
+            Some((len as u32, len))
+        }
     }
 }
+
+/// Some versions of Bedrock elide the numeric ID or name of the Overworld,
+/// and only serialize the IDs or names of non-Overworld dimensions.
+///
+/// Dimension IDs and names are read as `Option<NumericDimension>` or `Option<NamedDimension>`,
+/// with `None` indicating an implicit Overworld value.
+///
+/// These options indicate how a `Option<NumericDimension>` or `Option<NamedDimension>`
+/// should be serialized: either
+/// - never elide the value and always write it,
+/// - always elide the Overworld value and only write the ID or name of a non-Overworld
+///   dimension, or
+/// - elide the Overworld value if the option is `None`.
+///
+/// The best choices (aside from testing, where `MatchElision` may be useful) are
+/// - numeric dimension IDs for all current versions (up to at least 1.21.51): `AlwaysElide`
+/// - dimension names for any version below 1.20.40: `AlwaysElide`
+/// - dimension names for any version at or above 1.20.40: `AlwaysWrite`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverworldElision {
+    /// Write the IDs and names of all dimensions.
+    AlwaysWrite,
+    /// Always write the ID or name of the Overworld, and only write the IDs and names of all
+    /// non-Overworld dimensions.
+    AlwaysElide,
+    /// Elide the ID or name of the Overworld if and only if a `Option<NumericDimension>`
+    /// or `Option<NamedDimension>` is `None`. The IDs and names of all non-Overworld dimensions
+    /// are always written.
+    MatchElision,
+}
+
+// Note that the `dimensions` module implements two functions for `OverworldElision`.
+
+
+// Throughout this crate, pretend we're implementing something like the following trait:
+/*
+trait DBValue {
+    // Could be `u8`, `[u8; N]`, or `&[u8]`; may or may not accept `opts`
+    fn parse(value: &[u8], opts: ValueParseOptions) -> Option<Self>;
+
+    // Could allow for either `self.to_bytes(opts)` or `self.to_bytes(opts)?`,
+    // or `self.to_le_bytes().to_vec()` or `vec![u8::from(self)]`.
+    // So, this is optional, and could be `-> Vec<u8>` instead of `-> Result<Vec<u8>, E>`.
+    // (Any nontrivial value should implement this.)
+    // Requiring `opts` is optional.
+    type E;
+    fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, E>;
+}
+*/
+// Exceptions (which don't follow the above pattern) are
+// `ChunkPosition`, `Dimension`, `DimensionedChunkPos`,
+// and structs in `palettized_storage`.
+
 
 /// For use during development. Instead of printing binary data as entirely binary,
 /// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
 /// with binary data interspersed.
 ///
 /// For example:
-/// `various_text-characters[0, 1, 2, 3,]more_text[255, 255]`
+/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
 fn print_debug(value: &[u8]) {
     #![allow(dead_code)]
     #![allow(clippy::all)]

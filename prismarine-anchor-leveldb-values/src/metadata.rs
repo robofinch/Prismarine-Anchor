@@ -1,6 +1,6 @@
 use std::io;
 use std::{collections::BTreeMap, ops::Range};
-use std::io::{Cursor, Read as _, Write as _};
+use std::io::{Cursor, Read as _};
 
 use bijective_enum_map::injective_enum_map;
 use indexmap::IndexMap;
@@ -13,9 +13,10 @@ use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
     settings::{Endianness, IoOptions},
 };
-use prismarine_anchor_util::{len_u32, ExcessiveLengthError};
+use prismarine_anchor_util::u64_equals_usize;
 
-use crate::{all_read, dimensions::NamedDimension};
+use crate::dimensions::NamedDimension;
+use crate::ValueToBytesOptions;
 
 
 #[derive(Debug, Clone)]
@@ -91,59 +92,41 @@ impl LevelChunkMetaDataDictionary {
         }
 
         // Reject if there was excess data
-        if !all_read(reader.position(), reader.into_inner().len()) {
+        if !u64_equals_usize(reader.position(), reader.into_inner().len()) {
             return Err(MetaDataParseError::ExcessData);
         }
 
         Ok(Self(map))
     }
 
-    pub fn to_bytes(
+    pub fn extend_serialized(
         &self,
-        error_on_excessive_length: bool,
-    ) -> Result<Vec<u8>, MetaDataWriteError> {
-        let (len, len_usize) = len_u32(self.0.len(), !error_on_excessive_length)?;
+        bytes: &mut Vec<u8>,
+        opts:  ValueToBytesOptions,
+    ) -> Result<(), MetaDictToBytesError> {
+        let (len, len_usize) = opts
+            .handle_excessive_length
+            .length_to_u32(self.0.len())
+            .ok_or(MetaDictToBytesError::ExcessiveLength)?;
 
-        let mut writer = Cursor::new(Vec::new());
-        writer
-            .write_all(&len.to_le_bytes())
-            .expect("Cursor IO doesn't fail");
+        bytes.extend(len.to_le_bytes());
 
         for (hash, nbt) in self.0.iter().take(len_usize) {
             let nbt = nbt.clone().into();
-            writer
-                .write_all(&hash.to_le_bytes())
-                .expect("Cursor IO doesn't fail");
+
+            bytes.extend(hash.to_le_bytes());
 
             // Could only fail on invalid NBT.
-            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
+            write_compound(bytes, IoOptions::bedrock_uncompressed(), None, &nbt)?;
         }
 
-        Ok(writer.into_inner())
+        Ok(())
     }
 
-    pub fn into_bytes(
-        self,
-        error_on_excessive_length: bool,
-    ) -> Result<Vec<u8>, MetaDataWriteError> {
-        let (len, len_usize) = len_u32(self.0.len(), !error_on_excessive_length)?;
-
-        let mut writer = Cursor::new(Vec::new());
-        writer
-            .write_all(&len.to_le_bytes())
-            .expect("Cursor IO doesn't fail");
-
-        for (hash, nbt) in self.0.into_iter().take(len_usize) {
-            let nbt = nbt.into();
-            writer
-                .write_all(&hash.to_le_bytes())
-                .expect("Cursor IO doesn't fail");
-
-            // Could only fail on invalid NBT.
-            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, &nbt)?;
-        }
-
-        Ok(writer.into_inner())
+    pub fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, MetaDictToBytesError> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes, opts)?;
+        Ok(bytes)
     }
 }
 
@@ -510,17 +493,11 @@ pub enum MetaDataParseError {
 }
 
 #[derive(Error, Debug)]
-pub enum MetaDataWriteError {
+pub enum MetaDictToBytesError {
     #[error("the number of metadata entries could not fit in a u32")]
     ExcessiveLength,
     #[error("NBT error while writing metadata dictionary to NBT: {0}")]
     NbtError(#[from] NbtIoError),
-}
-
-impl From<ExcessiveLengthError> for MetaDataWriteError {
-    fn from(_value: ExcessiveLengthError) -> Self {
-        Self::ExcessiveLength
-    }
 }
 
 #[derive(Error, Debug)]
