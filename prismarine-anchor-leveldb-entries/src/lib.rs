@@ -5,7 +5,15 @@ mod key;
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_values::{
-    checksums::ChecksumsToBytesError, hardcoded_spawners::SpawnersToBytesError, metadata::MetaDictToBytesError, DataFidelity, HandleExcessiveLength, OverworldElision, ValueParseOptions, ValueToBytesOptions
+    aabb_volumes::VolumesToBytesError,
+    checksums::ChecksumsToBytesError,
+    DataFidelity,
+    HandleExcessiveLength,
+    hardcoded_spawners::SpawnersToBytesError,
+    metadata::MetaDictToBytesError,
+    OverworldElision,
+    ValueParseOptions,
+    ValueToBytesOptions,
 };
 use prismarine_anchor_nbt::io::NbtIoError;
 use prismarine_anchor_translation::datatypes::NumericVersion;
@@ -144,6 +152,10 @@ pub enum ValueToBytesError {
     ChecksumsLength,
     #[error("there were too many entries in a HarcodedSpawners value")]
     SpawnersLength,
+    #[error("there were too many entries in an AabbVolumes key-value map")]
+    AabbMapLength,
+    #[error("a string for a namespaced identifier in an AabbVolumes value was too long")]
+    AabbStringLength,
 }
 
 impl From<ChecksumsToBytesError> for ValueToBytesError {
@@ -167,6 +179,15 @@ impl From<MetaDictToBytesError> for ValueToBytesError {
         match value {
             MetaDictToBytesError::ExcessiveLength => Self::DictionaryLength,
             MetaDictToBytesError::NbtError(err)   => Self::NbtIoError(err),
+        }
+    }
+}
+
+impl From<VolumesToBytesError> for ValueToBytesError {
+    fn from(value: VolumesToBytesError) -> Self {
+        match value {
+            VolumesToBytesError::ExcessiveMapLength    => Self::AabbMapLength,
+            VolumesToBytesError::ExcessiveStringLength => Self::AabbStringLength,
         }
     }
 }

@@ -4,7 +4,7 @@ use prismarine_anchor_leveldb_values::OverworldElision;
 use subslice_to_array::SubsliceToArray as _;
 
 use prismarine_anchor_leveldb_values::{
-    actor::ActorID,
+    actor_id::ActorID,
     chunk_position::DimensionedChunkPos,
     uuid::UUID,
 };
@@ -60,11 +60,11 @@ pub enum DBKey {
     /// Used in Education Edition
     BorderBlocks(DimensionedChunkPos),
     /// Bounding boxes for structure spawns, such as a Nether Fortress or Pillager Outpost.
-    /// No longer used as of 1.21.10.
+    /// Replaced by `AabbVolumes` starting in 1.21.20 (or, in one of the previews for 1.21.20).
     HardcodedSpawners(DimensionedChunkPos),
-    // Found in levilamina, key tag value 119 (b'w'). Related to hardcoded spawners, maybe?
-    // Apparently something to do with trial chambers... maybe other structures too?
-    // Need a larger sample size to figure out the binary format.
+    /// Bounding boxes for structures, including structure spawns (such as a Pillager Outpost)
+    /// and volumes where mobs cannot spawn through the normal biome-based means (such as
+    /// Trial Chambers).
     AabbVolumes(DimensionedChunkPos),
 
     /// xxHash64 checksums of `SubchunkBlocks`, `BlockEntities`, `Entities`, and `Data2D`

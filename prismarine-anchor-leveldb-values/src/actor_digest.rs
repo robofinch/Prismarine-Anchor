@@ -1,6 +1,6 @@
 use subslice_to_array::SubsliceToArray as _;
 
-use crate::actor::ActorID;
+use crate::actor_id::ActorID;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]

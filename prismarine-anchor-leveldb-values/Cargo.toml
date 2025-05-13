@@ -37,20 +37,21 @@ zerocopy            = { workspace = true, features = ["derive"], optional = true
 # This assumption allows testing to be faster; we need only test each feature individually.
 [features]
 all = [
-    "dimensions", "chunk_position", "uuid",
-    "concatenated_nbt_compounds", "nbt_compound_conversion", "palettized_storage",
+    "dimensions", "chunk_position", "uuid", "actor_id",
+    "block_volume", "concatenated_nbt_compounds", "nbt_compound_conversion", "palettized_storage",
     "chunk_version", "actor_digest_version",
     "data_3d", "data_2d", "legacy_data_2d",
     "subchunk_blocks", "legacy_terrain", "legacy_extra_block_data",
     "border_blocks", "hardcoded_spawners", "aabb_volumes",
     "checksums", "metadata",
-    "finalized_state", "biome_state", "conversion_data", "blending_data",
-    "actor_digest", "actor",
+    "finalized_state", "biome_state", "conversion_data", "blending_data", "actor_digest",
     "flat_world_layers", "level_spawn_was_fixed"
 ]
 dimensions                  = []
 chunk_position              = ["dimensions", "dep:subslice-to-array"]
 uuid                        = ["dep:prismarine-anchor-util", "dep:log", "dep:subslice-to-array"]
+actor_id                    = []
+block_volume                = ["dep:log"]
 concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util"]
 nbt_compound_conversion     = ["dep:prismarine-anchor-nbt"]
 palettized_storage          = ["dep:thiserror", "dep:zerocopy"]
@@ -69,9 +70,12 @@ subchunk_blocks             = [
 legacy_terrain              = []
 legacy_extra_block_data     = []
 border_blocks               = []
-hardcoded_spawners          = ["dep:bijective-enum-map", "dep:log", "dep:subslice-to-array"]
+hardcoded_spawners          = [
+    "block_volume", "dep:bijective-enum-map", "dep:log", "dep:subslice-to-array"
+]
 aabb_volumes                = [
-    "dep:prismarine-anchor-util", "dep:subslice-to-array", "dep:vecmap-rs"
+    "block_volume", "dep:prismarine-anchor-translation", "dep:prismarine-anchor-util",
+    "dep:subslice-to-array", "dep:vecmap-rs"
 ]
 checksums                   = [
     "dep:prismarine-anchor-util",
@@ -88,7 +92,6 @@ conversion_data             = []
 caves_and_cliffs_blending   = []
 blending_biome_height       = []
 blending_data               = []
-actor_digest                = ["actor", "dep:subslice-to-array"]
-actor                       = []
+actor_digest                = ["actor_id", "dep:subslice-to-array"]
 flat_world_layers           = ["dep:prismarine-anchor-util", "dep:log"]
 level_spawn_was_fixed       = ["dep:log"]

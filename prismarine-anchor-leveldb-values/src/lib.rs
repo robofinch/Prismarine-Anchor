@@ -1,12 +1,18 @@
+// Special cases / used for keys as well
 #[cfg(feature = "dimensions")]
 pub mod dimensions;
 #[cfg(feature = "chunk_position")]
 pub mod chunk_position;
 #[cfg(feature = "uuid")]
 pub mod uuid;
+#[cfg(feature = "actor_id")]
+pub mod actor_id;
 
+// Helpers
+#[cfg(feature = "block_volume")]
+pub mod block_volume;
 #[cfg(feature = "concatenated_nbt_compounds")]
-pub mod concatenated_nbt_compounds; // For multiple sorts of values
+pub mod concatenated_nbt_compounds;
 #[cfg(feature = "nbt_compound_conversion")]
 pub mod nbt_compound_conversion;
 #[cfg(feature = "palettized_storage")]
@@ -48,8 +54,6 @@ pub mod conversion_data;
 pub mod blending_data;
 #[cfg(feature = "actor_digest")]
 pub mod actor_digest;
-#[cfg(feature = "actor")]
-pub mod actor;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
 #[cfg(feature = "level_spawn_was_fixed")]
@@ -91,13 +95,15 @@ pub enum DataFidelity {
     Semantic,
 }
 
-/// How to handle lists or maps whose number of entries is too large to fit in a u32.
+/// How to handle lists or maps whose number of entries is too large to fit in a u32, or strings
+/// whose length does not fit in a u16.
 ///
 /// If set to `ReturnError`, then if a list with a length that needs to be
-/// written into a `u32` in the byte representation (e.g. `Checksums` or
-/// `LevelChunkMetaDataDictionary` data) with more than 2^32 values is attempted to be written
-/// to bytes, an error is returned.
-/// If `SilentlyTruncate`, the list is silently truncated to 2^32 values if such a thing occurs.
+/// written into a `u32` or `u16` in the byte representation (e.g. `Checksums` or
+/// `LevelChunkMetaDataDictionary` data, or a `NamespacedIdentifier` string) with more than
+/// 2^32 or 2^16 values is attempted to be written to bytes, an error is returned.
+/// If `SilentlyTruncate`, the list or string is silently truncated to the maximum length if such
+/// an event occurs.
 ///
 /// Note that this does *not* affect `SubchunkBlocks` data; if there are more than 255
 /// block layers in `SubchunkBlocks` data, then only the first 255 layers will be written;
@@ -134,6 +140,24 @@ impl HandleExcessiveLength {
             // This cast from usize to u32 won't overflow
             Some((len as u32, len))
         }
+    }
+
+    /// Given a `usize` length, attempts to cast it to a `u16`. If `self` is `ReturnError`
+    /// and the conversion fails, then an error is returned; otherwise, the value is saturated
+    /// to `u16::MAX` instead.
+    ///
+    /// Both a `u16` and `usize` are returned, to handle the case that the `usize` length
+    /// must be truncated.
+    pub fn length_to_u16(self, len: usize) -> Option<(u16, usize)> {
+        let len = match u16::try_from(len) {
+            Ok(len) => len,
+            Err(_) => match self {
+                Self::ReturnError      => return None,
+                Self::SilentlyTruncate => u16::MAX,
+            }
+        };
+
+        Some((len, usize::from(len)))
     }
 }
 
@@ -185,9 +209,7 @@ trait DBValue {
     fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, E>;
 }
 */
-// Exceptions (which don't follow the above pattern) are
-// `ChunkPosition`, `Dimension`, `DimensionedChunkPos`,
-// and structs in `palettized_storage`.
+// There are some exceptions (see the the special-case and helper modules at the top)
 
 
 /// For use during development. Instead of printing binary data as entirely binary,

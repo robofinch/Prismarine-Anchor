@@ -1,7 +1,8 @@
 use prismarine_anchor_leveldb_values::{
-    actor::ActorID,
+    aabb_volumes::AabbVolumes,
     actor_digest::ActorDigest,
     actor_digest_version::ActorDigestVersion,
+    actor_id::ActorID,
     biome_state::BiomeState,
     blending_data::BlendingData,
     checksums::Checksums,
@@ -69,7 +70,7 @@ pub enum DBEntry {
     // BorderBlocks(DimensionedChunkPos),
     /// No longer used
     HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),
-    // AabbVolumes(DimensionedChunkPos), // Not NBT
+    AabbVolumes(DimensionedChunkPos, AabbVolumes),
 
     Checksums(DimensionedChunkPos, Checksums),
     MetaDataHash(DimensionedChunkPos, u64),
@@ -211,7 +212,10 @@ impl DBEntry {
         }
     }
 
-    #[expect(clippy::too_many_lines, reason = "it's a giant match, which uses helper functions")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "it's a giant match, and at least uses helper functions",
+    )]
     pub fn parse_recognized_value(key: DBKey, value: &[u8]) -> ValueParseResult {
         use ValueParseResult as V;
 
@@ -302,8 +306,10 @@ impl DBEntry {
                     return V::Parsed(Self::HardcodedSpawners(chunk_pos, spawners));
                 }
             }
-            DBKey::AabbVolumes(_chunk_pos) => {
-                // TODO
+            DBKey::AabbVolumes(chunk_pos) => {
+                if let Some(volumes) = AabbVolumes::parse(value) {
+                    return V::Parsed(Self::AabbVolumes(chunk_pos, volumes));
+                }
             }
             DBKey::Checksums(chunk_pos) => {
                 if let Some(checksums) = Checksums::parse(value) {
@@ -558,6 +564,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(*chunk_pos),
+            Self::AabbVolumes(chunk_pos, ..)        => DBKey::AabbVolumes(*chunk_pos),
             Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(*chunk_pos),
@@ -616,6 +623,7 @@ impl DBEntry {
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(chunk_pos),
+            Self::AabbVolumes(chunk_pos, ..)        => DBKey::AabbVolumes(chunk_pos),
             Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(chunk_pos),
@@ -675,6 +683,7 @@ impl DBEntry {
             Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes()?,
             Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(opts)?,
+            Self::AabbVolumes(.., volumes)              => volumes.to_bytes(opts)?,
             Self::Checksums(.., checksums)              => checksums.to_bytes(opts)?,
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
             Self::FinalizedState(.., state)             => state.to_bytes(),
