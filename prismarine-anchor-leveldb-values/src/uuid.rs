@@ -65,7 +65,6 @@ impl UUID {
     /// 8-4-4-4-12 UUID format.
     #[inline]
     pub fn extend_serialized(self, bytes: &mut Vec<u8>) {
-        bytes.reserve(36);
         bytes.extend(self.to_string().as_bytes());
     }
 

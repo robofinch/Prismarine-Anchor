@@ -65,7 +65,7 @@ impl LegacyData2D {
         })
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
         let heightmap: [u16; 256] = transmute!(self.heightmap);
         let heightmap: [[u8; 2]; 256] = heightmap.map(u16::to_le_bytes);
         let heightmap: [u8; 512] = transmute!(heightmap);
@@ -80,9 +80,16 @@ impl LegacyData2D {
         });
         let biomes: [u8; 1024] = transmute!(biomes);
 
-        let mut output = heightmap.to_vec();
-        output.extend(biomes);
-        output
+        bytes.reserve(1536); // 512 + 1024
+        bytes.extend(heightmap);
+        bytes.extend(biomes);
+    }
+
+    #[inline]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes);
+        bytes
     }
 }
 

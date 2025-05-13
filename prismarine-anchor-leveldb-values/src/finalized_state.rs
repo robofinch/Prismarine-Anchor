@@ -29,6 +29,11 @@ impl FinalizedState {
     }
 
     #[inline]
+    pub fn extend_serialized(self, bytes: &mut Vec<u8>) {
+        bytes.extend(u32::from(self).to_le_bytes());
+    }
+
+    #[inline]
     pub fn to_bytes(self) -> Vec<u8> {
         u32::from(self).to_le_bytes().to_vec()
     }

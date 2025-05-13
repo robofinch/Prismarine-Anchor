@@ -45,15 +45,22 @@ impl Data2D {
         })
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
         let heightmap: [u16; 256] = transmute!(self.heightmap);
         let heightmap: [[u8; 2]; 256] = heightmap.map(u16::to_le_bytes);
         let heightmap: [u8; 512] = transmute!(heightmap);
 
         let biome_ids: [u8; 256] = transmute!(self.biome_ids);
 
-        let mut output = heightmap.to_vec();
-        output.extend(biome_ids);
-        output
+        bytes.reserve(768); // 512 + 256
+        bytes.extend(heightmap);
+        bytes.extend(biome_ids);
+    }
+
+    #[inline]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes);
+        bytes
     }
 }

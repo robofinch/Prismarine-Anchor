@@ -305,7 +305,6 @@ impl From<NbtCompound> for MetaData {
 
 impl From<MetaData> for NbtCompound {
     fn from(value: MetaData) -> Self {
-
         let mut compound = value.unrecognized;
 
         macro_rules! add_meta {

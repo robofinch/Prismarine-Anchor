@@ -58,4 +58,11 @@ impl BlockVolume {
         bytes.extend(high_y.to_le_bytes());
         bytes.extend(high_z.to_le_bytes());
     }
+
+    #[inline]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes);
+        bytes
+    }
 }
