@@ -27,12 +27,20 @@ pub(super) fn new_leveldb<P: AsRef<Path>>(
         DBCompressor::ZlibWithoutHeader => 4,
     };
 
+    // Larger values are apparently better for bulk scans.
+    // The default is 4096, and the cache is (by default) 1024 times 4096.
+    // I'm multiplying it by 4.
+    // TODO: would even larger values be more performant?
+    let block_size = 4 * 4096;
+
     let options = Options {
+        block_size,
+        block_cache_capacity_bytes: block_size * 1024,
         create_if_missing,
         compressor,
-        compressor_list: Rc::new(compressors),
-        paranoid_checks: false,
+        compressor_list:            Rc::new(compressors),
         env,
+        write_buffer_size:          block_size * 1024,
         ..Options::default()
     };
 

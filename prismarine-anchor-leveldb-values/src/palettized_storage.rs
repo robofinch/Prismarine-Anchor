@@ -680,6 +680,8 @@ impl<T> PalettizedSubchunk<T> {
     /// In other words, the correct indexing order should be `unpacked_data[X][Z][Y]`.
     ///
     /// Any needed padding bits will be zeroes.
+    ///
+    /// When `T` is `u32`, the `new_unpacked_u32s` function is more efficient.
     pub fn new_unpacked(unpacked_data: [[[T; 16]; 16]; 16]) -> Self
     where
         T: Ord,
@@ -700,6 +702,8 @@ impl<T> PalettizedSubchunk<T> {
     /// In the output data, Y is the innermost index, Z is the middle index,
     /// and X is the outermost index.
     /// In other words, the correct indexing order should be `self.unpacked()[X][Z][Y]`.
+    ///
+    /// When `T` is `u32`, the `unpacked_u32s` function is more efficient.
     pub fn unpacked(&self) -> [[[T; 16]; 16]; 16]
     where
         T: Clone,

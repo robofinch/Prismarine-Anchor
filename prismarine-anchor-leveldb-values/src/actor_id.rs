@@ -18,6 +18,11 @@ impl ActorID {
     }
 
     #[inline]
+    pub fn extend_serialized(self, bytes: &mut Vec<u8>) {
+        bytes.extend(self.to_bytes());
+    }
+
+    #[inline]
     pub fn to_bytes(self) -> [u8; 8] {
         let upper = self.upper.to_be_bytes();
         let lower = self.lower.to_be_bytes();

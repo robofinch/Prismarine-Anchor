@@ -326,18 +326,6 @@ impl DBKey {
                     return Some(Self::Map(map_id));
                 }
 
-            } else if parts.len() == 2 && parts[0] == "structuretemplate" {
-                // Structure templates
-                if let Ok(identifier) = NamespacedIdentifier::parse_string(
-                    parts[1].to_owned(),
-                    IdentifierParseOptions {
-                        default_namespace:          None,
-                        java_character_constraints: false,
-                    },
-                ) {
-                    return Some(Self::StructureTemplate(identifier));
-                }
-
             } else if parts.len() == 2 && parts[0] == "player" {
                 // A remote player
                 if let Some(uuid) = UUID::new(parts[1]) {
@@ -357,6 +345,18 @@ impl DBKey {
                 // A ticking area, could be in any dimension.
                 if let Some(uuid) = UUID::new(parts[1]) {
                     return Some(Self::TickingArea(uuid));
+                }
+            }
+
+            if let Some(structure_identifier) = key_string.strip_prefix("structuretemplate_") {
+                if let Ok(identifier) = NamespacedIdentifier::parse_string(
+                    structure_identifier.to_owned(),
+                    IdentifierParseOptions {
+                        default_namespace:          None,
+                        java_character_constraints: false,
+                    },
+                ) {
+                    return Some(Self::StructureTemplate(identifier));
                 }
             }
 
@@ -489,7 +489,7 @@ impl DBKey {
             &Self::Actor(actor_id) => {
                 bytes.reserve(19);
                 bytes.extend(b"actorprefix");
-                bytes.extend(actor_id.to_bytes());
+                actor_id.extend_serialized(bytes);
                 return;
             }
             &Self::LevelChunkMetaDataDictionary => {
