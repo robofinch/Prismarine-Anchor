@@ -405,6 +405,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-mc-datatypes"
+version = "0.1.0"
+
+[[package]]
 name = "prismarine-anchor-nbt"
 version = "0.1.0"
 dependencies = [

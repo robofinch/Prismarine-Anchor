@@ -1,15 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
-    "prismarine-anchor-editor",
-    "prismarine-anchor-leveldb-entries",
-    "prismarine-anchor-leveldb-values",
-    "prismarine-anchor-macros",
-    "prismarine-anchor-nbt",
-    "prismarine-anchor-translation",
-    "prismarine-anchor-translators",
-    "prismarine-anchor-util",
-    "prismarine-anchor-world",
+    "crates/bedrock/leveldb-entries",
+    "crates/bedrock/leveldb-values",
+
+    "crates/cross-platform/mc-datatypes",
+
+    "crates/editor/editor",
+
+    "crates/foundation/nbt",
+    "crates/foundation/util",
+
+    "crates/unstable/macros",
+    "crates/unstable/translation",
+    "crates/unstable/translators",
+    "crates/unstable/world",
 ]
 
 [workspace.package]
@@ -49,15 +54,20 @@ opt-level = 1                # Make debug builds run faster
 opt-level = 2
 
 [workspace.dependencies]
-prismarine-anchor-editor          = { version = "0.1.0", path = "./prismarine-anchor-editor"          }
-prismarine-anchor-leveldb-entries = { version = "0.1.0", path = "./prismarine-anchor-leveldb-entries" }
-prismarine-anchor-leveldb-values  = { version = "0.1.0", path = "./prismarine-anchor-leveldb-values"  }
-prismarine-anchor-macros          = { version = "0.1.0", path = "./prismarine-anchor-macros"          }
-prismarine-anchor-nbt             = { version = "0.1.0", path = "./prismarine-anchor-nbt"             }
-prismarine-anchor-translation     = { version = "0.1.0", path = "./prismarine-anchor-translation"     }
-prismarine-anchor-translators     = { version = "0.1.0", path = "./prismarine-anchor-translators"     }
-prismarine-anchor-util            = { version = "0.1.0", path = "./prismarine-anchor-util"            }
-prismarine-anchor-world           = { version = "0.1.0", path = "./prismarine-anchor-world"           }
+prismarine-anchor-leveldb-entries = { version = "0.1.0", path = "crates/bedrock/leveldb-entries"     }
+prismarine-anchor-leveldb-values  = { version = "0.1.0", path = "crates/bedrock/leveldb-values"      }
+
+prismarine-anchor-mc-datatypes    = { version = "0.1.0", path = "crates/cross-platform/mc-datatypes" }
+
+prismarine-anchor-editor          = { version = "0.1.0", path = "crates/editor/editor"               }
+
+prismarine-anchor-nbt             = { version = "0.1.0", path = "crates/foundation/nbt"              }
+prismarine-anchor-util            = { version = "0.1.0", path = "crates/foundation/util"             }
+
+prismarine-anchor-macros          = { version = "0.1.0", path = "crates/unstable/macros"             }
+prismarine-anchor-translation     = { version = "0.1.0", path = "crates/unstable/translation"        }
+prismarine-anchor-translators     = { version = "0.1.0", path = "crates/unstable/translators"        }
+prismarine-anchor-world           = { version = "0.1.0", path = "crates/unstable/world"              }
 
 # TODO: bisect the earliest version of tolnay's crates that work here
 anyhow              = "1"

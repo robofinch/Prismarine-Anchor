@@ -1,0 +1,15 @@
+[package]
+name = "prismarine-anchor-util"
+authors = ["Finley Huggins"]
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+
+[features]
+print_debug = []

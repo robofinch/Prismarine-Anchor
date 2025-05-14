@@ -1,0 +1,524 @@
+#![allow(unused_imports)]
+#![allow(clippy::all)]
+
+// This is used for testing, at least for now. It's very hacky, but so be it.
+
+use std::ops::RangeInclusive;
+use std::{mem::size_of, path::Path};
+use std::io::{Cursor, Read};
+
+use prismarine_anchor_leveldb_values::aabb_volumes::AabbVolumes;
+use prismarine_anchor_leveldb_values::metadata::LevelChunkMetaDataDictionary;
+use prismarine_anchor_leveldb_values::palettized_storage::PalettizedStorage;
+use prismarine_anchor_leveldb_values::subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9};
+use prismarine_anchor_nbt::io::{read_compound, write_compound};
+use prismarine_anchor_nbt::{NbtList, NbtTag};
+use rusty_leveldb::LdbIterator;
+#[cfg(not(target_arch = "wasm32"))]
+use rusty_leveldb::PosixDiskEnv;
+use subslice_to_array::SubsliceToArray as _;
+
+use prismarine_anchor_leveldb_entries::{
+    DBEntry, DBKey, EntryToBytesOptions, KeyToBytesOptions
+};
+use prismarine_anchor_leveldb_values::chunk_position::DimensionedChunkPos;
+use prismarine_anchor_nbt::snbt::VerifiedSnbt;
+use prismarine_anchor_nbt::settings::{
+    EnabledEscapeSequences, Endianness, IoOptions, NbtCompression, SnbtParseOptions, SnbtWriteOptions
+};
+use prismarine_anchor_translation::datatypes::{NumericVersion, VersionName};
+use prismarine_anchor_world::bedrock::BedrockWorldFiles;
+
+
+
+fn main() -> anyhow::Result<()> {
+    println!("Hello, world!");
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut args = std::env::args().skip(1);
+        while let Some(path) = args.next() {
+
+            println!("Opening world: {path}");
+
+            let Ok(mut world) = BedrockWorldFiles::open_world_from_path(
+                Box::new(PosixDiskEnv::new()),
+                &Path::new(&path),
+            ).inspect_err(|err| println!("{err}")) else {
+                continue;
+            };
+            // LMAO, i forgot that super old worlds don't have icons at all
+            // assert!(world.world_icon().is_ok());
+
+            fn nbtlist_to_version(version: &NbtList) -> NumericVersion {
+                NumericVersion(
+                    version.get(0).unwrap_or(0i32) as u32,
+                    version.get(1).unwrap_or(0i32) as u32,
+                    version.get(2).unwrap_or(0i32) as u32,
+                    version.get(3).unwrap_or(0i32) as u32,
+                    version.get(4).unwrap_or(0i32) as u32,
+                )
+            }
+
+            let empty = NbtList::new();
+
+            let version: &NbtList = world.level_dat().nbt.get("lastOpenedWithVersion")
+                // .expect("No game version in level.dat");
+                .unwrap_or(&empty);
+
+            let version = nbtlist_to_version(version);
+
+            let opts = EntryToBytesOptions::for_version(version);
+
+            println!("Last opened with: {version}");
+
+            let dictionary = world.get(
+                DBKey::LevelChunkMetaDataDictionary,
+                opts.into(),
+            );
+
+            let _dictionary = dictionary.and_then(|dict| {
+                if let DBEntry::LevelChunkMetaDataDictionary(dict) = dict {
+                    Some(dict)
+                } else {
+                    None
+                }
+            });
+
+            let mut iter = world.level_db().new_iter().unwrap();
+            let mut key = Vec::new();
+            let mut value = Vec::new();
+            while iter.advance() {
+                iter.current(&mut key, &mut value);
+
+                let key = DBKey::parse_key(&key);
+
+                // match &key {
+                //     DBKey::BorderBlocks(_) => {
+                //         // print_raw("BorderBlocks", &entry);
+                //         println!("BorderBlocks: {value:?}");
+                //     }
+                //     DBKey::ConversionData(_) => {
+                //         // print_raw("ConversionData", &entry);
+                //         println!("ConversionData: {value:?}");
+                //     }
+                //     DBKey::GenerationSeed(_) => {
+                //         // print_raw("GenerationSeed", &entry);
+                //         println!("GenerationSeed: {value:?}");
+                //     }
+                //     DBKey::RawKey(key) => {
+                //         println!("Raw Key! : {key:?}");
+                //         print_debug(key);
+                //     }
+                //     _ => continue,
+                // }
+
+                match key {
+                    // DBKey::ActorDigest(_) => {
+                    //     let entry = DBEntry::parse_value(key, &value);
+                    //     // print_raw("ActorDigest", &entry);
+                    //     println!("ActorDigest: {entry:?}");
+                    //     continue;
+                    // }
+                    // _ => continue,
+                    DBKey::Data3D(_) => continue,
+                    DBKey::SubchunkBlocks(_, _) => continue,
+                    _ => {},
+                }
+
+                let entry = DBEntry::parse_value(key, &value);
+                // if let DBEntry::RawValue { key, value } = entry {
+                //     // panic!("Invalid value for {key:?}: {:?}", value.into_iter().take(20).collect::<Vec<_>>())
+                //     panic!("Invalid value for {key:?}: {:?}", value)
+                // }
+
+                // let (round_trip_key, round_trip_value) = entry.to_bytes(opts).unwrap();
+
+                // if round_trip_key != key {
+                //     println!("unequal keys for key {key:?}, entry {entry:?}");
+                // }
+
+                // if round_trip_value != value {
+                //     println!("unequal values for value {value:?}, entry {entry:?}");
+                // }
+
+                let key = entry.to_key();
+
+                fn print_raw(name: &'static str, entry: &DBEntry) {
+                    if let DBEntry::RawValue { .. } = entry {
+                        println!("Could not parse {name}: {entry:?}");
+                    }
+                }
+
+                macro_rules! check_parsed {
+                    ($name:expr, $entry: expr, $variant:ident) => {
+                        if let DBEntry::$variant{..} = $entry {
+                            println!("{} parsed", $name);
+                        } else {
+                            println!("{} couldn't be parsed", $name);
+                        }
+                    };
+                }
+
+                match key {
+                    DBKey::BorderBlocks(_) => {
+                        // print_raw("BorderBlocks", &entry);
+                        println!("BorderBlocks: {entry:?}");
+                    }
+                    DBKey::ConversionData(_) => {
+                        // print_raw("ConversionData", &entry);
+                        println!("ConversionData: {entry:?}");
+                    }
+                    DBKey::GenerationSeed(_) => {
+                        // print_raw("GenerationSeed", &entry);
+                        println!("GenerationSeed: {entry:?}");
+                    }
+                    DBKey::LegacyExtraBlockData(_) => {
+
+                    }
+                    DBKey::LegacyTerrain(_) => {
+
+                    }
+
+
+                    DBKey::RawKey(key) => {
+                        println!("Raw Key! : {key:?}");
+                        print_debug(&key);
+                    }
+
+
+                    DBKey::Version{..} => {
+                        print_raw("Version", &entry);
+                    }
+                    DBKey::LegacyVersion{..} => {
+                        print_raw("LegacyVersion", &entry);
+                    }
+                    DBKey::ActorDigestVersion{..} => {
+                        print_raw("ActorDigestVersion", &entry);
+                    }
+                    DBKey::Data3D{..} => {
+                        print_raw("Data3D", &entry);
+                    }
+                    DBKey::Data2D{..} => {
+                        print_raw("Data2D", &entry);
+                    }
+                    DBKey::LegacyData2D{..} => {
+                        print_raw("LegacyData2D", &entry);
+                    }
+                    DBKey::SubchunkBlocks{..} => {
+                        print_raw("SubchunkBlocks", &entry);
+                    }
+                    DBKey::BlockEntities{..} => {
+                        print_raw("BlockEntities", &entry);
+                    }
+                    DBKey::Entities{..} => {
+                        print_raw("Entities", &entry);
+                        // check_parsed!("Entities", &entry, Entities);
+                    }
+                    DBKey::PendingTicks{..} => {
+                        print_raw("PendingTicks", &entry);
+                    }
+                    DBKey::RandomTicks{..} => {
+                        print_raw("RandomTicks", &entry);
+                    }
+                    DBKey::HardcodedSpawners(_) => {
+                        print_raw("HardcodedSpawners", &entry);
+                        // println!("HardcodedSpawners: {entry:?}");
+                    }
+                    DBKey::AabbVolumes(_) => {
+                        print_raw("AabbVolumes", &entry);
+                        // check_parsed!("AabbVolumes", &entry, AabbVolumes);
+                    }
+                    DBKey::Checksums(_) => {
+                        print_raw("Checksums", &entry);
+                        // println!("Checksums: {entry:?}");
+                    }
+                    DBKey::MetaDataHash{..} => {
+                        print_raw("MetaDataHash", &entry);
+                    }
+                    DBKey::FinalizedState{..} => {
+                        print_raw("FinalizedState", &entry);
+                    }
+                    DBKey::BiomeState{..} => {
+                        print_raw("BiomeState", &entry);
+                        // check_parsed!("BiomeState", &entry, BiomeState);
+                    }
+                    DBKey::CavesAndCliffsBlending{..} => {
+                        print_raw("CavesAndCliffsBlending", &entry);
+                    }
+                    DBKey::BlendingBiomeHeight{..} => {
+                        print_raw("BlendingBiomeHeight", &entry);
+                    }
+                    DBKey::BlendingData{..} => {
+                        print_raw("BlendingData", &entry);
+                    }
+                    DBKey::ActorDigest(_) => {
+                        print_raw("ActorDigest", &entry);
+                        // println!("ActorDigest: {entry:?}");
+                    }
+                    DBKey::Actor(_) => {
+                        print_raw("Actor", &entry);
+                        // println!("Actor info: {entry:?}");
+                    }
+                    DBKey::LevelChunkMetaDataDictionary => {
+                        print_raw("LevelChunkMetaDataDictionary", &entry);
+                    }
+                    DBKey::AutonomousEntities => {
+                        // print_raw("AutonomousEntities", &entry);
+                        println!("AutonomousEntities: {entry:?}")
+                    }
+                    DBKey::LocalPlayer => {
+                        // print_raw("LocalPlayer", &entry);
+                        check_parsed!("LocalPlayer", &entry, LocalPlayer);
+                    }
+                    DBKey::Player{..} => {
+                        // print_raw("Player", &entry);
+                        check_parsed!("Player", &entry, Player);
+                    }
+                    DBKey::LegacyPlayer{..} => {
+                        // print_raw("LegacyPlayer", &entry);
+                        check_parsed!("LegacyPlayer", &entry, LegacyPlayer);
+                    }
+                    DBKey::PlayerServer{..} => {
+                        // print_raw("PlayerServer", &entry);
+                        check_parsed!("PlayerServer", &entry, PlayerServer);
+                    }
+                    DBKey::VillageDwellers{..}=> {
+                        print_raw("VillageDwellers", &entry);
+                        // println!("VillageDwellers: {entry:?}");
+                    }
+                    DBKey::VillageInfo{..} => {
+                        print_raw("VillageInfo", &entry);
+                        // println!("VillageInfo: {entry:?}");
+                    }
+                    DBKey::VillagePOI{..} => {
+                        print_raw("VillagePOI", &entry);
+                        // println!("VillagePOI: {entry:?}");
+                    }
+                    DBKey::VillagePlayers{..} => {
+                        print_raw("VillagePlayers", &entry);
+                        // println!("VillagePlayers: {entry:?}");
+                    }
+                    DBKey::Map{..} => {
+                        print_raw("Map", &entry);
+                        // println!("Map: {entry:?}");
+                        // check_parsed!("Map", &entry, Map);
+                    }
+                    DBKey::Portals => {
+                        print_raw("Portals", &entry);
+                        // println!("Portals: {entry:?}");
+                    }
+                    DBKey::StructureTemplate(..) => {
+                        print_raw("StructureTemplate", &entry);
+                        // println!("StructureTemplate: {entry:?}");
+                        // check_parsed!("StructureTemplate", &entry, StructureTemplate);
+                    }
+                    DBKey::TickingArea(..) => {
+                        // print_raw("TickingArea", &entry);
+                        println!("TickingArea: {entry:?}");
+                    }
+                    DBKey::Scoreboard => {
+                        print_raw("Scoreboard", &entry);
+                        // println!("Scoreboard: {entry:?}");
+                    }
+                    DBKey::WanderingTraderScheduler => {
+                        // print_raw("WanderingTraderScheduler", &entry);
+                        println!("WanderingTraderScheduler: {entry:?}");
+                    }
+                    DBKey::BiomeData => {
+                        print_raw("BiomeData", &entry);
+                        // println!("BiomeData: {entry:?}");
+                    }
+                    DBKey::MobEvents => {
+                        print_raw("MobEvents", &entry);
+                        // println!("MobEvents: {entry:?}");
+                    }
+                    DBKey::Overworld => {
+                        print_raw("Overworld", &entry);
+                        // println!("Overworld: {entry:?}");
+                    }
+                    DBKey::Nether => {
+                        print_raw("Nether", &entry);
+                        // println!("Nether: {entry:?}");
+                    }
+                    DBKey::TheEnd => {
+                        print_raw("TheEnd", &entry);
+                        // println!("TheEnd: {entry:?}");
+                    }
+                    DBKey::PositionTrackingDB{..} => {
+                        // print_raw("PositionTrackingDB", &entry);
+                        println!("PositionTrackingDB: {entry:?}");
+                    }
+                    DBKey::PositionTrackingLastId => {
+                        // print_raw("PositionTrackingLastId", &entry);
+                        println!("PositionTrackingLastId: {entry:?}");
+                    }
+                    DBKey::FlatWorldLayers => {
+                        // print_raw("FlatWorldLayers", &entry);
+                        println!("FlatWorldLayers: {entry:?}");
+                    }
+                    DBKey::LevelSpawnWasFixed => {
+                        // print_raw("LevelSpawnWasFixed", &entry);
+                        println!("LevelSpawnWasFixed: {entry:?}");
+                    }
+                    DBKey::MVillages => {
+                        // print_raw("MVillages", &entry);
+                        println!("MVillages: {entry:?}");
+                    }
+                    DBKey::Villages => {
+                        // print_raw("Villages", &entry);
+                        // println!("Villages: {entry:?}");
+                        check_parsed!("Villages", &entry, Villages);
+                    }
+                    DBKey::Dimension0 => {
+                        print_raw("Dimension0", &entry);
+                        // println!("Dimension0: {entry:?}");
+                    }
+                    DBKey::Dimension1 => {
+                        print_raw("Dimension1", &entry);
+                        // println!("Dimension1: {entry:?}");
+                    }
+                    DBKey::Dimension2 => {
+                        print_raw("Dimension2", &entry);
+                        // println!("Dimension2: {entry:?}");
+                    }
+
+                }
+
+                #[allow(dead_code)]
+                fn chunk_pos_to_version(
+                    chunk_pos: DimensionedChunkPos,
+                    world: &mut BedrockWorldFiles,
+                    opts: KeyToBytesOptions,
+                    dict: &LevelChunkMetaDataDictionary,
+                ) -> Option<(Option<String>, Option<String>)> {
+                    let Some(metadata_hash) = world.get(DBKey::MetaDataHash(chunk_pos), opts) else {
+                        println!("Chunks with no hash?? pos: {chunk_pos:?}");
+                        return None;
+                    };
+
+                    let DBEntry::MetaDataHash(_, metadata_hash) = metadata_hash else {
+                        return None;
+                    };
+
+                    let Some(metadata) = dict.get(metadata_hash) else {
+                        println!("Metadata not in dictionary?? pos: {chunk_pos:?}, hash: {metadata_hash}");
+                        return None;
+                    };
+
+                    Some((
+                        metadata.original_base_game_version.clone(),
+                        metadata.last_saved_base_game_version.clone(),
+                    ))
+                }
+
+
+                // if let DBEntry::Version(chunk_pos, version) = entry {
+                //     print!("Chunk version: {}", u8::from(version));
+                //     if let Some(dict) = &dictionary {
+                //         println!(", (Original, last opened): {:?}", chunk_pos_to_version(chunk_pos, &mut world, opts.into(), dict));
+                //     } else {
+                //         println!("")
+                //     }
+                // }
+
+                // if let DBEntry::LegacyVersion(chunk_pos, version) = entry {
+                //     print!("Legacy chunk version: {}", u8::from(version));
+                //     if let Some(dict) = &dictionary {
+                //         println!(", (Original, last opened): {:?}", chunk_pos_to_version(chunk_pos, &mut world, opts.into(), dict));
+                //     } else {
+                //         println!("")
+                //     }
+                // }
+
+                // if let BedrockLevelDBKey::LevelChunkMetaDataDictionary = &parsed_key {
+
+                //     println!("{:?}", entry);
+
+                //     let value = world.level_db()
+                //         .get(&parsed_key.clone().to_bytes(key_opts));
+
+                //     if let Some(value) = value {
+                //         let mut value = Cursor::new(value);
+                //         let mut buf = [0; 4];
+                //         value.read_exact(&mut buf).unwrap();
+
+                //         loop {
+                //             let mut buf: [u8; 8] = [0; 8];
+                //             let Ok(()) = value.read_exact(&mut buf) else {
+                //                 break;
+                //             };
+
+                //             let Ok((nbt, ..)) = read_compound(&mut value, IoOptions::bedrock_uncompressed()) else {
+                //                 break;
+                //             };
+
+                //             let mut writer = Cursor::new(Vec::new());
+                //             write_compound(
+                //                 &mut writer,
+                //                 IoOptions {
+                //                     endianness: Endianness::NetworkLittleEndian,
+                //                     ..IoOptions::bedrock_uncompressed()
+                //                 },
+                //                 None,
+                //                 &nbt,
+                //             ).unwrap();
+
+                //             assert_eq!(buf, xxhash_rust::xxh64::xxh64(&writer.into_inner(), 0).to_le_bytes());
+                //         }
+                //     }
+                // }
+
+
+
+            }
+
+        }
+    }
+
+    Ok(())
+}
+
+
+
+/// For use during development. Instead of printing binary data as entirely binary,
+/// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
+/// with binary data interspersed.
+///
+/// For example:
+/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
+fn print_debug(value: &[u8]) {
+    #![allow(dead_code)]
+    #![allow(clippy::all)]
+    // Apparently this wasn't covered.
+    #![expect(clippy::cast_lossless)]
+
+    let mut nums = value.iter().peekable();
+
+    while nums.peek().is_some() {
+        while let Some(&&num) = nums.peek() {
+            if let Some(ch) = char::from_u32(num as u32) {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
+                    nums.next();
+                    print!("{ch}");
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        print!("[");
+        while let Some(&&num) = nums.peek() {
+            if let Some(ch) = char::from_u32(num as u32) {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
+                    break;
+                }
+            }
+            nums.next();
+            print!("{num},");
+        }
+        print!("]");
+    }
+    println!();
+}

@@ -1,5 +1,5 @@
 [package]
-name = "prismarine-anchor-util"
+name = "prismarine-anchor-mc-datatypes"
 authors = ["Finley Huggins"]
 license.workspace = true
 version.workspace = true

@@ -3,6 +3,19 @@ In-progress reimplementation of [Amulet Editor](https://www.amuletmc.com/) in Ru
 (Will likely end up very different, though, as perfectly matching Amulet is not a priority,
 and code isn't copied from Amulet.)
 
+### Repository organization
+
+* Crate names have `prismarine-anchor-` prefixes, but their folders elide that prefix.
+* The crates in `crates/editor` are (or will be) related to the final application.
+* The crates in `crates/foundation` do not rely on anything else in the Prismarine Anchor project,
+  and may be useful for other people/projects.
+* The crates in `crates/bedrock` are specific to Bedrock Edition.
+* The crates the crates in `crates/cross-platform` are not specific to any version of Minecraft.
+* The crates in the `crates/unstable` folder can be more or less ignored.
+
+Also, the current `prismarine-anchor-editor` binary produced is solely for development
+and testing.
+
 ### Licensing
 
 Notable dependencies and inspirations include Amulet Editor, which is not open-source,

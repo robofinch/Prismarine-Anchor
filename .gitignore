@@ -11,3 +11,6 @@ target_wasm
 
 # Editor settings
 .vscode
+
+# Used during development
+crates/editor/editor/notes
