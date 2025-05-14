@@ -3,7 +3,8 @@
 use bijective_enum_map::injective_enum_map;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub enum BiomeState {
     /// Note that this should be limited to `u8::MAX` (255) entries.
     OneByteBiomes(OneByteBiomeStates),
@@ -112,9 +113,12 @@ impl BiomeState {
 // but the order of real game data is inconsistent, and have very, very few values.
 // This makes things easier for testing to be able to round-trip,
 // and is probably more performant, too.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct OneByteBiomeStates(Vec<(u8, u8)>);
-#[derive(Debug, Clone, PartialEq, Eq)]
+
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct TwoByteBiomeStates(Vec<(u16, u8)>);
 
 macro_rules! impl_n_byte_biome_states {

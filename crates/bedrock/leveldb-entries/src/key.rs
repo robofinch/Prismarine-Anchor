@@ -1,15 +1,17 @@
 use std::str;
 
-use prismarine_anchor_leveldb_values::OverworldElision;
 use subslice_to_array::SubsliceToArray as _;
 
 use prismarine_anchor_leveldb_values::{
     actor_id::ActorID,
-    chunk_position::DimensionedChunkPos,
+    dimensioned_chunk_pos::DimensionedChunkPos,
     uuid::UUID,
 };
-use prismarine_anchor_leveldb_values::dimensions::{NamedDimension, VanillaDimension};
-use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
+use prismarine_anchor_mc_datatypes::{
+    dimensions::{NamedDimension, OverworldElision, VanillaDimension},
+    identifier::{IdentifierParseOptions, NamespacedIdentifier},
+};
+
 
 use super::KeyToBytesOptions;
 
@@ -21,7 +23,8 @@ use super::KeyToBytesOptions;
 /// [minecraft.wiki]: https://minecraft.wiki/w/Bedrock_Edition_level_format#Chunk_key_format
 // TODO: are "since 1.18.0" and "since 1.0.0" the precise versions that something changed?
 // TODO: improve documentation
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub enum DBKey {
     // ================================
     //  Chunk-specific data

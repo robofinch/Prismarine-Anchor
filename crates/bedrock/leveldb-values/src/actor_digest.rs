@@ -3,7 +3,8 @@ use subslice_to_array::SubsliceToArray as _;
 use crate::actor_id::ActorID;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct ActorDigest(pub Vec<ActorID>);
 
 impl ActorDigest {

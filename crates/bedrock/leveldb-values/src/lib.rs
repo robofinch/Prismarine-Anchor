@@ -1,12 +1,10 @@
 // Special cases / used for keys as well
-#[cfg(feature = "dimensions")]
-pub mod dimensions;
-#[cfg(feature = "chunk_position")]
-pub mod chunk_position;
-#[cfg(feature = "uuid")]
-pub mod uuid;
+#[cfg(feature = "dimensioned_chunk_pos")]
+pub mod dimensioned_chunk_pos;
 #[cfg(feature = "actor_id")]
 pub mod actor_id;
+#[cfg(feature = "uuid")]
+pub mod uuid;
 
 // Helpers
 #[cfg(feature = "block_volume")]
@@ -60,12 +58,33 @@ pub mod flat_world_layers;
 pub mod level_spawn_was_fixed;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// Throughout this crate, pretend we're implementing something like the following trait:
+/*
+trait DBValue {
+    // Could be `u8`, `[u8; N]`, or `&[u8]`; may or may not accept `opts`
+    fn parse(value: &[u8], opts: ValueParseOptions) -> Option<Self>;
+
+    // Could allow for either `self.to_bytes(opts)` or `self.to_bytes(opts)?`,
+    // or `self.to_le_bytes().to_vec()` or `vec![u8::from(self)]`.
+    // So, this is optional, and could be `-> Vec<u8>` instead of `-> Result<Vec<u8>, E>`.
+    // (Any nontrivial value should implement the below.)
+    // Requiring `opts` is optional. Usually, to_bytes is implemented using extend_serialized.
+    type E;
+    fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), E>;
+    fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, E>;
+}
+*/
+// There are some exceptions where reasonable.
+
+
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct ValueParseOptions {
     pub data_fidelity: DataFidelity,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct ValueToBytesOptions {
     pub data_fidelity:           DataFidelity,
     pub handle_excessive_length: HandleExcessiveLength,
@@ -76,7 +95,8 @@ pub struct ValueToBytesOptions {
 ///
 /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
 /// for `BitPerfect` to fully function.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum DataFidelity {
     /// Preserve all data, including semantically unimportant data like padding bits, and preserves
     /// the order of all entries in likely-unordered key-value maps.
@@ -87,6 +107,7 @@ pub enum DataFidelity {
     ///
     /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
     /// for this option to fully function.
+    // TODO: implement this for NBT *names*, and actually sort AabbVolumes
     BitPerfect,
     /// Preserve all semantically important data. Currently, padding bits in `PalettizedStorage`
     /// (when read/written from/to the packed index representation) and the order of entries
@@ -111,7 +132,8 @@ pub enum DataFidelity {
 /// layers).
 ///
 /// It should probably be set to `ReturnError` unless you have cause to write weirdly massive data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum HandleExcessiveLength {
     ReturnError,
     SilentlyTruncate,
@@ -159,97 +181,4 @@ impl HandleExcessiveLength {
 
         Some((len, usize::from(len)))
     }
-}
-
-/// Some versions of Bedrock elide the numeric ID or name of the Overworld,
-/// and only serialize the IDs or names of non-Overworld dimensions.
-///
-/// Dimension IDs and names are read as `Option<NumericDimension>` or `Option<NamedDimension>`,
-/// with `None` indicating an implicit Overworld value.
-///
-/// These options indicate how a `Option<NumericDimension>` or `Option<NamedDimension>`
-/// should be serialized: either
-/// - never elide the value and always write it,
-/// - always elide the Overworld value and only write the ID or name of a non-Overworld
-///   dimension, or
-/// - elide the Overworld value if the option is `None`.
-///
-/// The best choices (aside from testing, where `MatchElision` may be useful) are
-/// - numeric dimension IDs for all current versions (up to at least 1.21.51): `AlwaysElide`
-/// - dimension names for any version below 1.20.40: `AlwaysElide`
-/// - dimension names for any version at or above 1.20.40: `AlwaysWrite`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OverworldElision {
-    /// Write the IDs and names of all dimensions.
-    AlwaysWrite,
-    /// Always write the ID or name of the Overworld, and only write the IDs and names of all
-    /// non-Overworld dimensions.
-    AlwaysElide,
-    /// Elide the ID or name of the Overworld if and only if a `Option<NumericDimension>`
-    /// or `Option<NamedDimension>` is `None`. The IDs and names of all non-Overworld dimensions
-    /// are always written.
-    MatchElision,
-}
-
-// Note that the `dimensions` module implements two functions for `OverworldElision`.
-
-
-// Throughout this crate, pretend we're implementing something like the following trait:
-/*
-trait DBValue {
-    // Could be `u8`, `[u8; N]`, or `&[u8]`; may or may not accept `opts`
-    fn parse(value: &[u8], opts: ValueParseOptions) -> Option<Self>;
-
-    // Could allow for either `self.to_bytes(opts)` or `self.to_bytes(opts)?`,
-    // or `self.to_le_bytes().to_vec()` or `vec![u8::from(self)]`.
-    // So, this is optional, and could be `-> Vec<u8>` instead of `-> Result<Vec<u8>, E>`.
-    // (Any nontrivial value should implement this.)
-    // Requiring `opts` is optional.
-    type E;
-    fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, E>;
-}
-*/
-// There are some exceptions (see the the special-case and helper modules at the top)
-
-
-/// For use during development. Instead of printing binary data as entirely binary,
-/// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
-/// with binary data interspersed.
-///
-/// For example:
-/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
-fn print_debug(value: &[u8]) {
-    #![allow(dead_code)]
-    #![allow(clippy::all)]
-    // Apparently this wasn't covered.
-    #![expect(clippy::cast_lossless)]
-
-    let mut nums = value.iter().peekable();
-
-    while nums.peek().is_some() {
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    nums.next();
-                    print!("{ch}");
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        print!("[");
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    break;
-                }
-            }
-            nums.next();
-            print!("{num},");
-        }
-        print!("]");
-    }
-    println!();
 }

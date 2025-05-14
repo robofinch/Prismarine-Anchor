@@ -18,7 +18,8 @@ pub enum PalettizedStorage<T> {
     Palettized(PalettizedSubchunk<T>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct PaletteHeader {
     pub palette_type:   PaletteType,
     pub bits_per_index: HeaderBitsPerIndex,
@@ -34,7 +35,8 @@ pub struct PalettizedSubchunk<T> {
 /// Either the (nonzero) number of bits per index into a palette,
 /// or a special case for when the subchunk is uniformly a single value
 /// or is empty.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum HeaderBitsPerIndex {
     Empty,
     Uniform,
@@ -42,7 +44,8 @@ pub enum HeaderBitsPerIndex {
 }
 
 /// The (nonzero) number of bits per index into a palette.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum PaletteBitsPerIndex {
     One,
     Two,
@@ -59,7 +62,8 @@ pub enum PaletteBitsPerIndex {
 
 /// In practice, `Data3D` data uses only `Runtime`, and `SubchunkBlocks` data uses
 /// `Persistent`. There could be exceptions, but they should be rare.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum PaletteType {
     Persistent,
     Runtime,

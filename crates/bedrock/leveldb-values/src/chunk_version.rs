@@ -1,8 +1,10 @@
 use bijective_enum_map::injective_enum_map;
-use prismarine_anchor_translation::datatypes::NumericVersion;
+
+use prismarine_anchor_mc_datatypes::version::NumericVersion;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(Hash))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChunkVersion {
     V0,  V1,  V2,  V3,  V4,  V5,  V6,  V7,  V8,  V9,
     V10, V11, V12, V13, V14, V15, V16, V17, V18, V19,
@@ -209,6 +211,8 @@ impl ChunkVersion {
     }
 
     // TODO: metadata about what each version *means*
+    // TODO: my world saves have versions that usually have four nonzero components.....
+    // not sure if that will actually matter, but perhaps I should track the full detail
 }
 
 injective_enum_map! {

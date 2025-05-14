@@ -3,12 +3,13 @@ use std::io::{Cursor, Read};
 use subslice_to_array::SubsliceToArray as _;
 use vecmap::VecMap;
 
-use prismarine_anchor_translation::datatypes::{IdentifierParseOptions, NamespacedIdentifier};
+use prismarine_anchor_mc_datatypes::identifier::{IdentifierParseOptions, NamespacedIdentifier};
 use prismarine_anchor_util::u64_equals_usize;
 
 use crate::{block_volume::BlockVolume, ValueToBytesOptions};
 
 
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq))]
 #[derive(Debug, Clone)]
 pub enum AabbVolumes {
     /// First used in 1.21.20 (or, some preview of 1.21.20)
@@ -50,6 +51,7 @@ impl AabbVolumes {
 }
 
 // TODO: make a more strictly-typed version of this
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq))]
 #[derive(Debug, Clone)]
 pub struct AabbVolumesV1 {
     /// Map with `structure_id` keys (the IDs are used in `DynamicSpawnArea` and `StaticSpawnArea`)

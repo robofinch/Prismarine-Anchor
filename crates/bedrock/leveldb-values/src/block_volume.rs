@@ -1,7 +1,8 @@
 use std::num::NonZeroU32;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct BlockVolume {
     pub low_x:   i32,
     pub low_y:   i32,

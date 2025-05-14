@@ -3,7 +3,8 @@
 use std::array;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum BlendingData {
     Zero,
     Version {

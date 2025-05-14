@@ -4,7 +4,8 @@ use subslice_to_array::SubsliceToArray as _;
 use crate::{block_volume::BlockVolume, ValueToBytesOptions};
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct HardcodedSpawners(pub Vec<(BlockVolume, HardcodedSpawnerType)>);
 
 impl HardcodedSpawners {
@@ -83,7 +84,8 @@ impl HardcodedSpawners {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum HardcodedSpawnerType {
     NetherFortress,
     WitchHut,
@@ -103,6 +105,7 @@ injective_enum_map! {
     NewerLegacyVillageCat <=> 6,
 }
 
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
 #[derive(Debug, Clone, Copy)]
 pub enum SpawnersToBytesError {
     ExcessiveLength,

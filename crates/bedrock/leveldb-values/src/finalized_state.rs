@@ -3,7 +3,8 @@ use subslice_to_array::SubsliceToArray as _;
 
 
 // Based on rbedrock
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum FinalizedState {
     NeedsInstaticking,
     NeedsPopulation,

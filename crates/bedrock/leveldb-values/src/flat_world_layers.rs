@@ -5,7 +5,8 @@ use prismarine_anchor_util::InspectNone as _;
 ///
 /// For example, bedrock is ID `7`, dirt is `3`, and grass is `2`; the default flat world is then
 /// `[7,3,3,2]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct FlatWorldLayers(pub Vec<u32>);
 
 impl FlatWorldLayers {

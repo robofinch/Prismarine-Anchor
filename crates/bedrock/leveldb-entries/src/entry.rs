@@ -6,12 +6,11 @@ use prismarine_anchor_leveldb_values::{
     biome_state::BiomeState,
     blending_data::BlendingData,
     checksums::Checksums,
-    chunk_position::DimensionedChunkPos,
+    dimensioned_chunk_pos::DimensionedChunkPos,
     chunk_version::ChunkVersion,
     concatenated_nbt_compounds::ConcatenatedNbtCompounds,
     data_2d::Data2D,
     data_3d::Data3D,
-    dimensions::NamedDimension,
     finalized_state::FinalizedState,
     flat_world_layers::FlatWorldLayers,
     hardcoded_spawners::HardcodedSpawners,
@@ -22,8 +21,8 @@ use prismarine_anchor_leveldb_values::{
     subchunk_blocks::SubchunkBlocks,
     uuid::UUID,
 };
+use prismarine_anchor_mc_datatypes::{dimensions::NamedDimension, identifier::NamespacedIdentifier};
 use prismarine_anchor_nbt::NbtCompound;
-use prismarine_anchor_translation::datatypes::NamespacedIdentifier;
 
 // Crazy luck with the alignment
 use crate::{
@@ -66,7 +65,6 @@ pub enum DBEntry {
     PendingTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
     RandomTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
 
-    // TODO: learn what the format of BorderBlocks data is.
     // BorderBlocks(DimensionedChunkPos),
     /// No longer used
     HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),

@@ -1,21 +1,11 @@
 use subslice_to_array::SubsliceToArray as _;
 
-use crate::{dimensions::NumericDimension, OverworldElision};
-
-
-/// The location of a chunk in a dimension of a world.
-///
-/// Note that this is not the block position;
-/// multiply this position by 16 to find the positions of its blocks. For example
-/// `ChunkPosition { x: 1, z: 2 }` refers to the chunk from `(16, 32)` to `(31, 47)`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ChunkPosition {
-    pub x: i32,
-    pub z: i32,
-}
+use prismarine_anchor_mc_datatypes::positions::ChunkPosition;
+use prismarine_anchor_mc_datatypes::dimensions::{NumericDimension, OverworldElision};
 
 /// The location of a chunk in a world, including its dimension.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct DimensionedChunkPos(pub ChunkPosition, pub Option<NumericDimension>);
 
 impl DimensionedChunkPos {

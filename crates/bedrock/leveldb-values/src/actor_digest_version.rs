@@ -1,9 +1,10 @@
 use bijective_enum_map::injective_enum_map;
 
-use prismarine_anchor_translation::datatypes::NumericVersion;
+use prismarine_anchor_mc_datatypes::version::NumericVersion;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum ActorDigestVersion {
     V1_18_30,
 }

@@ -11,12 +11,11 @@ use prismarine_anchor_leveldb_values::{
     HandleExcessiveLength,
     hardcoded_spawners::SpawnersToBytesError,
     metadata::MetaDictToBytesError,
-    OverworldElision,
     ValueParseOptions,
     ValueToBytesOptions,
 };
+use prismarine_anchor_mc_datatypes::{dimensions::OverworldElision, version::NumericVersion};
 use prismarine_anchor_nbt::io::NbtIoError;
-use prismarine_anchor_translation::datatypes::NumericVersion;
 
 
 pub use self::{entry::DBEntry, key::DBKey};
@@ -24,13 +23,15 @@ pub use self::{entry::DBEntry, key::DBKey};
 // Note in case the LevelDB part didn't make it obvious: this is for Minecraft Bedrock.
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct EntryBytes {
     pub key:   Vec<u8>,
     pub value: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct EntryParseOptions {
     /// The data fidelity of entry values; does not affect keys.
     pub value_fidelity: DataFidelity,
@@ -45,7 +46,8 @@ impl From<EntryParseOptions> for ValueParseOptions {
 }
 
 /// Settings for converting a `DBKey` into raw key bytes for use in a LevelDB.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct KeyToBytesOptions {
     pub write_overworld_id:   OverworldElision,
     pub write_overworld_name: OverworldElision,
@@ -78,7 +80,8 @@ impl KeyToBytesOptions {
 /// - `write_overworld_name = AlwaysWrite` for any version at or above 1.20.40.
 /// - `handle_excessive_length = ReturnError`, unless you have cause to write weirdly massive data.
 /// - `value_fidelity = DataFidelity::Semantic`, unless running tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct EntryToBytesOptions {
     pub write_overworld_id:      OverworldElision,
     pub write_overworld_name:    OverworldElision,
@@ -197,46 +200,4 @@ impl From<VolumesToBytesError> for ValueToBytesError {
 pub struct EntryToBytesError {
     pub key:         Vec<u8>,
     pub value_error: ValueToBytesError,
-}
-
-/// For use during development. Instead of printing binary data as entirely binary,
-/// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
-/// with binary data interspersed.
-///
-/// For example:
-/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
-fn print_debug(value: &[u8]) {
-    #![allow(dead_code)]
-    #![allow(clippy::all)]
-    // Apparently this wasn't covered.
-    #![expect(clippy::cast_lossless)]
-
-    let mut nums = value.iter().peekable();
-
-    while nums.peek().is_some() {
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    nums.next();
-                    print!("{ch}");
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        print!("[");
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    break;
-                }
-            }
-            nums.next();
-            print!("{num},");
-        }
-        print!("]");
-    }
-    println!();
 }

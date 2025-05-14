@@ -1,7 +1,11 @@
-use crate::OverworldElision;
+#[cfg(feature = "derive_serde")]
+use serde::{Deserialize, Serialize};
+
 
 /// A dimension of a Minecraft world, such as the Overworld.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub enum Dimension {
     Vanilla(VanillaDimension),
     CustomNumeric(CustomDimensionNumber),
@@ -35,7 +39,9 @@ impl Dimension {
 }
 
 /// A dimension of a Minecraft world with a numeric identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum NumericDimension {
     Vanilla(VanillaDimension),
     CustomNumeric(CustomDimensionNumber),
@@ -76,7 +82,9 @@ impl NumericDimension {
 }
 
 /// A dimension of a Minecraft world with a string name.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub enum NamedDimension {
     Vanilla(VanillaDimension),
     CustomNamed(CustomDimensionName),
@@ -133,7 +141,9 @@ impl NamedDimension {
 }
 
 /// One of Minecraft's three vanilla dimensions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum VanillaDimension {
     Overworld,
     Nether,
@@ -220,13 +230,49 @@ impl VanillaDimension {
 
 /// The numeric ID of a custom dimension; used in Bedrock's LevelDB keys, and can sometimes
 /// be important in Java.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct CustomDimensionNumber(pub i32);
 
 /// The name of a custom dimension; used as the ID for custom Java dimensions.
 // Box<str> because it shouldn't be changed much if ever.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone)]
 pub struct CustomDimensionName(pub Box<str>);
+
+/// Some versions of Bedrock elide the numeric ID or name of the Overworld,
+/// and only serialize the IDs or names of non-Overworld dimensions.
+///
+/// Dimension IDs and names are read as `Option<NumericDimension>` or `Option<NamedDimension>`,
+/// with `None` indicating an implicit Overworld value.
+///
+/// These options indicate how a `Option<NumericDimension>` or `Option<NamedDimension>`
+/// should be serialized: either
+/// - never elide the value and always write it,
+/// - always elide the Overworld value and only write the ID or name of a non-Overworld
+///   dimension, or
+/// - elide the Overworld value if the option is `None`.
+///
+/// The best choices (aside from testing, where `MatchElision` may be useful) are
+/// - numeric dimension IDs for all current versions (up to at least 1.21.51): `AlwaysElide`
+/// - dimension names for any version below 1.20.40: `AlwaysElide`
+/// - dimension names for any version at or above 1.20.40: `AlwaysWrite`
+#[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
+pub enum OverworldElision {
+    /// Write the IDs and names of all dimensions.
+    AlwaysWrite,
+    /// Always write the ID or name of the Overworld, and only write the IDs and names of all
+    /// non-Overworld dimensions.
+    AlwaysElide,
+    /// Elide the ID or name of the Overworld if and only if a `Option<NumericDimension>`
+    /// or `Option<NamedDimension>` is `None`. The IDs and names of all non-Overworld dimensions
+    /// are always written.
+    MatchElision,
+}
 
 impl OverworldElision {
     pub fn maybe_elide_id(
@@ -235,7 +281,8 @@ impl OverworldElision {
     ) -> Option<NumericDimension> {
         match self {
             Self::AlwaysElide => match dimension_id {
-                None | Some(NumericDimension::OVERWORLD) => None,
+                // Can't do `Some(NumericDimension::OVERWORLD)` in a pattern without `PartialEq`
+                None | Some(NumericDimension::Vanilla(VanillaDimension::Overworld)) => None,
                 Some(other_dimension) => Some(other_dimension),
             }
             Self::AlwaysWrite => {
@@ -251,7 +298,8 @@ impl OverworldElision {
     ) -> Option<&NamedDimension> {
         match self {
             Self::AlwaysElide => match dimension_name {
-                None | Some(&NamedDimension::OVERWORLD) => None,
+                // Can't do `Some(&NamedDimension::OVERWORLD)` in a pattern without `PartialEq`
+                None | Some(&NamedDimension::Vanilla(VanillaDimension::Overworld)) => None,
                 Some(other_dimension) => Some(other_dimension),
             }
             Self::AlwaysWrite => {

@@ -11,10 +11,15 @@ workspace = true
 
 [dependencies]
 prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
+prismarine-anchor-mc-datatypes      = { workspace = true, features = ["all"] }
 prismarine-anchor-nbt               .workspace = true
-prismarine-anchor-translation       .workspace = true
-prismarine-anchor-util              .workspace = true
 
 log                 .workspace = true
 subslice-to-array   .workspace = true
 thiserror           .workspace = true
+
+[features]
+derive_standard = [
+    "prismarine-anchor-leveldb-values/derive_standard",
+    "prismarine-anchor-mc-datatypes/derive_standard"
+]

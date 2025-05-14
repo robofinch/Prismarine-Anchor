@@ -60,13 +60,14 @@ impl SubchunkBlocks {
 pub struct LegacySubchunkBlocks {
     // TODO: make this easier to use, with unflattened and unpacked data.
     // Not a priority, though, since this data isn't normally used anymore.
+
     /// Version of the chunk, which in this case is either `0` or in `2..=7`.
     pub version:           u8,
     /// All block IDs in this subchunk, in YZX order (Y increments first).
     pub block_ids:         [u8; 4096],
     /// All block data for this subchunk, with 4 bits per block,
     /// in YZX order (Y increments first).
-    // TODO: is less significant nibble before the more significant nibble?
+    // TODO: is the less significant nibble before the more significant nibble?
     pub packed_block_data: [u8; 2048],
     /// All skylight values for this subchunk, with 4 bits per block,
     /// in YZX order (Y increments first). Optional.

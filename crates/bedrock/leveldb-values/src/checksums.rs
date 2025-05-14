@@ -5,7 +5,8 @@ use crate::ValueToBytesOptions;
 
 
 // Thanks to rbedrock, I didn't have to do as much work determining the binary format here
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq))]
+#[derive(Debug, Clone)]
 pub struct Checksums(pub VecMap<ChecksumType, u64>);
 
 impl Checksums {
@@ -78,7 +79,8 @@ impl Checksums {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChecksumType {
     Data2D,
     SubchunkBlocks(i8),

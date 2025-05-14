@@ -8,6 +8,7 @@ use subslice_to_array::SubsliceToArray as _;
 use thiserror::Error;
 use xxhash_rust::xxh64;
 
+use prismarine_anchor_mc_datatypes::dimensions::NamedDimension;
 use prismarine_anchor_nbt::{NbtCompound, NbtTag};
 use prismarine_anchor_nbt::{
     io::{NbtIoError, read_compound, write_compound},
@@ -15,7 +16,6 @@ use prismarine_anchor_nbt::{
 };
 use prismarine_anchor_util::u64_equals_usize;
 
-use crate::dimensions::NamedDimension;
 use crate::ValueToBytesOptions;
 
 
@@ -137,7 +137,8 @@ impl Default for LevelChunkMetaDataDictionary {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq))]
+#[derive(Debug, Clone)]
 pub struct MetaData {
     pub last_saved_base_game_version:      Option<String>,
     pub original_base_game_version:        Option<String>,
@@ -378,7 +379,8 @@ impl From<MetaData> for NbtCompound {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum MetaDataType {
     LastSavedBaseGameVersion,
     OriginalBaseGameVersion,
@@ -432,7 +434,8 @@ injective_enum_map! {
     SkullFlatteningPerformed      <=> "SkullFlatteningPerformed",
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum BlendingVersion {
     V1_19_0,
     V1_19_0_1,
@@ -456,7 +459,8 @@ injective_enum_map! {
     V1_21_60  <=> 7,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub enum GeneratorType {
     Old,
     Infinite,

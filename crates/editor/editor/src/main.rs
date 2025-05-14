@@ -3,30 +3,36 @@
 
 // This is used for testing, at least for now. It's very hacky, but so be it.
 
-use std::ops::RangeInclusive;
-use std::{mem::size_of, path::Path};
+use std::{mem::size_of, ops::RangeInclusive, path::Path};
 use std::io::{Cursor, Read};
 
-use prismarine_anchor_leveldb_values::aabb_volumes::AabbVolumes;
-use prismarine_anchor_leveldb_values::metadata::LevelChunkMetaDataDictionary;
-use prismarine_anchor_leveldb_values::palettized_storage::PalettizedStorage;
-use prismarine_anchor_leveldb_values::subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9};
-use prismarine_anchor_nbt::io::{read_compound, write_compound};
-use prismarine_anchor_nbt::{NbtList, NbtTag};
 use rusty_leveldb::LdbIterator;
+use subslice_to_array::SubsliceToArray as _;
 #[cfg(not(target_arch = "wasm32"))]
 use rusty_leveldb::PosixDiskEnv;
-use subslice_to_array::SubsliceToArray as _;
 
 use prismarine_anchor_leveldb_entries::{
     DBEntry, DBKey, EntryToBytesOptions, KeyToBytesOptions
 };
-use prismarine_anchor_leveldb_values::chunk_position::DimensionedChunkPos;
-use prismarine_anchor_nbt::snbt::VerifiedSnbt;
-use prismarine_anchor_nbt::settings::{
-    EnabledEscapeSequences, Endianness, IoOptions, NbtCompression, SnbtParseOptions, SnbtWriteOptions
+use prismarine_anchor_leveldb_values::{
+    aabb_volumes::AabbVolumes,
+    dimensioned_chunk_pos::DimensionedChunkPos,
+    metadata::LevelChunkMetaDataDictionary,
+    palettized_storage::PalettizedStorage,
 };
-use prismarine_anchor_translation::datatypes::{NumericVersion, VersionName};
+use prismarine_anchor_leveldb_values::subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9};
+use prismarine_anchor_mc_datatypes::version::{NumericVersion, VersionName};
+use prismarine_anchor_nbt::{NbtList, NbtTag, snbt::VerifiedSnbt};
+use prismarine_anchor_nbt::{
+    io::{read_compound, write_compound},
+    settings::{
+        EnabledEscapeSequences, Endianness, IoOptions, NbtCompression,
+        SnbtParseOptions, SnbtWriteOptions,
+    },
+};
+use prismarine_anchor_util::print_debug;
+
+// Unstable
 use prismarine_anchor_world::bedrock::BedrockWorldFiles;
 
 
@@ -477,48 +483,4 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-
-
-/// For use during development. Instead of printing binary data as entirely binary,
-/// stretches of ASCII alphanumeric characters (plus `.`, `-`, `_`) are printed as text,
-/// with binary data interspersed.
-///
-/// For example:
-/// `various_text-characters[0,1,2,3,]more_text[255,255,]`
-fn print_debug(value: &[u8]) {
-    #![allow(dead_code)]
-    #![allow(clippy::all)]
-    // Apparently this wasn't covered.
-    #![expect(clippy::cast_lossless)]
-
-    let mut nums = value.iter().peekable();
-
-    while nums.peek().is_some() {
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    nums.next();
-                    print!("{ch}");
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        print!("[");
-        while let Some(&&num) = nums.peek() {
-            if let Some(ch) = char::from_u32(num as u32) {
-                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
-                    break;
-                }
-            }
-            nums.next();
-            print!("{num},");
-        }
-        print!("]");
-    }
-    println!();
 }
