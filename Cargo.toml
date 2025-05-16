@@ -21,6 +21,7 @@ members = [
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2024"
+# TODO: make sure this remains accurate
 rust-version = "1.85"
 
 # Some of this toml is copied from egui's repository,
@@ -43,9 +44,10 @@ opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
 panic = "abort"
 
 [profile.dev]
+# TODO: change this back
 # Can't leave this on by default, because it breaks the Windows build.
 # Related: https://github.com/rust-lang/cargo/issues/4897
-# split-debuginfo = "unpacked" # faster debug builds on mac
+split-debuginfo = "unpacked" # faster debug builds on mac
 opt-level = 1                # Make debug builds run faster
 
 [profile.dev.package."*"]
@@ -205,7 +207,6 @@ manual_string_new = "warn"
 map_err_ignore = "warn"
 map_flatten = "warn"
 match_bool = "warn"
-match_on_vec_items = "warn"
 match_same_arms = "warn"
 match_wild_err_arm = "warn"
 match_wildcard_for_single_variants = "warn"

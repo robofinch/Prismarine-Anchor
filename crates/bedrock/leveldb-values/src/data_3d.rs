@@ -5,6 +5,7 @@ use zerocopy::transmute;
 
 use prismarine_anchor_util::u64_equals_usize;
 
+use crate::heightmap::Heightmap;
 use crate::palettized_storage::{
     PaletteHeader, PaletteType, PalettizedStorage,
     read_le_u32s, write_le_u32s,
@@ -13,12 +14,10 @@ use crate::palettized_storage::{
 
 #[derive(Debug, Clone)]
 pub struct Data3D {
-    /// The inner array is indexed by Z values. The outer array is indexed by X values.
-    /// Therefore, the correct indexing order is `heightmap[X][Z]`.
-    pub heightmap: [[u16; 16]; 16],
+    pub heightmap: Heightmap,
     /// The biomes are stored in subchunks starting from the bottom of the world.
     /// In the Overworld, it should have length 24; in the Nether, 8; and in the End, 16.
-    pub biomes: Vec<PalettizedStorage<u32>>,
+    pub biomes:    Vec<PalettizedStorage<u32>>,
 }
 
 impl Data3D {
@@ -57,19 +56,17 @@ impl Data3D {
         }
 
         Some(Self {
-            heightmap,
-            biomes: subchunks,
+            heightmap: Heightmap(heightmap),
+            biomes:    subchunks,
         })
     }
 
-    #[inline]
-    pub fn flattened_heightmap(&self) -> [u16; 256] {
-        transmute!(self.heightmap)
-    }
-
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) {
-        let heightmap: [u16; 256] = transmute!(self.heightmap);
-        let heightmap = heightmap.map(u16::to_le_bytes);
+        let heightmap: [[u8; 2]; 256] = self
+            .heightmap
+            .clone()
+            .flattened()
+            .map(u16::to_le_bytes);
         let heightmap: [u8; 512] = transmute!(heightmap);
 
         bytes.extend(heightmap);

@@ -17,10 +17,10 @@ prismarine-anchor-util              = { workspace = true, features = ["print_deb
 prismarine-anchor-world             .workspace = true
 
 anyhow              .workspace = true
-flate2              .workspace = true
+# flate2              .workspace = true
 rusty-leveldb       .workspace = true
 subslice-to-array   .workspace = true
-xxhash-rust         .workspace = true
+# xxhash-rust         .workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # We don't directly use this, but our deps do, and it needs to have the js feature enabled.

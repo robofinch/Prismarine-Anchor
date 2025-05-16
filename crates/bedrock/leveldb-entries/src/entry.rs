@@ -4,6 +4,7 @@ use prismarine_anchor_leveldb_values::{
     actor_digest_version::ActorDigestVersion,
     actor_id::ActorID,
     biome_state::BiomeState,
+    border_blocks::BorderBlocks,
     blending_data::BlendingData,
     checksums::Checksums,
     dimensioned_chunk_pos::DimensionedChunkPos,
@@ -26,8 +27,8 @@ use prismarine_anchor_nbt::NbtCompound;
 
 // Crazy luck with the alignment
 use crate::{
-    EntryBytes, EntryParseResult, EntryToBytesError, EntryToBytesOptions,
-    key::DBKey, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
+    key::DBKey, EntryBytes, EntryParseOptions, EntryParseResult, EntryToBytesError,
+    EntryToBytesOptions, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
 };
 
 
@@ -57,7 +58,7 @@ pub enum DBEntry {
     // LegacyTerrain(DimensionedChunkPos),
     // LegacyExtraBlockData(DimensionedChunkPos),
     BlockEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
-    // On a super old save, I saw this have the value [3] and fail to parse.
+    // On a super old save, I saw Entities have the value [3] and fail to parse.
     // It was in the End dimension. Until I understand what that is, I'm just
     // going to let it stay as a `RawValue` instead of an `Entities` entry.
     /// No longer used
@@ -65,7 +66,7 @@ pub enum DBEntry {
     PendingTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
     RandomTicks(DimensionedChunkPos, ConcatenatedNbtCompounds),
 
-    // BorderBlocks(DimensionedChunkPos),
+    BorderBlocks(DimensionedChunkPos, BorderBlocks),
     /// No longer used
     HardcodedSpawners(DimensionedChunkPos, HardcodedSpawners),
     AabbVolumes(DimensionedChunkPos, AabbVolumes),
@@ -73,11 +74,13 @@ pub enum DBEntry {
     Checksums(DimensionedChunkPos, Checksums),
     MetaDataHash(DimensionedChunkPos, u64),
 
-    // GenerationSeed(DimensionedChunkPos),
+    GenerationSeed(DimensionedChunkPos, u64),
     FinalizedState(DimensionedChunkPos, FinalizedState),
     BiomeState(DimensionedChunkPos, BiomeState),
 
-    // ConversionData(DimensionedChunkPos),
+    // Haven't managed to find a save file with this yet. Without more info, Vec<u8>
+    // is the best we can do.
+    ConversionData(DimensionedChunkPos, Vec<u8>),
 
     // Not used, apparently, so Vec<u8> is the best we can do without more info.
     CavesAndCliffsBlending(DimensionedChunkPos, Vec<u8>),
@@ -107,6 +110,7 @@ pub enum DBEntry {
     VillageInfo(    Option<NamedDimension>, UUID, NbtCompound),
     VillagePOI(     Option<NamedDimension>, UUID, NbtCompound),
     VillagePlayers( Option<NamedDimension>, UUID, NbtCompound),
+    VillageRaid(    Option<NamedDimension>, UUID, NbtCompound),
 
     Map(i64, NbtCompound),
     Portals(NbtCompound),
@@ -125,7 +129,7 @@ pub enum DBEntry {
 
     PositionTrackingDB(u32, NbtCompound),
     PositionTrackingLastId(NbtCompound),
-    // BiomeIdsTable
+    BiomeIdsTable(NbtCompound),
 
     // Other encountered keys from old versions:
 
@@ -161,8 +165,8 @@ pub enum DBEntry {
 }
 
 impl DBEntry {
-    pub fn parse_entry(key: &[u8], value: &[u8]) -> Self {
-        match Self::parse_recognized_entry(key, value) {
+    pub fn parse_entry(key: &[u8], value: &[u8], opts: EntryParseOptions) -> Self {
+        match Self::parse_recognized_entry(key, value, opts) {
             EntryParseResult::Parsed(entry) => entry,
             EntryParseResult::UnrecognizedKey => Self::RawEntry {
                 key:   key.to_owned(),
@@ -175,8 +179,8 @@ impl DBEntry {
         }
     }
 
-    pub fn parse_entry_vec(key: Vec<u8>, value: Vec<u8>) -> Self {
-        match Self::parse_recognized_entry(&key, &value) {
+    pub fn parse_entry_vec(key: Vec<u8>, value: Vec<u8>, opts: EntryParseOptions) -> Self {
+        match Self::parse_recognized_entry(&key, &value, opts) {
             EntryParseResult::Parsed(entry) => entry,
             EntryParseResult::UnrecognizedKey => Self::RawEntry { key, value },
             EntryParseResult::UnrecognizedValue(parsed_key) => Self::RawValue {
@@ -186,15 +190,19 @@ impl DBEntry {
         }
     }
 
-    pub fn parse_recognized_entry(key: &[u8], value: &[u8]) -> EntryParseResult {
+    pub fn parse_recognized_entry(
+        key: &[u8],
+        value: &[u8],
+        opts: EntryParseOptions,
+    ) -> EntryParseResult {
         let Some(key) = DBKey::parse_recognized_key(key) else {
             return EntryParseResult::UnrecognizedKey;
         };
-        Self::parse_recognized_value(key, value).into()
+        Self::parse_recognized_value(key, value, opts).into()
     }
 
-    pub fn parse_value(key: DBKey, value: &[u8]) -> Self {
-        match Self::parse_recognized_value(key, value) {
+    pub fn parse_value(key: DBKey, value: &[u8], opts: EntryParseOptions) -> Self {
+        match Self::parse_recognized_value(key, value, opts) {
             ValueParseResult::Parsed(parsed) => parsed,
             ValueParseResult::UnrecognizedValue(key) => Self::RawValue {
                 key,
@@ -203,8 +211,8 @@ impl DBEntry {
         }
     }
 
-    pub fn parse_value_vec(key: DBKey, value: Vec<u8>) -> Self {
-        match Self::parse_recognized_value(key, &value) {
+    pub fn parse_value_vec(key: DBKey, value: Vec<u8>, opts: EntryParseOptions) -> Self {
+        match Self::parse_recognized_value(key, &value, opts) {
             ValueParseResult::Parsed(parsed) => parsed,
             ValueParseResult::UnrecognizedValue(key) => Self::RawValue { key, value },
         }
@@ -214,7 +222,11 @@ impl DBEntry {
         clippy::too_many_lines,
         reason = "it's a giant match, and at least uses helper functions",
     )]
-    pub fn parse_recognized_value(key: DBKey, value: &[u8]) -> ValueParseResult {
+    pub fn parse_recognized_value(
+        key: DBKey,
+        value: &[u8],
+        opts: EntryParseOptions,
+    ) -> ValueParseResult {
         use ValueParseResult as V;
 
         match key {
@@ -296,8 +308,10 @@ impl DBEntry {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             }
-            DBKey::BorderBlocks(_chunk_pos) => {
-                // TODO
+            DBKey::BorderBlocks(chunk_pos) => {
+                if let Some(border_blocks) = BorderBlocks::parse(value, opts.into()) {
+                    return V::Parsed(Self::BorderBlocks(chunk_pos, border_blocks))
+                }
             }
             DBKey::HardcodedSpawners(chunk_pos) => {
                 if let Some(spawners) = HardcodedSpawners::parse(value) {
@@ -319,8 +333,10 @@ impl DBEntry {
                     return V::Parsed(Self::MetaDataHash(chunk_pos, u64::from_le_bytes(bytes)));
                 }
             }
-            DBKey::GenerationSeed(_chunk_pos) => {
-                // TODO
+            DBKey::GenerationSeed(chunk_pos) => {
+                if let Ok(bytes) = <[u8; 8]>::try_from(value) {
+                    return V::Parsed(Self::GenerationSeed(chunk_pos, u64::from_le_bytes(bytes)));
+                }
             }
             DBKey::FinalizedState(chunk_pos) => {
                 if let Some(finalized_state) = FinalizedState::parse(value) {
@@ -332,13 +348,16 @@ impl DBEntry {
                     return V::Parsed(Self::BiomeState(chunk_pos, biome_state));
                 }
             }
-            DBKey::ConversionData(_chunk_pos) => {
-                // TODO
+            DBKey::ConversionData(chunk_pos) => {
+                log::warn!("Encountered ConversionData value: {value:?}");
+                return V::Parsed(Self::ConversionData(chunk_pos, value.to_vec()));
             }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
+                log::warn!("Encountered CavesAndCliffsBlending value: {value:?}");
                 return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, value.to_vec()));
             }
             DBKey::BlendingBiomeHeight(chunk_pos) => {
+                log::warn!("Encountered BlendingBiomeHeight value: {value:?}");
                 return V::Parsed(Self::BlendingBiomeHeight(chunk_pos, value.to_vec()));
             }
             DBKey::BlendingData(chunk_pos) => {
@@ -426,6 +445,15 @@ impl DBEntry {
                     return V::UnrecognizedValue(DBKey::VillagePlayers(dim, uuid));
                 }
             }
+            DBKey::VillageRaid(dim, uuid) => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::VillageRaid(dim, uuid, nbt));
+                } else {
+                    // Note that `dim` is not Copy, so we can't rely on falling through
+                    // to the end of the function
+                    return V::UnrecognizedValue(DBKey::VillageRaid(dim, uuid));
+                }
+            }
             DBKey::Map(map_id) => {
                 if let Some(nbt) = NbtCompound::parse(value) {
                     return V::Parsed(Self::Map(map_id, nbt));
@@ -495,7 +523,11 @@ impl DBEntry {
                     return V::Parsed(Self::PositionTrackingLastId(nbt));
                 }
             }
-            // BiomeIdsTable
+            DBKey::BiomeIdsTable => {
+                if let Some(nbt) = NbtCompound::parse(value) {
+                    return V::Parsed(Self::BiomeIdsTable(nbt));
+                }
+            }
             DBKey::FlatWorldLayers => {
                 if let Some(layers) = FlatWorldLayers::parse(value) {
                     return V::Parsed(Self::FlatWorldLayers(layers));
@@ -542,8 +574,13 @@ impl DBEntry {
             }
         }
 
-        log::warn!("Could not parse DBEntry value. Run at trace level to see raw bytes.");
-        log::trace!("Unparsed DBEntry value bytes: {value:?}");
+        log::warn!("Could not parse DBEntry value corresponding to key {key:?}.");
+        if value.len() <= 100 {
+            log::warn!("Unparsed DBEntry value bytes: {value:?}");
+        } else {
+            log::warn!("First 100 bytes of unparsed DBEntry value: {:?}", &value[..100]);
+            log::trace!("Remainder of unparsed DBEntry value: {:?}", &value[100..]);
+        }
 
         ValueParseResult::UnrecognizedValue(key)
     }
@@ -561,47 +598,52 @@ impl DBEntry {
             Self::Entities(chunk_pos, ..)           => DBKey::Entities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(*chunk_pos),
+            Self::BorderBlocks(chunk_pos, ..)       => DBKey::BorderBlocks(*chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(*chunk_pos),
             Self::AabbVolumes(chunk_pos, ..)        => DBKey::AabbVolumes(*chunk_pos),
             Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(*chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(*chunk_pos),
+            Self::GenerationSeed(chunk_pos, ..)     => DBKey::GenerationSeed(*chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(*chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(*chunk_pos),
+            Self::ConversionData(chunk_pos, ..)     => DBKey::ConversionData(*chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(*c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(*c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(*chunk_pos),
             Self::ActorDigest(chunk_pos, ..)        => DBKey::ActorDigest(*chunk_pos),
             Self::Actor(actor_id, ..)               => DBKey::Actor(*actor_id),
-            Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
-            Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
-            Self::LocalPlayer(_)                    => DBKey::LocalPlayer,
-            Self::Player(uuid, _)                   => DBKey::Player(*uuid),
-            Self::LegacyPlayer(id, _)               => DBKey::LegacyPlayer(*id),
-            Self::PlayerServer(uuid, _)             => DBKey::PlayerServer(*uuid),
-            Self::VillageDwellers(dim, uuid, _)     => DBKey::VillageDwellers(dim.clone(), *uuid),
-            Self::VillageInfo(dim, uuid, _)         => DBKey::VillageInfo(dim.clone(), *uuid),
-            Self::VillagePOI(dim, uuid, _)          => DBKey::VillagePOI(dim.clone(), *uuid),
-            Self::VillagePlayers(dim, uuid, _)      => DBKey::VillagePlayers(dim.clone(), *uuid),
-            Self::Map(map_id, _)                    => DBKey::Map(*map_id),
-            Self::Portals(_)                        => DBKey::Portals,
-            Self::StructureTemplate(name, _)        => DBKey::StructureTemplate(name.clone()),
-            Self::TickingArea(uuid, _)              => DBKey::TickingArea(*uuid),
-            Self::Scoreboard(_)                     => DBKey::Scoreboard,
-            Self::WanderingTraderScheduler(_)       => DBKey::WanderingTraderScheduler,
-            Self::BiomeData(_)                      => DBKey::BiomeData,
-            Self::MobEvents(_)                      => DBKey::MobEvents,
-            Self::Overworld(_)                      => DBKey::Overworld,
-            Self::Nether(_)                         => DBKey::Nether,
-            Self::TheEnd(_)                         => DBKey::TheEnd,
-            Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(*id),
-            Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
-            Self::FlatWorldLayers(_)                => DBKey::FlatWorldLayers,
-            Self::LevelSpawnWasFixed(_)             => DBKey::LevelSpawnWasFixed,
-            Self::MVillages(_)                      => DBKey::MVillages,
-            Self::Villages(_)                       => DBKey::Villages,
-            Self::Dimension0(_)                     => DBKey::Dimension0,
-            Self::Dimension1(_)                     => DBKey::Dimension1,
-            Self::Dimension2(_)                     => DBKey::Dimension2,
+            Self::LevelChunkMetaDataDictionary(..)  => DBKey::LevelChunkMetaDataDictionary,
+            Self::AutonomousEntities(..)            => DBKey::AutonomousEntities,
+            Self::LocalPlayer(..)                   => DBKey::LocalPlayer,
+            Self::Player(uuid, ..)                  => DBKey::Player(*uuid),
+            Self::LegacyPlayer(id, ..)              => DBKey::LegacyPlayer(*id),
+            Self::PlayerServer(uuid, ..)            => DBKey::PlayerServer(*uuid),
+            Self::VillageDwellers(dim, uuid, ..)    => DBKey::VillageDwellers(dim.clone(), *uuid),
+            Self::VillageInfo(dim, uuid, ..)        => DBKey::VillageInfo(dim.clone(), *uuid),
+            Self::VillagePOI(dim, uuid, ..)         => DBKey::VillagePOI(dim.clone(), *uuid),
+            Self::VillagePlayers(dim, uuid, ..)     => DBKey::VillagePlayers(dim.clone(), *uuid),
+            Self::VillageRaid(dim, uuid, ..)        => DBKey::VillageRaid(dim.clone(), *uuid),
+            Self::Map(map_id, ..)                   => DBKey::Map(*map_id),
+            Self::Portals(..)                       => DBKey::Portals,
+            Self::StructureTemplate(name, ..)       => DBKey::StructureTemplate(name.clone()),
+            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(*uuid),
+            Self::Scoreboard(..)                    => DBKey::Scoreboard,
+            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
+            Self::BiomeData(..)                     => DBKey::BiomeData,
+            Self::MobEvents(..)                     => DBKey::MobEvents,
+            Self::Overworld(..)                     => DBKey::Overworld,
+            Self::Nether(..)                        => DBKey::Nether,
+            Self::TheEnd(..)                        => DBKey::TheEnd,
+            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(*id),
+            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
+            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
+            Self::FlatWorldLayers(..)               => DBKey::FlatWorldLayers,
+            Self::LevelSpawnWasFixed(..)            => DBKey::LevelSpawnWasFixed,
+            Self::MVillages(..)                     => DBKey::MVillages,
+            Self::Villages(..)                      => DBKey::Villages,
+            Self::Dimension0(..)                    => DBKey::Dimension0,
+            Self::Dimension1(..)                    => DBKey::Dimension1,
+            Self::Dimension2(..)                    => DBKey::Dimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key.clone()),
             Self::RawValue { key, .. }              => key.clone(),
         }
@@ -620,47 +662,52 @@ impl DBEntry {
             Self::Entities(chunk_pos, ..)           => DBKey::Entities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
             Self::RandomTicks(chunk_pos, ..)        => DBKey::RandomTicks(chunk_pos),
+            Self::BorderBlocks(chunk_pos, ..)       => DBKey::BorderBlocks(chunk_pos),
             Self::HardcodedSpawners(chunk_pos, ..)  => DBKey::HardcodedSpawners(chunk_pos),
             Self::AabbVolumes(chunk_pos, ..)        => DBKey::AabbVolumes(chunk_pos),
             Self::Checksums(chunk_pos, ..)          => DBKey::Checksums(chunk_pos),
             Self::MetaDataHash(chunk_pos, ..)       => DBKey::MetaDataHash(chunk_pos),
+            Self::GenerationSeed(chunk_pos, ..)     => DBKey::GenerationSeed(chunk_pos),
             Self::FinalizedState(chunk_pos, ..)     => DBKey::FinalizedState(chunk_pos),
             Self::BiomeState(chunk_pos, ..)         => DBKey::BiomeState(chunk_pos),
+            Self::ConversionData(chunk_pos, ..)     => DBKey::ConversionData(chunk_pos),
             Self::CavesAndCliffsBlending(c_pos, ..) => DBKey::CavesAndCliffsBlending(c_pos),
             Self::BlendingBiomeHeight(c_pos, ..)    => DBKey::BlendingBiomeHeight(c_pos),
             Self::BlendingData(chunk_pos, ..)       => DBKey::BlendingData(chunk_pos),
             Self::ActorDigest(chunk_pos, ..)        => DBKey::ActorDigest(chunk_pos),
             Self::Actor(actor_id, ..)               => DBKey::Actor(actor_id),
-            Self::LevelChunkMetaDataDictionary(_)   => DBKey::LevelChunkMetaDataDictionary,
-            Self::AutonomousEntities(_)             => DBKey::AutonomousEntities,
-            Self::LocalPlayer(_)                    => DBKey::LocalPlayer,
-            Self::Player(uuid, _)                   => DBKey::Player(uuid),
-            Self::LegacyPlayer(id, _)               => DBKey::LegacyPlayer(id),
-            Self::PlayerServer(uuid, _)             => DBKey::PlayerServer(uuid),
-            Self::VillageDwellers(dim, uuid, _)     => DBKey::VillageDwellers(dim, uuid),
-            Self::VillageInfo(dim, uuid, _)         => DBKey::VillageInfo(dim, uuid),
-            Self::VillagePOI(dim, uuid, _)          => DBKey::VillagePOI(dim, uuid),
-            Self::VillagePlayers(dim, uuid, _)      => DBKey::VillagePlayers(dim, uuid),
-            Self::Map(map_id, _)                    => DBKey::Map(map_id),
-            Self::Portals(_)                        => DBKey::Portals,
-            Self::StructureTemplate(name, _)        => DBKey::StructureTemplate(name),
-            Self::TickingArea(uuid, _)              => DBKey::TickingArea(uuid),
-            Self::Scoreboard(_)                     => DBKey::Scoreboard,
-            Self::WanderingTraderScheduler(_)       => DBKey::WanderingTraderScheduler,
-            Self::BiomeData(_)                      => DBKey::BiomeData,
-            Self::MobEvents(_)                      => DBKey::MobEvents,
-            Self::Overworld(_)                      => DBKey::Overworld,
-            Self::Nether(_)                         => DBKey::Nether,
-            Self::TheEnd(_)                         => DBKey::TheEnd,
-            Self::PositionTrackingDB(id, _)         => DBKey::PositionTrackingDB(id),
-            Self::PositionTrackingLastId(_)         => DBKey::PositionTrackingLastId,
-            Self::FlatWorldLayers(_)                => DBKey::FlatWorldLayers,
-            Self::LevelSpawnWasFixed(_)             => DBKey::LevelSpawnWasFixed,
-            Self::MVillages(_)                      => DBKey::MVillages,
-            Self::Villages(_)                       => DBKey::Villages,
-            Self::Dimension0(_)                     => DBKey::Dimension0,
-            Self::Dimension1(_)                     => DBKey::Dimension1,
-            Self::Dimension2(_)                     => DBKey::Dimension2,
+            Self::LevelChunkMetaDataDictionary(..)  => DBKey::LevelChunkMetaDataDictionary,
+            Self::AutonomousEntities(..)            => DBKey::AutonomousEntities,
+            Self::LocalPlayer(..)                   => DBKey::LocalPlayer,
+            Self::Player(uuid, ..)                  => DBKey::Player(uuid),
+            Self::LegacyPlayer(id, ..)              => DBKey::LegacyPlayer(id),
+            Self::PlayerServer(uuid, ..)            => DBKey::PlayerServer(uuid),
+            Self::VillageDwellers(dim, uuid, ..)    => DBKey::VillageDwellers(dim, uuid),
+            Self::VillageInfo(dim, uuid, ..)        => DBKey::VillageInfo(dim, uuid),
+            Self::VillagePOI(dim, uuid, ..)         => DBKey::VillagePOI(dim, uuid),
+            Self::VillagePlayers(dim, uuid, ..)     => DBKey::VillagePlayers(dim, uuid),
+            Self::VillageRaid(dim, uuid, ..)        => DBKey::VillageRaid(dim, uuid),
+            Self::Map(map_id, ..)                   => DBKey::Map(map_id),
+            Self::Portals(..)                       => DBKey::Portals,
+            Self::StructureTemplate(name, ..)       => DBKey::StructureTemplate(name),
+            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(uuid),
+            Self::Scoreboard(..)                    => DBKey::Scoreboard,
+            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
+            Self::BiomeData(..)                     => DBKey::BiomeData,
+            Self::MobEvents(..)                     => DBKey::MobEvents,
+            Self::Overworld(..)                     => DBKey::Overworld,
+            Self::Nether(..)                        => DBKey::Nether,
+            Self::TheEnd(..)                        => DBKey::TheEnd,
+            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(id),
+            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
+            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
+            Self::FlatWorldLayers(..)               => DBKey::FlatWorldLayers,
+            Self::LevelSpawnWasFixed(..)            => DBKey::LevelSpawnWasFixed,
+            Self::MVillages(..)                     => DBKey::MVillages,
+            Self::Villages(..)                      => DBKey::Villages,
+            Self::Dimension0(..)                    => DBKey::Dimension0,
+            Self::Dimension1(..)                    => DBKey::Dimension1,
+            Self::Dimension2(..)                    => DBKey::Dimension2,
             Self::RawEntry { key, .. }              => DBKey::RawKey(key),
             Self::RawValue { key, .. }              => key,
         }
@@ -680,12 +727,15 @@ impl DBEntry {
             Self::Entities(.., compounds)               => compounds.to_bytes()?,
             Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,
             Self::RandomTicks(.., compounds)            => compounds.to_bytes()?,
+            Self::BorderBlocks(.., blocks)              => blocks.to_bytes(opts),
             Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(opts)?,
             Self::AabbVolumes(.., volumes)              => volumes.to_bytes(opts)?,
             Self::Checksums(.., checksums)              => checksums.to_bytes(opts)?,
             Self::MetaDataHash(.., hash)                => hash.to_le_bytes().to_vec(),
+            Self::GenerationSeed(.., seed)              => seed.to_le_bytes().to_vec(),
             Self::FinalizedState(.., state)             => state.to_bytes(),
             Self::BiomeState(.., state)                 => state.to_bytes(),
+            Self::ConversionData(.., raw)               => raw.clone(),
             Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
@@ -694,17 +744,18 @@ impl DBEntry {
             Self::LevelChunkMetaDataDictionary(dict)    => dict.to_bytes(opts)?,
             Self::AutonomousEntities(nbt)               => nbt.to_bytes()?,
             Self::LocalPlayer(nbt)                      => nbt.to_bytes()?,
-            Self::Player(_, nbt)                        => nbt.to_bytes()?,
-            Self::LegacyPlayer(_, nbt)                  => nbt.to_bytes()?,
-            Self::PlayerServer(_, nbt)                  => nbt.to_bytes()?,
+            Self::Player(.., nbt)                       => nbt.to_bytes()?,
+            Self::LegacyPlayer(.., nbt)                 => nbt.to_bytes()?,
+            Self::PlayerServer(.., nbt)                 => nbt.to_bytes()?,
             Self::VillageDwellers(.., nbt)              => nbt.to_bytes()?,
             Self::VillageInfo(.., nbt)                  => nbt.to_bytes()?,
             Self::VillagePOI(.., nbt)                   => nbt.to_bytes()?,
             Self::VillagePlayers(.., nbt)               => nbt.to_bytes()?,
-            Self::Map(_, nbt)                           => nbt.to_bytes()?,
+            Self::VillageRaid(.., nbt)                  => nbt.to_bytes()?,
+            Self::Map(.., nbt)                          => nbt.to_bytes()?,
             Self::Portals(nbt)                          => nbt.to_bytes()?,
-            Self::StructureTemplate(_, nbt)             => nbt.to_bytes()?,
-            Self::TickingArea(_, nbt)                   => nbt.to_bytes()?,
+            Self::StructureTemplate(.., nbt)            => nbt.to_bytes()?,
+            Self::TickingArea(.., nbt)                  => nbt.to_bytes()?,
             Self::Scoreboard(nbt)                       => nbt.to_bytes()?,
             Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes()?,
             Self::BiomeData(nbt)                        => nbt.to_bytes()?,
@@ -712,8 +763,9 @@ impl DBEntry {
             Self::Overworld(nbt)                        => nbt.to_bytes()?,
             Self::Nether(nbt)                           => nbt.to_bytes()?,
             Self::TheEnd(nbt)                           => nbt.to_bytes()?,
-            Self::PositionTrackingDB(_, nbt)            => nbt.to_bytes()?,
+            Self::PositionTrackingDB(.., nbt)           => nbt.to_bytes()?,
             Self::PositionTrackingLastId(nbt)           => nbt.to_bytes()?,
+            Self::BiomeIdsTable(nbt)                    => nbt.to_bytes()?,
             Self::FlatWorldLayers(layers)               => layers.to_bytes(),
             Self::LevelSpawnWasFixed(fixed)             => fixed.to_bytes(),
             Self::MVillages(nbt)                        => nbt.to_bytes()?,
@@ -752,6 +804,15 @@ impl DBEntry {
                     value,
                 })
             }
+            Self::ConversionData(chunk_pos, raw) => {
+                let key = DBKey::ConversionData(chunk_pos);
+                let key_bytes = key.to_bytes(opts.into());
+
+                Ok(EntryBytes {
+                    key:   key_bytes,
+                    value: raw,
+                })
+            }
             Self::CavesAndCliffsBlending(chunk_pos, raw) => {
                 let key = DBKey::CavesAndCliffsBlending(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
@@ -770,7 +831,6 @@ impl DBEntry {
                     value: raw,
                 })
             }
-            // TODO: maybe some other entries could also be more memory efficient, too.
             _ => {
                 let value_bytes = self.to_value_bytes(opts.into());
                 let key_bytes = self.into_key().to_bytes(opts.into());
@@ -787,17 +847,5 @@ impl DBEntry {
                 }
             }
         }
-    }
-}
-
-impl From<(&[u8], &[u8])> for DBEntry {
-    fn from(raw_entry: (&[u8], &[u8])) -> Self {
-        Self::parse_entry(raw_entry.0, raw_entry.1)
-    }
-}
-
-impl From<(Vec<u8>, Vec<u8>)> for DBEntry {
-    fn from(raw_entry: (Vec<u8>, Vec<u8>)) -> Self {
-        Self::parse_entry_vec(raw_entry.0, raw_entry.1)
     }
 }

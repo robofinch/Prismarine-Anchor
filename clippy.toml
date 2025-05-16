@@ -4,7 +4,7 @@ too-many-lines-threshold = 100
 
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_macros
 disallowed-macros = [
-    'dbg',
+    'std::dbg',
     'std::unimplemented',
 
     'std::eprint',
@@ -17,9 +17,9 @@ disallowed-macros = [
 
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_methods
 disallowed-methods = [
-    "std::env::temp_dir",           # use `tempdir` crate instead
-    "std::time::Instant::now",      # use `instant` crate instead for wasm/web compatibility
-    "std::time::Duration::elapsed", # use `instant` crate instead for wasm/web compatibility
+    "std::env::temp_dir",          # use `tempdir` crate instead
+    "std::time::Instant::now",     # use `instant` crate instead for wasm/web compatibility
+    "std::time::Instant::elapsed", # use `instant` crate instead for wasm/web compatibility
     # use `instant` or `time` crates instead for wasm/web compatibility
     # "std::time::SystemTime::now", # Disabled because it's used for non-wasm code
 
@@ -33,7 +33,8 @@ disallowed-names = []
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_types
 disallowed-types = [
     # Consider forcing `parking_lot instead of `std::sync`
-    { path = "instant::SystemTime", reason = "Known bugs. Use web-time." },
+    # Commented out since we aren't used the `instant` crate here
+    # { path = "instant::SystemTime", reason = "Known bugs. Use web-time." },
     { path = "std::thread::Builder", reason = "Cannot spawn threads on wasm" },
     { path = "std::time::Instant", reason = "Use web-time instead." },
 ]

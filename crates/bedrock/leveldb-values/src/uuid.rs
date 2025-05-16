@@ -8,13 +8,14 @@ use prismarine_anchor_util::{chars_to_u32, InspectNone as _, pair_to_u32};
 
 /// A 128-bit UUID in the 8-4-4-4-12 hex digit format,
 /// such as `002494ea-22dc-4fec-b590-4ea523338c20`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy)]
 pub struct UUID(pub [u32; 4]);
 
 impl UUID {
     /// Parse a 128-bit UUID in the 8-4-4-4-12 hex digit format,
     /// such as `002494ea-22dc-4fec-b590-4ea523338c20`.
-    pub fn new(uuid: &str) -> Option<Self> {
+    pub fn parse(uuid: &str) -> Option<Self> {
         // Based on the slightly-more-complicated UUID implementation in
         // prismarine-anchor-nbt's lexer
 
@@ -82,7 +83,7 @@ impl TryFrom<&str> for UUID {
 
     #[inline]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::new(value).ok_or(())
+        Self::parse(value).ok_or(())
     }
 }
 

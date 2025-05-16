@@ -13,4 +13,3 @@ workspace = true
 prismarine-anchor-nbt  .workspace = true
 
 thiserror   .workspace = true
-anyhow      .workspace = true

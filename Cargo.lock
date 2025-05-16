@@ -351,7 +351,6 @@ name = "prismarine-anchor-editor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "flate2",
  "getrandom",
  "prismarine-anchor-leveldb-entries",
  "prismarine-anchor-leveldb-values",
@@ -361,7 +360,6 @@ dependencies = [
  "prismarine-anchor-world",
  "rusty-leveldb",
  "subslice-to-array",
- "xxhash-rust",
 ]
 
 [[package]]
@@ -386,7 +384,6 @@ dependencies = [
  "prismarine-anchor-mc-datatypes",
  "prismarine-anchor-nbt",
  "prismarine-anchor-util",
- "serde",
  "subslice-to-array",
  "thiserror",
  "vecmap-rs",
@@ -436,7 +433,6 @@ dependencies = [
 name = "prismarine-anchor-translation"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "prismarine-anchor-nbt",
  "thiserror",
 ]
@@ -445,7 +441,6 @@ dependencies = [
 name = "prismarine-anchor-translators"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "prismarine-anchor-nbt",
  "prismarine-anchor-translation",
  "serde",
@@ -464,19 +459,14 @@ dependencies = [
  "anyhow",
  "flate2",
  "getrandom",
- "indexmap",
  "prismarine-anchor-leveldb-entries",
  "prismarine-anchor-nbt",
  "prismarine-anchor-translation",
  "prismarine-anchor-translators",
  "prismarine-anchor-util",
  "rusty-leveldb",
- "serde",
- "serde_json",
  "thiserror",
  "web-time",
- "xxhash-rust",
- "zerocopy 0.8.24",
  "zip",
 ]
 

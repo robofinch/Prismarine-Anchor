@@ -5,12 +5,18 @@ pub mod dimensioned_chunk_pos;
 pub mod actor_id;
 #[cfg(feature = "uuid")]
 pub mod uuid;
+#[cfg(feature = "nibble_array")]
+pub mod nibble_array;
 
 // Helpers
 #[cfg(feature = "block_volume")]
 pub mod block_volume;
 #[cfg(feature = "concatenated_nbt_compounds")]
 pub mod concatenated_nbt_compounds;
+#[cfg(feature = "heightmap")]
+pub mod heightmap;
+#[cfg(feature = "legacy_biome_data")]
+pub mod legacy_biome_data;
 #[cfg(feature = "nbt_compound_conversion")]
 pub mod nbt_compound_conversion;
 #[cfg(feature = "palettized_storage")]
@@ -46,8 +52,6 @@ pub mod metadata; // for both MetaDataHash and LevelChunkMetaDataDictionary
 pub mod finalized_state;
 #[cfg(feature = "biome_state")]
 pub mod biome_state;
-#[cfg(feature = "conversion_data")]
-pub mod conversion_data;
 #[cfg(feature = "blending_data")]
 pub mod blending_data;
 #[cfg(feature = "actor_digest")]

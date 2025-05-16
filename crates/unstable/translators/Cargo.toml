@@ -13,7 +13,6 @@ workspace = true
 prismarine-anchor-nbt           = { workspace = true, features = ["comparable"] }
 prismarine-anchor-translation   .workspace = true
 
-anyhow          .workspace = true
 serde           = { workspace = true, features = ["serde_derive"] }
 serde_json      = { workspace = true, features = ["raw_value"] }
 thiserror       .workspace = true

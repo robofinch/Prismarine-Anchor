@@ -80,7 +80,8 @@ pub enum DBKey {
     MetaDataHash(DimensionedChunkPos),
 
     /// The seed which was used to generate this chunk.
-    // TODO: what versions use this?
+    // TODO: what versions use this? probably stopped being used after it moved to metadata,
+    // so knowing when metadata began being used might be enough
     GenerationSeed(DimensionedChunkPos),
     /// Indicates the state of world generation in this chunk, such as whether it
     /// has been fully generated.
@@ -91,7 +92,11 @@ pub enum DBKey {
     BiomeState(DimensionedChunkPos),
 
     /// No longer used.
-    // TODO: figure out what it was
+    // TODO: figure out what it was.. Maybe an NBT compound?
+    // Presumably something to do with converting a world from one version to another.
+    // Maybe LCE to Bedrock, maybe it *had* been used for Old -> Infinite
+    // or pre-Caves and Cliffs to post-Caves and cliffs.
+    // It seems likely that it's been moved to the MetaData dictionary, just like GenerationSeed.
     ConversionData(DimensionedChunkPos),
 
     // I might never know what `CavesAndCliffsBlending` and `BlendingBiomeHeight` are/do.
@@ -143,6 +148,7 @@ pub enum DBKey {
     /// Key has the dimension which the village is in, and the name of the village.
     // Probably tracking player reputation or something? Idk. TODO: figure it out
     VillagePlayers(Option<NamedDimension>, UUID),
+    VillageRaid(Option<NamedDimension>, UUID),
 
     Map(i64),
     Portals,
@@ -169,7 +175,7 @@ pub enum DBKey {
     // New and exciting tags, with very little information about them
     PositionTrackingDB(u32),
     PositionTrackingLastId,
-    // BiomeIdsTable
+    BiomeIdsTable,
 
     // Other encountered keys from very old versions:
 
@@ -230,12 +236,13 @@ impl DBKey {
 
         if (raw_key.len() == 9 || raw_key.len() == 13) && !not_a_chunk_key {
             // b'd' (Overworld), b'a' (BiomeData), b's' (mobevents / mVillages),
-            // and b'r' (~local_player)
+            // b'r' (~local_player), and b'e' (BiomeIdsTable)
             // should never be allowed as tags here, to avoid a collision. We don't check for
             // them above, since they're a colder path, and we don't strictly need to.
             // Note that:
             //    b'a' == 97
             //    b'd' == 100
+            //    b'e' == 101
             //    b'r' == 114
             //    b's' == 115
             let tag = raw_key[raw_key.len() - 1];
@@ -299,12 +306,14 @@ impl DBKey {
 
             // The majority of the rest of the keys will likely be villages and maps
 
+            // VILLAGE_[DIMENSION]?_[UUID]_[VARIANT]
             if (parts.len() == 3 || parts.len() == 4)
                 && parts[0] == "VILLAGE"
-                && ["DWELLERS", "INFO", "PLAYERS", "POI"].contains(&parts[parts.len() - 1])
+                && ["DWELLERS", "INFO", "PLAYERS", "POI", "RAID"]
+                    .contains(&parts[parts.len() - 1])
             {
-                // VILLAGE_[DIMENSION]?_[UUID]_[VARIANT]
-                if let Some(uuid) = UUID::new(parts[parts.len() - 2]) {
+                // Note that len is 3 or 4, so this doesn't overflow or panic
+                if let Some(uuid) = UUID::parse(parts[parts.len() - 2]) {
                     let dimension = if parts.len() == 4 {
                         // Dimension included
                         Some(NamedDimension::from_bedrock_name(parts[1]))
@@ -312,13 +321,12 @@ impl DBKey {
                         None
                     };
 
-                    // Note that len is 3 or 4, so this doesn't overflow or panic
-                    #[expect(clippy::match_on_vec_items)]
                     return Some(match parts[parts.len() - 1] {
                         "DWELLERS" => Self::VillageDwellers(dimension, uuid),
                         "INFO"     => Self::VillageInfo(dimension, uuid),
                         "PLAYERS"  => Self::VillagePlayers(dimension, uuid),
                         "POI"      => Self::VillagePOI(dimension, uuid),
+                        "RAID"     => Self::VillageRaid(dimension, uuid),
                         _ => unreachable!(),
                     });
                 }
@@ -331,7 +339,7 @@ impl DBKey {
 
             } else if parts.len() == 2 && parts[0] == "player" {
                 // A remote player
-                if let Some(uuid) = UUID::new(parts[1]) {
+                if let Some(uuid) = UUID::parse(parts[1]) {
                     return Some(Self::Player(uuid));
 
                 } else if let Ok(id) = u64::from_str_radix(parts[1], 10) {
@@ -340,13 +348,13 @@ impl DBKey {
 
             } else if parts.len() == 3 && parts[0] == "player" && parts[1] == "server" {
                 // A player, probably the local player?
-                if let Some(uuid) = UUID::new(parts[2]) {
+                if let Some(uuid) = UUID::parse(parts[2]) {
                     return Some(Self::PlayerServer(uuid));
                 }
 
             } else if parts.len() == 2 && parts[0] == "tickingarea" {
                 // A ticking area, could be in any dimension.
-                if let Some(uuid) = UUID::new(parts[1]) {
+                if let Some(uuid) = UUID::parse(parts[1]) {
                     return Some(Self::TickingArea(uuid));
                 }
             }
@@ -390,6 +398,7 @@ impl DBKey {
                 "BiomeData"                     => Self::BiomeData,
                 "mobevents"                     => Self::MobEvents,
                 "PositionTrackDB-LastId"        => Self::PositionTrackingLastId,
+                "BiomeIdsTable"                 => Self::BiomeIdsTable,
                 "game_flatworldlayers"          => Self::FlatWorldLayers,
                 "LevelSpawnWasFixed"            => Self::LevelSpawnWasFixed,
                 "mVillages"                     => Self::MVillages,
@@ -401,8 +410,13 @@ impl DBKey {
             });
         }
 
-        log::warn!("Could not parse DBKey. Run at trace level to see raw bytes.");
-        log::trace!("Unparsed DBKey bytes: {raw_key:?}");
+        if raw_key.len() <= 100 {
+            log::warn!("Could not parse DBKey: {raw_key:?}");
+        } else {
+            log::warn!("Could not parse DBKey. First 100 bytes: {:?}", &raw_key[..100]);
+            log::trace!("Remainder of unparsed DBKey: {:?}", &raw_key[100..]);
+        }
+
         None
     }
 
@@ -543,6 +557,10 @@ impl DBKey {
                 extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"PLAYERS");
                 return;
             }
+            Self::VillageRaid(dimension, uuid) => {
+                extend_village(bytes, dimension, uuid, opts.write_overworld_name, b"RAID");
+                return;
+            }
             &Self::Map(map_id) => {
                 bytes.extend(b"map_");
                 bytes.extend(format!("{map_id}").as_bytes());
@@ -606,6 +624,10 @@ impl DBKey {
             }
             &Self::PositionTrackingLastId => {
                 bytes.extend(b"PositionTrackDB-LastId");
+                return;
+            }
+            &Self::BiomeIdsTable => {
+                bytes.extend(b"BiomeIdsTable");
                 return;
             }
             &Self::FlatWorldLayers => {

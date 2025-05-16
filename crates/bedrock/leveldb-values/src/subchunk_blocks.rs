@@ -9,6 +9,7 @@ use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
 use prismarine_anchor_util::u64_equals_usize;
 
+use crate::nibble_array::NibbleArray;
 use crate::palettized_storage::{
     PaletteHeader, PaletteHeaderParseError, PaletteType,
     PalettizedStorage, PalettizedStorageParseError,
@@ -67,14 +68,19 @@ pub struct LegacySubchunkBlocks {
     pub block_ids:         [u8; 4096],
     /// All block data for this subchunk, with 4 bits per block,
     /// in YZX order (Y increments first).
-    // TODO: is the less significant nibble before the more significant nibble?
-    pub packed_block_data: [u8; 2048],
+    ///
+    /// Note that there are 4096 values, in 2048 bytes.
+    pub packed_block_data: NibbleArray<2048>,
     /// All skylight values for this subchunk, with 4 bits per block,
     /// in YZX order (Y increments first). Optional.
-    pub skylight:          Option<[u8; 2048]>,
+    ///
+    /// Note that there are 4096 values, in 2048 bytes.
+    pub skylight:          Option<NibbleArray<2048>>,
     /// All blocklight values for this subchunk, with 4 bits per block,
     /// in YZX order (Y increments first). Optional.
-    pub blocklight:        Option<[u8; 2048]>,
+    ///
+    /// Note that there are 4096 values, in 2048 bytes.
+    pub blocklight:        Option<NibbleArray<2048>>,
 }
 
 impl LegacySubchunkBlocks {
@@ -103,6 +109,7 @@ impl LegacySubchunkBlocks {
         let value = &value[4096..];
 
         let packed_block_data: [u8; 2048] = value.subslice_to_array::<0, 2048>();
+        let packed_block_data = NibbleArray(packed_block_data);
         let value = &value[2048..];
 
         if !skylight {
@@ -110,12 +117,13 @@ impl LegacySubchunkBlocks {
                 version,
                 block_ids,
                 packed_block_data,
-                skylight: None,
+                skylight:   None,
                 blocklight: None,
             });
         }
 
         let skylight: Option<[u8; 2048]> = Some(value.subslice_to_array::<0, 2048>());
+        let skylight = skylight.map(NibbleArray);
         let value = &value[2048..];
 
         if !blocklight {
@@ -129,6 +137,7 @@ impl LegacySubchunkBlocks {
         }
 
         let blocklight: Option<[u8; 2048]> = Some(value.subslice_to_array::<0, 2048>());
+        let blocklight = blocklight.map(NibbleArray);
 
         Ok(Self {
             version,
@@ -151,14 +160,14 @@ impl LegacySubchunkBlocks {
 
         bytes.push(self.version);
         bytes.extend(&self.block_ids);
-        bytes.extend(&self.packed_block_data);
+        bytes.extend(&self.packed_block_data.0);
 
         if let Some(blocklight) = &self.blocklight {
-            bytes.extend(&self.skylight.unwrap_or([0; 2048]));
-            bytes.extend(blocklight);
+            bytes.extend(&self.skylight.map(|arr| arr.0).unwrap_or([0; 2048]));
+            bytes.extend(blocklight.0);
 
         } else if let Some(skylight) = &self.skylight {
-            bytes.extend(skylight);
+            bytes.extend(skylight.0);
         }
     }
 

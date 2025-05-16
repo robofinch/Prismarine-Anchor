@@ -12,10 +12,11 @@ use subslice_to_array::SubsliceToArray as _;
 use rusty_leveldb::PosixDiskEnv;
 
 use prismarine_anchor_leveldb_entries::{
-    DBEntry, DBKey, EntryToBytesOptions, KeyToBytesOptions
+    DBEntry, DBKey, EntryParseOptions, EntryToBytesOptions, KeyToBytesOptions,
 };
 use prismarine_anchor_leveldb_values::{
     aabb_volumes::AabbVolumes,
+    DataFidelity,
     dimensioned_chunk_pos::DimensionedChunkPos,
     metadata::LevelChunkMetaDataDictionary,
     palettized_storage::PalettizedStorage,
@@ -81,6 +82,7 @@ fn main() -> anyhow::Result<()> {
             let dictionary = world.get(
                 DBKey::LevelChunkMetaDataDictionary,
                 opts.into(),
+                EntryParseOptions { value_fidelity: DataFidelity::BitPerfect },
             );
 
             let _dictionary = dictionary.and_then(|dict| {
@@ -132,7 +134,10 @@ fn main() -> anyhow::Result<()> {
                     _ => {},
                 }
 
-                let entry = DBEntry::parse_value(key, &value);
+                let entry_opts = EntryParseOptions {
+                    value_fidelity: DataFidelity::Semantic,
+                };
+                let entry = DBEntry::parse_value(key, &value, entry_opts);
                 // if let DBEntry::RawValue { key, value } = entry {
                 //     // panic!("Invalid value for {key:?}: {:?}", value.into_iter().take(20).collect::<Vec<_>>())
                 //     panic!("Invalid value for {key:?}: {:?}", value)
@@ -167,23 +172,25 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 match key {
-                    DBKey::BorderBlocks(_) => {
-                        // print_raw("BorderBlocks", &entry);
-                        println!("BorderBlocks: {entry:?}");
-                    }
-                    DBKey::ConversionData(_) => {
+                    // I don't know the format of these.
+                    DBKey::ConversionData{..} => {
                         // print_raw("ConversionData", &entry);
                         println!("ConversionData: {entry:?}");
                     }
-                    DBKey::GenerationSeed(_) => {
-                        // print_raw("GenerationSeed", &entry);
-                        println!("GenerationSeed: {entry:?}");
+                    DBKey::CavesAndCliffsBlending{..} => {
+                        // print_raw("CavesAndCliffsBlending", &entry);
+                        println!("CavesAndCliffsBlending: {entry:?}");
                     }
-                    DBKey::LegacyExtraBlockData(_) => {
+                    DBKey::BlendingBiomeHeight{..} => {
+                        // print_raw("BlendingBiomeHeight", &entry);
+                        println!("BlendingBiomeHeight: {entry:?}");
+                    }
 
+                    DBKey::LegacyExtraBlockData(_) => {
+                        println!("LegacyExtraBlockData, length {}", value.len());
                     }
                     DBKey::LegacyTerrain(_) => {
-
+                        println!("LegacyTerrain, length {}", value.len());
                     }
 
 
@@ -207,6 +214,7 @@ fn main() -> anyhow::Result<()> {
                     }
                     DBKey::Data2D{..} => {
                         print_raw("Data2D", &entry);
+                        // println!("Data2D: {entry:?}");
                     }
                     DBKey::LegacyData2D{..} => {
                         print_raw("LegacyData2D", &entry);
@@ -227,6 +235,10 @@ fn main() -> anyhow::Result<()> {
                     DBKey::RandomTicks{..} => {
                         print_raw("RandomTicks", &entry);
                     }
+                    DBKey::BorderBlocks(_) => {
+                        print_raw("BorderBlocks", &entry);
+                        // println!("BorderBlocks: {entry:?}");
+                    }
                     DBKey::HardcodedSpawners(_) => {
                         print_raw("HardcodedSpawners", &entry);
                         // println!("HardcodedSpawners: {entry:?}");
@@ -245,15 +257,13 @@ fn main() -> anyhow::Result<()> {
                     DBKey::FinalizedState{..} => {
                         print_raw("FinalizedState", &entry);
                     }
+                    DBKey::GenerationSeed(_) => {
+                        print_raw("GenerationSeed", &entry);
+                        check_parsed!("GenerationSeed", &entry, GenerationSeed);
+                    }
                     DBKey::BiomeState{..} => {
                         print_raw("BiomeState", &entry);
                         // check_parsed!("BiomeState", &entry, BiomeState);
-                    }
-                    DBKey::CavesAndCliffsBlending{..} => {
-                        print_raw("CavesAndCliffsBlending", &entry);
-                    }
-                    DBKey::BlendingBiomeHeight{..} => {
-                        print_raw("BlendingBiomeHeight", &entry);
                     }
                     DBKey::BlendingData{..} => {
                         print_raw("BlendingData", &entry);
@@ -304,6 +314,10 @@ fn main() -> anyhow::Result<()> {
                     DBKey::VillagePlayers{..} => {
                         print_raw("VillagePlayers", &entry);
                         // println!("VillagePlayers: {entry:?}");
+                    }
+                    DBKey::VillageRaid{..} => {
+                        print_raw("VillageRaid", &entry);
+                        // println!("VillageRaid: {entry:?}");
                     }
                     DBKey::Map{..} => {
                         print_raw("Map", &entry);
@@ -359,9 +373,13 @@ fn main() -> anyhow::Result<()> {
                         // print_raw("PositionTrackingLastId", &entry);
                         println!("PositionTrackingLastId: {entry:?}");
                     }
+                    DBKey::BiomeIdsTable => {
+                        print_raw("BiomeIdsTable", &entry);
+                        // println!("BiomeIdsTable: {entry:?}");
+                    }
                     DBKey::FlatWorldLayers => {
-                        // print_raw("FlatWorldLayers", &entry);
-                        println!("FlatWorldLayers: {entry:?}");
+                        print_raw("FlatWorldLayers", &entry);
+                        // println!("FlatWorldLayers: {entry:?}");
                     }
                     DBKey::LevelSpawnWasFixed => {
                         // print_raw("LevelSpawnWasFixed", &entry);
@@ -391,32 +409,31 @@ fn main() -> anyhow::Result<()> {
 
                 }
 
-                #[allow(dead_code)]
-                fn chunk_pos_to_version(
-                    chunk_pos: DimensionedChunkPos,
-                    world: &mut BedrockWorldFiles,
-                    opts: KeyToBytesOptions,
-                    dict: &LevelChunkMetaDataDictionary,
-                ) -> Option<(Option<String>, Option<String>)> {
-                    let Some(metadata_hash) = world.get(DBKey::MetaDataHash(chunk_pos), opts) else {
-                        println!("Chunks with no hash?? pos: {chunk_pos:?}");
-                        return None;
-                    };
+                // fn chunk_pos_to_version(
+                //     chunk_pos: DimensionedChunkPos,
+                //     world: &mut BedrockWorldFiles,
+                //     opts: KeyToBytesOptions,
+                //     dict: &LevelChunkMetaDataDictionary,
+                // ) -> Option<(Option<String>, Option<String>)> {
+                //     let Some(metadata_hash) = world.get(DBKey::MetaDataHash(chunk_pos), opts) else {
+                //         println!("Chunks with no hash?? pos: {chunk_pos:?}");
+                //         return None;
+                //     };
 
-                    let DBEntry::MetaDataHash(_, metadata_hash) = metadata_hash else {
-                        return None;
-                    };
+                //     let DBEntry::MetaDataHash(_, metadata_hash) = metadata_hash else {
+                //         return None;
+                //     };
 
-                    let Some(metadata) = dict.get(metadata_hash) else {
-                        println!("Metadata not in dictionary?? pos: {chunk_pos:?}, hash: {metadata_hash}");
-                        return None;
-                    };
+                //     let Some(metadata) = dict.get(metadata_hash) else {
+                //         println!("Metadata not in dictionary?? pos: {chunk_pos:?}, hash: {metadata_hash}");
+                //         return None;
+                //     };
 
-                    Some((
-                        metadata.original_base_game_version.clone(),
-                        metadata.last_saved_base_game_version.clone(),
-                    ))
-                }
+                //     Some((
+                //         metadata.original_base_game_version.clone(),
+                //         metadata.last_saved_base_game_version.clone(),
+                //     ))
+                // }
 
 
                 // if let DBEntry::Version(chunk_pos, version) = entry {
