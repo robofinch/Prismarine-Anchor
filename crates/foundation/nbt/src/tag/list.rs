@@ -62,6 +62,18 @@ impl NbtList {
         )
     }
 
+    /// Iterates over references to each tag in this tag list
+    #[inline]
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+
+    /// Iterates over mutable references to each tag in this tag list
+    #[inline]
+    pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+
     /// Iterates over this tag list, converting each tag reference into the specified type.
     #[inline]
     pub fn iter_map<'a, T: TryFrom<&'a NbtTag>>(
