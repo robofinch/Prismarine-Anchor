@@ -64,3 +64,37 @@ impl Heightmap {
         }
     }
 }
+
+/// Variant of `Heightmap` used in `LegacyTerrain` data.
+///
+/// The inner array is indexed by Z values. The outer array is indexed by X values.
+/// Therefore, the correct indexing order is `heightmap.0[X][Z]`.
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq))]
+#[derive(Debug, Clone)]
+pub struct OldHeightmap(pub [[u8; 16]; 16]);
+
+impl OldHeightmap {
+    /// The data should be in ZX order (Z increments first)
+    #[inline]
+    pub fn from_flattened(heightmap: [u8; 256]) -> Self {
+        Self(transmute!(heightmap))
+    }
+
+    /// Gets the data in ZX order (Z increments first)
+    #[inline]
+    pub fn flattened(self) -> [u8; 256] {
+        transmute!(self.0)
+    }
+
+    /// Gets the data in ZX order (Z increments first)
+    #[inline]
+    pub fn flattened_ref(&self) -> &[u8; 256] {
+        transmute_ref!(&self.0)
+    }
+
+    /// Gets the data in ZX order (Z increments first)
+    #[inline]
+    pub fn flattened_mut(&mut self) -> &mut [u8; 256] {
+        transmute_mut!(&mut self.0)
+    }
+}

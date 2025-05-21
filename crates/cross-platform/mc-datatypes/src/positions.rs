@@ -39,11 +39,12 @@ pub struct FloatingWorldPos {
 /// Since `u8` is the smallest standard integer type, encapsulation is provided to enforce
 /// this limit.
 #[cfg_attr(feature = "derive_serde",    derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
-#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "derive_standard", derive(PartialOrd, Ord, Hash))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChunkColumn(u8);
 
 impl ChunkColumn {
+    /// Returns a `Some` value if and only if `x < 16` and `z < 16`.
     #[inline]
     pub fn new(x: u8, z: u8) -> Option<Self> {
         if x < 16 && z < 16 {
@@ -53,16 +54,19 @@ impl ChunkColumn {
         }
     }
 
+    /// Guaranteed to be at most 15.
     #[inline]
     pub fn x(self) -> u8 {
         self.0 >> 4
     }
 
+    /// Guaranteed to be at most 15.
     #[inline]
     pub fn z(self) -> u8 {
         self.0 & 0b1111
     }
 
+    /// Each value is at most 15.
     #[inline]
     pub fn xz(self) -> (u8, u8) {
         (self.x(), self.z())
@@ -109,6 +113,7 @@ impl BlockPosInChunk {
         }
     }
 
+    // TODO: document when `None` is returned
     #[inline]
     pub fn to_subchunk_pos(self) -> Option<(i8, BlockPosInSubchunk)> {
         let subchunk_y = i8::try_from(self.height / 16).ok()?;
@@ -131,12 +136,14 @@ impl BlockPosInChunk {
 pub struct BlockPosInSubchunk(u16);
 
 impl BlockPosInSubchunk {
+    /// Returns a `Some` value if and only if `x < 16`, `y < 16`, and `z < 16`.
     #[inline]
     pub fn new(x: u8, y: u8, z: u8) -> Option<Self> {
         let column = ChunkColumn::new(x, z)?;
         Self::from_column(y, column)
     }
 
+    /// Returns a `Some` value if and only if `y < 16`.
     #[inline]
     pub fn from_column(y: u8, column: ChunkColumn) -> Option<Self> {
         if y < 16 {
@@ -153,11 +160,13 @@ impl BlockPosInSubchunk {
         ChunkColumn(self.0 as u8)
     }
 
+    /// Guaranteed to be at most 15.
     #[inline]
     pub fn x(self) -> u8 {
         self.column().x()
     }
 
+    /// Guaranteed to be at most 15.
     #[inline]
     pub fn y(self) -> u8 {
         // The `& 0b1111` isn't actually needed, but it should more firmly assert to the compiler
@@ -165,11 +174,13 @@ impl BlockPosInSubchunk {
         ((self.0 >> 8) & 0b1111) as u8
     }
 
+    /// Guaranteed to be at most 15.
     #[inline]
     pub fn z(self) -> u8 {
         self.column().z()
     }
 
+    /// Each value is at most 15.
     #[inline]
     pub fn xyz(self) -> (u8, u8, u8) {
         (self.x(), self.y(), self.z())

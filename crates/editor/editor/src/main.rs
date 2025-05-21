@@ -21,7 +21,10 @@ use prismarine_anchor_leveldb_values::{
     metadata::LevelChunkMetaDataDictionary,
     palettized_storage::PalettizedStorage,
 };
-use prismarine_anchor_leveldb_values::subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9};
+use prismarine_anchor_leveldb_values::{
+    legacy_extra_block_data::{NbtPieces, SubchunkExtraBlockData, TerrainExtraBlockData},
+    subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9},
+};
 use prismarine_anchor_mc_datatypes::version::{NumericVersion, VersionName};
 use prismarine_anchor_nbt::{NbtList, NbtTag, snbt::VerifiedSnbt};
 use prismarine_anchor_nbt::{
@@ -76,8 +79,12 @@ fn main() -> anyhow::Result<()> {
             let version = nbtlist_to_version(version);
 
             let opts = EntryToBytesOptions::for_version(version);
+            let parse_opts = EntryParseOptions {
+                value_fidelity: DataFidelity::BitPerfect,
+            };
 
             println!("Last opened with: {version}");
+            println!("Level dat: {:?}", world.level_dat());
 
             let dictionary = world.get(
                 DBKey::LevelChunkMetaDataDictionary,
@@ -101,26 +108,140 @@ fn main() -> anyhow::Result<()> {
 
                 let key = DBKey::parse_key(&key);
 
-                // match &key {
-                //     DBKey::BorderBlocks(_) => {
-                //         // print_raw("BorderBlocks", &entry);
-                //         println!("BorderBlocks: {value:?}");
-                //     }
-                //     DBKey::ConversionData(_) => {
-                //         // print_raw("ConversionData", &entry);
-                //         println!("ConversionData: {value:?}");
-                //     }
-                //     DBKey::GenerationSeed(_) => {
-                //         // print_raw("GenerationSeed", &entry);
-                //         println!("GenerationSeed: {value:?}");
-                //     }
-                //     DBKey::RawKey(key) => {
-                //         println!("Raw Key! : {key:?}");
-                //         print_debug(key);
-                //     }
-                //     _ => continue,
-                // }
+                println!("Key: {key:?}");
 
+                match &key {
+                    DBKey::LegacyExtraBlockData(pos) => {
+                        let pos = pos.clone();
+
+                        let entry = DBEntry::parse_value(key, &value, parse_opts);
+                        let DBEntry::LegacyExtraBlockData(_, data) = &entry else {
+                            println!("Couldn't parse: {entry:?}");
+                            continue;
+                        };
+
+                        println!("At pos {pos:?}:");
+
+                        if data.likely_nbt_pieces() {
+                            let data = NbtPieces::from(data);
+
+                            println!("{data}");
+                        } else {
+                            let terrain = world.get(
+                                DBKey::LegacyTerrain(pos.clone()),
+                                opts.into(),
+                                parse_opts,
+                            ).is_some();
+
+                            if terrain {
+                                let data = TerrainExtraBlockData::from(data);
+
+                                println!("{data:?}");
+                            } else {
+                                let data = SubchunkExtraBlockData::from(data);
+
+                                println!("{data:?}");
+                            }
+                        }
+
+                        let block_entities = world.get(
+                            DBKey::BlockEntities(pos),
+                            opts.into(),
+                            parse_opts,
+                        );
+
+                        if let Some(DBEntry::BlockEntities(_, block_entities)) = block_entities {
+                            println!("Block entities: {block_entities:?}");
+                        }
+
+                        let terrain = world.get(
+                            DBKey::LegacyTerrain(pos),
+                            opts.into(),
+                            parse_opts,
+                        );
+
+                        let Some(terrain) = terrain else {
+                            println!("No associated terrain");
+                            continue;
+                        };
+
+                        let DBEntry::LegacyTerrain(_, terrain) = terrain else {
+                            println!("Associated terrain couldn't be parsed");
+                            continue;
+                        };
+
+                        let mut unique_ids = Vec::new();
+                        for id in terrain.block_ids {
+                            if !unique_ids.contains(&id) {
+                                unique_ids.push(id);
+                            }
+                        }
+
+                        let chest_positions = terrain
+                            .block_ids
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(idx, id)| {
+                                // numerical ID of chest
+                                if *id == 54 {
+                                    Some((
+                                        idx,
+                                        (
+                                            (idx >> 11) & 0b1111,
+                                            idx & 0b111_1111,
+                                            (idx >> 7) & 0b1111,
+                                        ),
+                                    ))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>();
+
+                        let nonzero_data = terrain
+                            .block_data
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(idx, data)| {
+                                if data != 0 {
+                                    Some((
+                                        idx,
+                                        (
+                                            (idx >> 11) & 0b1111,
+                                            idx & 0b111_1111,
+                                            (idx >> 7) & 0b1111,
+                                        ),
+                                        data,
+                                        terrain.block_ids[idx],
+                                    ))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>();
+
+                        println!("Associated terrain:");
+                        println!("Unique block ids: {unique_ids:?}");
+                        println!("Chest indices and positions: {chest_positions:?}");
+                        println!("(index, (x, y, z), block data, block id): {nonzero_data:?}");
+
+                        // println!("Raw value: {value:?}");
+                        // print_debug(&value);
+                    }
+                    DBKey::LegacyTerrain(_) => {}
+                    DBKey::RawKey(key) => {
+                        println!("Raw Key! : {key:?}");
+                        print_debug(key);
+                    }
+                    _ => {
+                        // let entry = DBEntry::parse_value(key.clone(), &value, parse_opts);
+                        // println!("{entry:?}");
+                    }
+                }
+
+                continue;
+
+                #[allow(unreachable_code)]
                 match key {
                     // DBKey::ActorDigest(_) => {
                     //     let entry = DBEntry::parse_value(key, &value);
@@ -134,10 +255,7 @@ fn main() -> anyhow::Result<()> {
                     _ => {},
                 }
 
-                let entry_opts = EntryParseOptions {
-                    value_fidelity: DataFidelity::Semantic,
-                };
-                let entry = DBEntry::parse_value(key, &value, entry_opts);
+                let entry = DBEntry::parse_value(key, &value, parse_opts);
                 // if let DBEntry::RawValue { key, value } = entry {
                 //     // panic!("Invalid value for {key:?}: {:?}", value.into_iter().take(20).collect::<Vec<_>>())
                 //     panic!("Invalid value for {key:?}: {:?}", value)
@@ -186,14 +304,6 @@ fn main() -> anyhow::Result<()> {
                         println!("BlendingBiomeHeight: {entry:?}");
                     }
 
-                    DBKey::LegacyExtraBlockData(_) => {
-                        println!("LegacyExtraBlockData, length {}", value.len());
-                    }
-                    DBKey::LegacyTerrain(_) => {
-                        println!("LegacyTerrain, length {}", value.len());
-                    }
-
-
                     DBKey::RawKey(key) => {
                         println!("Raw Key! : {key:?}");
                         print_debug(&key);
@@ -221,6 +331,32 @@ fn main() -> anyhow::Result<()> {
                     }
                     DBKey::SubchunkBlocks{..} => {
                         print_raw("SubchunkBlocks", &entry);
+                    }
+                    DBKey::LegacyTerrain(_) => {
+                        print_raw("LegacyTerrain", &entry);
+                        check_parsed!("LegacyTerrain", &entry, LegacyTerrain);
+                    }
+                    DBKey::LegacyExtraBlockData(_) => {
+                        print_raw("LegacyExtraBlockData", &entry);
+                        check_parsed!("LegacyExtraBlockData", &entry, LegacyExtraBlockData);
+
+                        // if let DBEntry::LegacyExtraBlockData(_, data) = &entry {
+                        //     for extra_block in data.0.iter().cloned() {
+                        //         let ExtraBlock {
+                        //             location_index,
+                        //             padding,
+                        //             block_id,
+                        //             block_data,
+                        //         } = extra_block;
+
+                        //         println!("    location_index: {location_index:016b}");
+                        //         println!("    padding:        {padding:016b}");
+                        //         println!("    block_id:   {block_id}");
+                        //         println!("    block_data: {block_data}");
+                        //     }
+                        // }
+
+                        // println!("LegacyExtraBlockData: {entry:#?}");
                     }
                     DBKey::BlockEntities{..} => {
                         print_raw("BlockEntities", &entry);

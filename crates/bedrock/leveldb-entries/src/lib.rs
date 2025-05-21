@@ -10,6 +10,7 @@ use prismarine_anchor_leveldb_values::{
     DataFidelity,
     HandleExcessiveLength,
     hardcoded_spawners::SpawnersToBytesError,
+    legacy_extra_block_data::ExtraBlocksToBytesError,
     metadata::MetaDictToBytesError,
     ValueParseOptions,
     ValueToBytesOptions,
@@ -153,6 +154,8 @@ pub enum ValueToBytesError {
     DictionaryLength,
     #[error("there were too many entries in a Checksums value")]
     ChecksumsLength,
+    #[error("there were too many entries in a LegacyExtraBlockData value")]
+    ExtraBlocksLength,
     #[error("there were too many entries in a HarcodedSpawners value")]
     SpawnersLength,
     #[error("there were too many entries in an AabbVolumes key-value map")]
@@ -165,6 +168,14 @@ impl From<ChecksumsToBytesError> for ValueToBytesError {
     fn from(value: ChecksumsToBytesError) -> Self {
         match value {
             ChecksumsToBytesError::ExcessiveLength => Self::ChecksumsLength,
+        }
+    }
+}
+
+impl From<ExtraBlocksToBytesError> for ValueToBytesError {
+    fn from(value: ExtraBlocksToBytesError) -> Self {
+        match value {
+            ExtraBlocksToBytesError::ExcessiveLength => Self::ExtraBlocksLength,
         }
     }
 }

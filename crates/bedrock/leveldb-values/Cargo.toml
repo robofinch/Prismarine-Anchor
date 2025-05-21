@@ -83,8 +83,13 @@ subchunk_blocks             = [
     "dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util",
     "dep:log", "dep:subslice-to-array", "dep:thiserror"
 ]
-legacy_terrain              = ["heightmap", "legacy_biome_data", "nibble_array"]
-legacy_extra_block_data     = []
+legacy_terrain              = [
+    "heightmap", "legacy_biome_data", "nibble_array",
+    "dep:subslice-to-array"
+]
+legacy_extra_block_data     = [
+    "prismarine-anchor-mc-datatypes/positions", "dep:subslice-to-array", "dep:vecmap-rs"
+]
 border_blocks               = [
     "prismarine-anchor-mc-datatypes/positions", "prismarine-anchor-mc-datatypes/derive_standard",
     "dep:vecmap-rs"

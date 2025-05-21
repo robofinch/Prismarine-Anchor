@@ -16,6 +16,8 @@ use prismarine_anchor_leveldb_values::{
     flat_world_layers::FlatWorldLayers,
     hardcoded_spawners::HardcodedSpawners,
     legacy_data_2d::LegacyData2D,
+    legacy_extra_block_data::LegacyExtraBlockData,
+    legacy_terrain::LegacyTerrain,
     level_spawn_was_fixed::LevelSpawnWasFixed,
     metadata::LevelChunkMetaDataDictionary,
     nbt_compound_conversion::NbtCompoundConversion as _,
@@ -55,8 +57,8 @@ pub enum DBEntry {
     LegacyData2D(DimensionedChunkPos, Box<LegacyData2D>),
 
     SubchunkBlocks(DimensionedChunkPos, i8, SubchunkBlocks),
-    // LegacyTerrain(DimensionedChunkPos),
-    // LegacyExtraBlockData(DimensionedChunkPos),
+    LegacyTerrain(DimensionedChunkPos, Box<LegacyTerrain>),
+    LegacyExtraBlockData(DimensionedChunkPos, LegacyExtraBlockData),
     BlockEntities(DimensionedChunkPos, ConcatenatedNbtCompounds),
     // On a super old save, I saw Entities have the value [3] and fail to parse.
     // It was in the End dimension. Until I understand what that is, I'm just
@@ -273,11 +275,15 @@ impl DBEntry {
                     return V::Parsed(Self::SubchunkBlocks(chunk_pos, y_index, subchunk_blocks));
                 }
             }
-            DBKey::LegacyTerrain(_chunk_pos) => {
-                // TODO
+            DBKey::LegacyTerrain(chunk_pos) => {
+                if let Some(terrain) = LegacyTerrain::parse(value) {
+                    return V::Parsed(Self::LegacyTerrain(chunk_pos, Box::new(terrain)));
+                }
             }
-            DBKey::LegacyExtraBlockData(_chunk_pos) => {
-                // TODO
+            DBKey::LegacyExtraBlockData(chunk_pos) => {
+                if let Some(extra_blocks) = LegacyExtraBlockData::parse(value) {
+                    return V::Parsed(Self::LegacyExtraBlockData(chunk_pos, extra_blocks));
+                }
             }
             DBKey::BlockEntities(chunk_pos) => {
                 // Note that block entities definitely have some `ByteString`s
@@ -594,6 +600,8 @@ impl DBEntry {
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(*chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(*chunk_pos),
             Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(*c_pos, *y),
+            Self::LegacyTerrain(chunk_pos, ..)      => DBKey::LegacyTerrain(*chunk_pos),
+            Self::LegacyExtraBlockData(c_pos, ..)   => DBKey::LegacyExtraBlockData(*c_pos),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(*chunk_pos),
             Self::Entities(chunk_pos, ..)           => DBKey::Entities(*chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(*chunk_pos),
@@ -658,6 +666,8 @@ impl DBEntry {
             Self::Data2D(chunk_pos, ..)             => DBKey::Data2D(chunk_pos),
             Self::LegacyData2D(chunk_pos, ..)       => DBKey::LegacyData2D(chunk_pos),
             Self::SubchunkBlocks(c_pos, y, ..)      => DBKey::SubchunkBlocks(c_pos, y),
+            Self::LegacyTerrain(chunk_pos, ..)      => DBKey::LegacyTerrain(chunk_pos),
+            Self::LegacyExtraBlockData(c_pos, ..)   => DBKey::LegacyExtraBlockData(c_pos),
             Self::BlockEntities(chunk_pos, ..)      => DBKey::BlockEntities(chunk_pos),
             Self::Entities(chunk_pos, ..)           => DBKey::Entities(chunk_pos),
             Self::PendingTicks(chunk_pos, ..)       => DBKey::PendingTicks(chunk_pos),
@@ -723,6 +733,8 @@ impl DBEntry {
             Self::Data2D(.., data)                      => data.to_bytes(),
             Self::LegacyData2D(.., data)                => data.to_bytes(),
             Self::SubchunkBlocks(.., blocks)            => blocks.to_bytes()?,
+            Self::LegacyTerrain(.., terrain)            => terrain.to_bytes(),
+            Self::LegacyExtraBlockData(.., blocks)      => blocks.to_bytes(opts)?,
             Self::BlockEntities(.., compounds)          => compounds.to_bytes()?,
             Self::Entities(.., compounds)               => compounds.to_bytes()?,
             Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,

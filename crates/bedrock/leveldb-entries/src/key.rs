@@ -148,6 +148,7 @@ pub enum DBKey {
     /// Key has the dimension which the village is in, and the name of the village.
     // Probably tracking player reputation or something? Idk. TODO: figure it out
     VillagePlayers(Option<NamedDimension>, UUID),
+    /// Key has the dimension which the village is in, and the name of the village.
     VillageRaid(Option<NamedDimension>, UUID),
 
     Map(i64),

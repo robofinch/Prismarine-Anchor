@@ -11,6 +11,7 @@ use crate::legacy_biome_data::{
 // TODO: exactly when?
 // And could a world end up with both LegacyData2D and Data2D keys?
 // (In such a circumstance, I assume the LegacyData2D would be ignored.)
+#[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq))]
 #[derive(Debug, Clone)]
 pub struct LegacyData2D {
     pub heightmap:    Heightmap,
