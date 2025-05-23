@@ -3,13 +3,13 @@ use std::str;
 use subslice_to_array::SubsliceToArray as _;
 
 use prismarine_anchor_mc_datatypes::{
-    dimensions::{NamedDimension, OverworldElision, VanillaDimension},
-    identifier::{IdentifierParseOptions, NamespacedIdentifier},
+    IdentifierParseOptions, NamedDimension, NamespacedIdentifier,
+    OverworldElision, VanillaDimension,
 };
 
 
 use super::interface::KeyToBytesOptions;
-use super::entries::helpers::{ActorID, DimensionedChunkPos, UUID};
+use super::entries::helpers::{ActorID, DimensionedChunkPos, Uuid};
 
 
 /// The keys in a world's LevelDB database used by Minecraft Bedrock.
@@ -123,7 +123,7 @@ pub enum DBKey {
     /// NBT data of the world's local player entity.
     LocalPlayer,
     /// NBT data of a player with the indicated UUID
-    Player(UUID),
+    Player(Uuid),
     /// NBT data of a player with the indicted numeric ID, which comes
     /// from `clientid.txt`. No longer used.
     // (based on a number stored in `clientid.txt`, which seems to fit in 64 bits or 63 unsigned).
@@ -131,28 +131,28 @@ pub enum DBKey {
     LegacyPlayer(u64),
     // This is NBT data, but I haven't looked closely at it.
     // Could be an alternative version of ~local_player?
-    PlayerServer(UUID),
+    PlayerServer(Uuid),
 
     /// Key has the dimension which the village is in, and the name of the village.
     // TODO: should have entity IDs of village dwellers. Verify.
-    VillageDwellers(Option<NamedDimension>, UUID),
+    VillageDwellers(Option<NamedDimension>, Uuid),
     /// Key has the dimension which the village is in, and the name of the village.
     // Village bounding box, and possibly other information TODO: figure out what
-    VillageInfo(Option<NamedDimension>, UUID),
+    VillageInfo(Option<NamedDimension>, Uuid),
     /// Key has the dimension which the village is in, and the name of the village.
     // villager - workstation mappings. Bed mappings aren't stored, apparently.
-    VillagePOI(Option<NamedDimension>, UUID),
+    VillagePOI(Option<NamedDimension>, Uuid),
     /// Key has the dimension which the village is in, and the name of the village.
     // Probably tracking player reputation or something? Idk. TODO: figure it out
-    VillagePlayers(Option<NamedDimension>, UUID),
+    VillagePlayers(Option<NamedDimension>, Uuid),
     /// Key has the dimension which the village is in, and the name of the village.
-    VillageRaid(Option<NamedDimension>, UUID),
+    VillageRaid(Option<NamedDimension>, Uuid),
 
     Map(i64),
     StructureTemplate(NamespacedIdentifier),
 
     Scoreboard,
-    TickingArea(UUID),
+    TickingArea(Uuid),
 
     // NBT data which effectively maps numeric biome IDs to floats indicating that
     // biome's snow accumulation (the maximum height of snow layers that can naturally
@@ -309,7 +309,7 @@ impl DBKey {
                     .contains(&parts[parts.len() - 1])
             {
                 // Note that len is 3 or 4, so this doesn't overflow or panic
-                if let Some(uuid) = UUID::parse(parts[parts.len() - 2]) {
+                if let Some(uuid) = Uuid::parse(parts[parts.len() - 2]) {
                     let dimension = if parts.len() == 4 {
                         // Dimension included
                         Some(NamedDimension::from_bedrock_name(parts[1]))
@@ -335,7 +335,7 @@ impl DBKey {
 
             } else if parts.len() == 2 && parts[0] == "player" {
                 // A remote player
-                if let Some(uuid) = UUID::parse(parts[1]) {
+                if let Some(uuid) = Uuid::parse(parts[1]) {
                     return Some(Self::Player(uuid));
 
                 } else if let Ok(id) = u64::from_str_radix(parts[1], 10) {
@@ -344,13 +344,13 @@ impl DBKey {
 
             } else if parts.len() == 3 && parts[0] == "player" && parts[1] == "server" {
                 // A player, probably the local player?
-                if let Some(uuid) = UUID::parse(parts[2]) {
+                if let Some(uuid) = Uuid::parse(parts[2]) {
                     return Some(Self::PlayerServer(uuid));
                 }
 
             } else if parts.len() == 2 && parts[0] == "tickingarea" {
                 // A ticking area, could be in any dimension.
-                if let Some(uuid) = UUID::parse(parts[1]) {
+                if let Some(uuid) = Uuid::parse(parts[1]) {
                     return Some(Self::TickingArea(uuid));
                 }
             }
@@ -427,7 +427,7 @@ impl DBKey {
         fn extend_village(
             bytes:                &mut Vec<u8>,
             dimension:            &Option<NamedDimension>,
-            uuid:                 &UUID,
+            uuid:                 &Uuid,
             write_overworld_name: OverworldElision,
             variant:              &'static [u8],
         ) {

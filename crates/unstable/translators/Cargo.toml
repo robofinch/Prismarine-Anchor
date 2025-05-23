@@ -10,7 +10,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-prismarine-anchor-nbt           = { workspace = true, features = ["comparable"] }
+prismarine-anchor-nbt           .workspace = true
 prismarine-anchor-translation   .workspace = true
 
 serde           = { workspace = true, features = ["serde_derive"] }

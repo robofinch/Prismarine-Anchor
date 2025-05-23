@@ -28,8 +28,8 @@ use prismarine_anchor_leveldb_entries::entries::{
     SubchunkExtraBlockData,
     TerrainExtraBlockData,
 };
-use prismarine_anchor_mc_datatypes::version::{NumericVersion, VersionName};
-use prismarine_anchor_nbt::{io::read_compound, NbtList, settings::IoOptions};
+use prismarine_anchor_mc_datatypes::{NumericVersion, VersionName};
+use prismarine_anchor_nbt::{io::read_compound, NbtList, IoOptions};
 use prismarine_anchor_util::print_debug;
 
 // Unstable

@@ -2,7 +2,7 @@
 
 use vecmap::VecSet;
 
-use prismarine_anchor_mc_datatypes::positions::ChunkColumn;
+use prismarine_anchor_mc_datatypes::ChunkColumn;
 
 use crate::interface::{DataFidelity, ValueParseOptions, ValueToBytesOptions};
 

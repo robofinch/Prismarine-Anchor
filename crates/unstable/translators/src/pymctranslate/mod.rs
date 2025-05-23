@@ -17,7 +17,7 @@ use thiserror::Error;
 use prismarine_anchor_nbt::snbt;
 use prismarine_anchor_nbt::{
     NbtContainerType, NbtTag, NbtType,
-    settings::SnbtParseOptions, snbt::SnbtError,
+    SnbtParseOptions, snbt::SnbtError,
 };
 use prismarine_anchor_translation::datatypes::{
     BlockProperty, IdentifierParseError, IdentifierParseOptions, NamespacedIdentifier,

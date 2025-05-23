@@ -7,11 +7,8 @@ use subslice_to_array::SubsliceToArray as _;
 use thiserror::Error;
 use xxhash_rust::xxh64;
 
-use prismarine_anchor_nbt::{NbtCompound, NbtTag};
-use prismarine_anchor_nbt::{
-    io::{NbtIoError, read_compound, write_compound},
-    settings::{Endianness, IoOptions},
-};
+use prismarine_anchor_nbt::{Endianness, IoOptions, NbtCompound, NbtTag};
+use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
 use prismarine_anchor_util::u64_equals_usize;
 
 use crate::interface::ValueToBytesOptions;

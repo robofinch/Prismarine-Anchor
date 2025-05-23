@@ -10,7 +10,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-prismarine-anchor-mc-datatypes      = { workspace = true, features = ["all"] }
+prismarine-anchor-mc-datatypes      .workspace = true
 prismarine-anchor-nbt               = { workspace = true, features = ["preserve_order"] }
 prismarine-anchor-util              .workspace = true
 

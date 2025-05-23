@@ -1,8 +1,8 @@
 #[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
 #[derive(Debug, Clone, Copy)]
-pub struct ActorDigestVersionDbValue(pub u8);
+pub struct ActorDigestVersionDBValue(pub u8);
 
-impl ActorDigestVersionDbValue {
+impl ActorDigestVersionDBValue {
     #[inline]
     pub fn parse(value: &[u8]) -> Option<Self> {
         if value.len() == 1 {

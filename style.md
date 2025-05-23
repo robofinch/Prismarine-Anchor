@@ -5,6 +5,8 @@
 - Use `#[expect(..)]`, `todo!()`, `// TODO` comments as needed.
 - Follow other conventions already in the code, like vertically aligning match arms
   and vertical function parameters.
+- Most Rust naming conventions are followed, except for using `DB` instead of `Db`
+  (the latter looks too weird, even if it's the pedantically correct `UpperCamelCase`).
 - If using `rustfmt`, manually reformat everything afterwards
   (so, use `rustfmt` rarely if ever)
 - The overall layout of a file is:

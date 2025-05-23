@@ -3,7 +3,7 @@ use std::io::{Cursor, Read};
 use subslice_to_array::SubsliceToArray as _;
 use vecmap::VecMap;
 
-use prismarine_anchor_mc_datatypes::identifier::{IdentifierParseOptions, NamespacedIdentifier};
+use prismarine_anchor_mc_datatypes::{IdentifierParseOptions, NamespacedIdentifier};
 use prismarine_anchor_util::u64_equals_usize;
 
 use crate::interface::ValueToBytesOptions;

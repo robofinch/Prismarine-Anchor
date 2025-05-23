@@ -10,9 +10,9 @@ use prismarine_anchor_util::{chars_to_u32, InspectNone as _, pair_to_u32};
 /// such as `002494ea-22dc-4fec-b590-4ea523338c20`.
 #[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
 #[derive(Debug, Clone, Copy)]
-pub struct UUID(pub [u32; 4]);
+pub struct Uuid(pub [u32; 4]);
 
-impl UUID {
+impl Uuid {
     /// Parse a 128-bit UUID in the 8-4-4-4-12 hex digit format,
     /// such as `002494ea-22dc-4fec-b590-4ea523338c20`.
     pub fn parse(uuid: &str) -> Option<Self> {
@@ -49,8 +49,8 @@ impl UUID {
             fourth:      [char; 4],
             fifth_start: [char; 4],
             fifth_end:   [char; 8],
-        ) -> Option<UUID> {
-            Some(UUID([
+        ) -> Option<Uuid> {
+            Some(Uuid([
                 chars_to_u32(first)?,
                 pair_to_u32((second, third))?,
                 pair_to_u32((fourth, fifth_start))?,
@@ -78,7 +78,7 @@ impl UUID {
     }
 }
 
-impl TryFrom<&str> for UUID {
+impl TryFrom<&str> for Uuid {
     type Error = ();
 
     #[inline]
@@ -87,14 +87,14 @@ impl TryFrom<&str> for UUID {
     }
 }
 
-impl From<UUID> for Vec<u8> {
+impl From<Uuid> for Vec<u8> {
     #[inline]
-    fn from(value: UUID) -> Self {
+    fn from(value: Uuid) -> Self {
         value.to_bytes()
     }
 }
 
-impl Display for UUID {
+impl Display for Uuid {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:08x}", self.0[0])?;
         write!(f, "-{:04x}", self.0[1] >> 16)?;

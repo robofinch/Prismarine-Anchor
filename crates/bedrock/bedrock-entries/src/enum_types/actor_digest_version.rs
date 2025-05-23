@@ -1,6 +1,6 @@
 use bijective_enum_map::injective_enum_map;
 
-use prismarine_anchor_mc_datatypes::version::NumericVersion;
+use prismarine_anchor_mc_datatypes::NumericVersion;
 
 
 #[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]

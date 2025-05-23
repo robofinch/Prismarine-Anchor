@@ -1,4 +1,4 @@
-use prismarine_anchor_mc_datatypes::{dimensions::OverworldElision, version::NumericVersion};
+use prismarine_anchor_mc_datatypes::{NumericVersion, OverworldElision};
 
 
 // ================================

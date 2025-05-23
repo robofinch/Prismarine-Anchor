@@ -1,4 +1,4 @@
-use prismarine_anchor_mc_datatypes::{dimensions::NamedDimension, identifier::NamespacedIdentifier};
+use prismarine_anchor_mc_datatypes::{NamedDimension, NamespacedIdentifier};
 
 use crate::DBKey;
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
         AabbVolumes,
         Actor,
         ActorDigest,
-        ActorDigestVersionDbValue,
+        ActorDigestVersionDBValue,
         BiomeState,
         BorderBlocks,
         BlendingData,
@@ -17,7 +17,7 @@ use crate::{
         FinalizedStateDbValue,
         FlatWorldLayers,
         HardcodedSpawners,
-        helpers::{ActorID, ConcatenatedNbtCompounds, DimensionedChunkPos, NamedCompound, UUID},
+        helpers::{ActorID, ConcatenatedNbtCompounds, DimensionedChunkPos, NamedCompound, Uuid},
         LegacyData2D,
         LegacyExtraBlockData,
         LegacyTerrain,
@@ -54,7 +54,7 @@ pub enum DBEntry {
 
     Version(DimensionedChunkPos, VersionDbValue),
     LegacyVersion(DimensionedChunkPos, LegacyVersionDbValue),
-    ActorDigestVersion(DimensionedChunkPos, ActorDigestVersionDbValue),
+    ActorDigestVersion(DimensionedChunkPos, ActorDigestVersionDBValue),
 
     Data3D(DimensionedChunkPos, Box<Data3D>),
     Data2D(DimensionedChunkPos, Box<Data2D>),
@@ -108,22 +108,22 @@ pub enum DBEntry {
     AutonomousEntities(NamedCompound),
 
     LocalPlayer(NamedCompound),
-    Player(UUID, NamedCompound),
+    Player(Uuid, NamedCompound),
     /// No longer used
     LegacyPlayer(u64, NamedCompound),
-    PlayerServer(UUID, NamedCompound),
+    PlayerServer(Uuid, NamedCompound),
 
-    VillageDwellers(Option<NamedDimension>, UUID, NamedCompound),
-    VillageInfo(    Option<NamedDimension>, UUID, NamedCompound),
-    VillagePOI(     Option<NamedDimension>, UUID, NamedCompound),
-    VillagePlayers( Option<NamedDimension>, UUID, NamedCompound),
-    VillageRaid(    Option<NamedDimension>, UUID, NamedCompound),
+    VillageDwellers(Option<NamedDimension>, Uuid, NamedCompound),
+    VillageInfo(    Option<NamedDimension>, Uuid, NamedCompound),
+    VillagePOI(     Option<NamedDimension>, Uuid, NamedCompound),
+    VillagePlayers( Option<NamedDimension>, Uuid, NamedCompound),
+    VillageRaid(    Option<NamedDimension>, Uuid, NamedCompound),
 
     Map(i64, NamedCompound),
     StructureTemplate(NamespacedIdentifier, NamedCompound),
 
     Scoreboard(NamedCompound),
-    TickingArea(UUID, NamedCompound),
+    TickingArea(Uuid, NamedCompound),
 
     BiomeData(NamedCompound),
     BiomeIdsTable(NamedCompound),
@@ -248,7 +248,7 @@ impl DBEntry {
                 }
             }
             DBKey::ActorDigestVersion(chunk_pos) => {
-                if let Some(digest_version) = ActorDigestVersionDbValue::parse(value) {
+                if let Some(digest_version) = ActorDigestVersionDBValue::parse(value) {
                     return V::Parsed(Self::ActorDigestVersion(chunk_pos, digest_version));
                 }
             }

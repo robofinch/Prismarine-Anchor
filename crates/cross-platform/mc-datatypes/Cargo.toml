@@ -11,16 +11,10 @@ workspace = true
 
 [dependencies]
 serde       = { workspace = true, optional = true }
-thiserror   = { workspace = true, optional = true }
+thiserror   .workspace = true
 
 [features]
 ## Derives `Serialize` and `Deserialize` for various structs.
 derive_serde    = ["serde/serde_derive"]
 ## Derives `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash` for various structs.
 derive_standard = []
-
-all = [ "dimensions", "identifier", "positions", "version" ]
-dimensions      = []
-identifier      = ["dep:thiserror"]
-positions       = []
-version         = []

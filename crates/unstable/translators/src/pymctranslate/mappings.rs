@@ -5,7 +5,7 @@ use serde_json::value::RawValue;
 
 use prismarine_anchor_nbt::snbt;
 use prismarine_anchor_nbt::{
-    comparable::ComparableNbtTag, NbtContainerType, NbtType, snbt::VerifiedSnbt,
+    ComparableNbtTag, NbtContainerType, NbtType, snbt::VerifiedSnbt,
 };
 use prismarine_anchor_translation::datatypes::{BlockPosition, BlockProperty};
 

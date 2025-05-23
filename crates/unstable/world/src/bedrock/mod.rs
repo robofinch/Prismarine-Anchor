@@ -17,7 +17,7 @@ use prismarine_anchor_leveldb_entries::{
     KeyToBytesOptions, ValueToBytesError,
 };
 use prismarine_anchor_nbt::io as nbt_io;
-use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
+use prismarine_anchor_nbt::{NbtCompound, IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, write_compound};
 
 use self::leveldb::{DBCompressor, new_leveldb};

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use subslice_to_array::SubsliceToArray as _;
 use vecmap::VecMap;
 
-use prismarine_anchor_mc_datatypes::positions::{ChunkColumn, BlockPosInSubchunk};
+use prismarine_anchor_mc_datatypes::{ChunkColumn, BlockPosInSubchunk};
 
 use crate::interface::ValueToBytesOptions;
 

@@ -1,7 +1,7 @@
 mod compound;
 mod list;
-#[cfg(feature = "comparable")]
-pub mod comparable;
+mod comparable;
+
 #[cfg(feature = "serde")]
 mod serde_impl;
 
@@ -19,6 +19,7 @@ use crate::{
 
 
 pub use self::{compound::NbtCompound, list::NbtList};
+pub use self::comparable::*;
 
 
 /// The hash map type utilized in this crate.

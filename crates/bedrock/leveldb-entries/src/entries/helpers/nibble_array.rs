@@ -1,4 +1,4 @@
-use prismarine_anchor_mc_datatypes::positions::{BlockPosInSubchunk, ChunkColumn};
+use prismarine_anchor_mc_datatypes::{BlockPosInSubchunk, ChunkColumn};
 
 
 /// An array of an even number of 4-bit values. Within each byte, the less significant

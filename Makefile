@@ -11,8 +11,7 @@ test:
 # NBT features:
 # default             = [ "named_escapes" ]
 # preserve_order      = [ "dep:indexmap" ]
-# comparable          = []
-# float_cmp           = [ "comparable", "dep:float-cmp" ]
+# float_cmp           = [ "dep:float-cmp" ]
 # named_escapes       = [ "dep:unicode_names2" ]
 # allow_any_root      = []
 # configurable_depth  = []
@@ -22,7 +21,7 @@ test:
 # js                  = [ "getrandom/js" ]
 
 # Combinations to check:
-# power set of preserve_order, comparable, float_cmp, serde, allow_any_root
+# power set of preserve_order, float_cmp, serde, allow_any_root
 # plus check each feature, with a depth of 2 just in case
 
 check:

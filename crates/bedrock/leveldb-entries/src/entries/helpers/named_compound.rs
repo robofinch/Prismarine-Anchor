@@ -2,7 +2,7 @@ use std::io::{Cursor, Read};
 
 use thiserror::Error;
 
-use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
+use prismarine_anchor_nbt::{NbtCompound, IoOptions};
 use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
 use prismarine_anchor_util::u64_equals_usize;
 

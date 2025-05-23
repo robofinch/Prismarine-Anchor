@@ -49,10 +49,8 @@ default = [ "named_escapes" ]
 
 ## If enabled, Compound tags will preserve the order of their elements.
 preserve_order      = [ "dep:indexmap" ]
-## Provides an NBT tag wrapper implementing `Eq`, `Ord`, and `Hash`.
-comparable          = []
 ## Provides approximate float comparisons for `ComparableNbtTag`.
-float_cmp           = [ "comparable", "dep:float-cmp" ]
+float_cmp           = [ "dep:float-cmp" ]
 
 ## Adds support for the `\N{name}` named Unicode escapes described in the Java 1.21.5 spec
 named_escapes       = [ "dep:unicode_names2" ]

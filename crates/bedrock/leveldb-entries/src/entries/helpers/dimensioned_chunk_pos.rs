@@ -1,7 +1,6 @@
 use subslice_to_array::SubsliceToArray as _;
 
-use prismarine_anchor_mc_datatypes::positions::ChunkPosition;
-use prismarine_anchor_mc_datatypes::dimensions::{NumericDimension, OverworldElision};
+use prismarine_anchor_mc_datatypes::{ChunkPosition, NumericDimension, OverworldElision};
 
 
 /// The location of a chunk in a world, including its dimension.
