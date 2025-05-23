@@ -17,6 +17,7 @@ prismarine-anchor-util          = { workspace = true, optional = true }
 bijective-enum-map  = { workspace = true, optional = true }
 indexmap            = { workspace = true, optional = true }
 log                 = { workspace = true, optional = true }
+nonmax              = { workspace = true, optional = true }
 subslice-to-array   = { workspace = true, optional = true }
 thiserror           = { workspace = true, optional = true }
 vecmap-rs           = { workspace = true, optional = true }
@@ -42,14 +43,15 @@ all = [
     "dimensioned_chunk_pos", "actor_id", "uuid", "nibble_array",
 
     "block_volume", "concatenated_nbt_compounds", "heightmap", "legacy_biome_data",
-    "nbt_compound_conversion", "palettized_storage",
+    "named_compound", "palettized_storage",
 
     "chunk_version", "actor_digest_version",
     "data_3d", "data_2d", "legacy_data_2d",
     "subchunk_blocks", "legacy_terrain", "legacy_extra_block_data",
     "border_blocks", "hardcoded_spawners", "aabb_volumes",
     "checksums", "metadata",
-    "finalized_state", "biome_state", "blending_data", "actor_digest",
+    "finalized_state", "biome_state", "caves_and_cliffs_blending", "blending_data",
+    "actor_digest", "actor",
     "flat_world_layers", "level_spawn_was_fixed"
 ]
 dimensioned_chunk_pos       = [
@@ -61,10 +63,14 @@ uuid                        = ["dep:prismarine-anchor-util", "dep:log", "dep:sub
 nibble_array                = ["prismarine-anchor-mc-datatypes/positions"]
 
 block_volume                = ["dep:log"]
-concatenated_nbt_compounds  = ["dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util"]
+concatenated_nbt_compounds  = [
+    "named_compound", "dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util"
+]
 heightmap                   = ["dep:zerocopy"]
-legacy_biome_data          = ["dep:zerocopy"]
-nbt_compound_conversion     = ["dep:prismarine-anchor-nbt"]
+legacy_biome_data           = ["dep:zerocopy"]
+named_compound              = [
+    "dep:prismarine-anchor-nbt", "dep:prismarine-anchor-util", "dep:log", "dep:thiserror"
+]
 palettized_storage          = ["dep:thiserror", "dep:zerocopy"]
 
 chunk_version               = ["prismarine-anchor-mc-datatypes/version", "dep:bijective-enum-map"]
@@ -88,11 +94,12 @@ legacy_terrain              = [
     "dep:subslice-to-array"
 ]
 legacy_extra_block_data     = [
-    "prismarine-anchor-mc-datatypes/positions", "dep:subslice-to-array", "dep:vecmap-rs"
+    "prismarine-anchor-mc-datatypes/positions",
+    "dep:log", "dep:subslice-to-array", "dep:vecmap-rs"
 ]
 border_blocks               = [
     "prismarine-anchor-mc-datatypes/positions", "prismarine-anchor-mc-datatypes/derive_standard",
-    "dep:vecmap-rs"
+    "dep:log", "dep:vecmap-rs"
 ]
 hardcoded_spawners          = [
     "block_volume", "dep:bijective-enum-map", "dep:log", "dep:subslice-to-array"
@@ -103,7 +110,7 @@ aabb_volumes                = [
 ]
 checksums                   = [
     "dep:prismarine-anchor-util",
-    "dep:vecmap-rs", "dep:subslice-to-array", "dep:xxhash-rust"
+    "dep:log", "dep:vecmap-rs", "dep:subslice-to-array", "dep:xxhash-rust"
 ]
 metadata                    = [
     "prismarine-anchor-mc-datatypes/dimensions", "prismarine-anchor-nbt/preserve_order",
@@ -113,7 +120,9 @@ metadata                    = [
 ]
 finalized_state             = ["dep:bijective-enum-map", "dep:subslice-to-array"]
 biome_state                 = ["dep:bijective-enum-map"]
-blending_data               = []
-actor_digest                = ["actor_id", "dep:subslice-to-array"]
+caves_and_cliffs_blending   = []
+blending_data               = ["dep:nonmax"]
+actor_digest                = ["actor_id", "dep:subslice-to-array", "dep:log"]
+actor                       = ["concatenated_nbt_compounds", "named_compound"]
 flat_world_layers           = ["dep:prismarine-anchor-util", "dep:log"]
 level_spawn_was_fixed       = ["dep:log"]

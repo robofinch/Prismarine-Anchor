@@ -22,19 +22,12 @@ impl BiomeState {
         if value.len() == 1 + possible_num_entries * 2 {
             // This is the older `BiomeState` format, with a one-byte length header
             // followed by entries that are 2 bytes each (1-byte biomes, 1-byte values)
-            let num_entries = possible_num_entries;
 
-            let mut value = value.iter().copied().skip(1);
-            let mut biome_snow_levels = Vec::with_capacity(num_entries);
-            #[expect(
-                clippy::unwrap_used,
-                reason = "we know there are 2 bytes in value per entry",
-            )]
-            for _ in 0..num_entries {
-                let biome = value.next().unwrap();
-                let state = value.next().unwrap();
-                biome_snow_levels.push((biome, state));
-            }
+            let biome_snow_levels = value[1..]
+                .chunks_exact(2)
+                .map(|entry| (entry[0], entry[1]))
+                .collect();
+
             return OneByteBiomeStates::new(biome_snow_levels).map(Self::OneByteBiomes);
         }
 
@@ -46,22 +39,15 @@ impl BiomeState {
 
         let possible_num_entries = usize::from(u16::from_le_bytes([value[0], value[1]]));
         if value.len() == 2 + possible_num_entries * 3 {
-            let num_entries = possible_num_entries;
 
-            let mut value = value.iter().copied().skip(1);
-            let mut biome_snow_levels = Vec::with_capacity(num_entries);
-            #[expect(
-                clippy::unwrap_used,
-                reason = "we know there are 3 bytes in value per entry",
-            )]
-            for _ in 0..num_entries {
-                let biome = u16::from_le_bytes([
-                    value.next().unwrap(),
-                    value.next().unwrap(),
-                ]);
-                let state = value.next().unwrap();
-                biome_snow_levels.push((biome, state));
-            }
+            let biome_snow_levels = value[2..]
+                .chunks_exact(3)
+                .map(|entry| {
+                    let biome = u16::from_le_bytes([entry[0], entry[1]]);
+                    (biome, entry[2])
+                })
+                .collect();
+
             return TwoByteBiomeStates::new(biome_snow_levels).map(Self::TwoByteBiomes);
         }
 
@@ -103,6 +89,14 @@ impl BiomeState {
         let mut bytes = Vec::new();
         self.extend_serialized(&mut bytes);
         bytes
+    }
+
+    #[inline]
+    pub fn bytes_per_biome(&self) -> BytesPerBiome {
+        match self {
+            Self::OneByteBiomes(_) => BytesPerBiome::One,
+            Self::TwoByteBiomes(_) => BytesPerBiome::Two,
+        }
     }
 }
 

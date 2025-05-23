@@ -2,6 +2,8 @@
 
 use std::array;
 
+use nonmax::NonMaxI16;
+
 
 #[cfg_attr(feature = "derive_standard", derive(PartialEq, Eq, PartialOrd, Ord, Hash))]
 #[derive(Debug, Clone, Copy)]
@@ -12,7 +14,7 @@ pub enum BlendingData {
     },
     VersionAndData {
         version:  u8,
-        i16_data: [Option<i16>; 16],
+        i16_data: [Option<NonMaxI16>; 16],
         i8_data:  i8,
     },
 }
@@ -49,7 +51,7 @@ impl BlendingData {
                         *i16_bytes.next().unwrap(),
                     ]);
 
-                    if entry == i16::MAX { None } else { Some(entry) }
+                    NonMaxI16::new(entry)
                 });
 
                 Some(Self::VersionAndData {
@@ -78,8 +80,13 @@ impl BlendingData {
             } => {
                 bytes.reserve(35);
                 bytes.extend([1, *version]);
-                for entry in i16_data {
-                    bytes.extend(entry.unwrap_or(i16::MAX).to_le_bytes());
+                for &entry in i16_data {
+                    let entry_repr = if let Some(non_max) = entry {
+                        non_max.get()
+                    } else {
+                        i16::MAX
+                    };
+                    bytes.extend(entry_repr.to_le_bytes());
                 }
                 bytes.push(*i8_data as u8);
             }

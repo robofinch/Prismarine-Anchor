@@ -52,12 +52,6 @@ impl ChunkVersion {
     /// Note that some chunk versions are not returned as they were only used during 1.17
     /// if the caves and cliffs experimental feature was enabled.
     pub fn chunk_version_for(game_version: NumericVersion) -> Option<Self> {
-
-        // TODO: this doesn't seem to cover everything, I have an alpha save whose
-        // last saved version *seems* to be plain 0's, which uses chunk version 4 -
-        // maybe i'm not looking at quite the right data for game version,
-        // but I wouldn't trust this for the oldest versions.
-
         let versions = [
             Self::V0, Self::V1, Self::V2, Self::V3, Self::V4, Self::V5, Self::V6, Self::V7,
             Self::V8, Self::V9, Self::V10, Self::V11, Self::V12, Self::V13, Self::V14, Self::V15,
@@ -137,9 +131,7 @@ impl ChunkVersion {
             Self::V10 => NumericVersion::from([1, 9, 0]),
             Self::V11 => NumericVersion::from([1, 10, 0]),
             Self::V12 => NumericVersion::from([1, 11, 0]),
-            // TODO: Maybe 1.11.10 instead of 1.11.1?
             Self::V13 => NumericVersion::from([1, 11, 1]),
-            // TODO: Maybe 1.11.20 instead of 1.11.2?
             Self::V14 => NumericVersion::from([1, 11, 2]),
             Self::V15 => NumericVersion::from([1, 12, 0]),
             Self::V16 => NumericVersion::from([1, 14, 0]),

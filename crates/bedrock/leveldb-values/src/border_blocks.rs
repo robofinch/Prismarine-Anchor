@@ -24,6 +24,13 @@ impl BorderBlocks {
         };
 
         if value.len() != 1 + columns_len {
+            log::warn!(
+                "Checksums with {} entries (according to header) was expected \
+                 to have length {}, but had length {}",
+                columns_len,
+                1 + columns_len,
+                value.len(),
+            );
             return None;
         }
 

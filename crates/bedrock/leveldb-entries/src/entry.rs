@@ -1,11 +1,13 @@
 use prismarine_anchor_leveldb_values::{
     aabb_volumes::AabbVolumes,
+    actor::Actor,
     actor_digest::ActorDigest,
     actor_digest_version::ActorDigestVersion,
     actor_id::ActorID,
     biome_state::BiomeState,
     border_blocks::BorderBlocks,
     blending_data::BlendingData,
+    caves_and_cliffs_blending::CavesAndCliffsBlending,
     checksums::Checksums,
     dimensioned_chunk_pos::DimensionedChunkPos,
     chunk_version::ChunkVersion,
@@ -20,17 +22,16 @@ use prismarine_anchor_leveldb_values::{
     legacy_terrain::LegacyTerrain,
     level_spawn_was_fixed::LevelSpawnWasFixed,
     metadata::LevelChunkMetaDataDictionary,
-    nbt_compound_conversion::NbtCompoundConversion as _,
+    named_compound::NamedCompound,
     subchunk_blocks::SubchunkBlocks,
     uuid::UUID,
 };
 use prismarine_anchor_mc_datatypes::{dimensions::NamedDimension, identifier::NamespacedIdentifier};
-use prismarine_anchor_nbt::NbtCompound;
 
-// Crazy luck with the alignment
 use crate::{
-    key::DBKey, EntryBytes, EntryParseOptions, EntryParseResult, EntryToBytesError,
-    EntryToBytesOptions, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
+    key::DBKey, EntryBytes,
+    EntryParseOptions, EntryParseResult, EntryToBytesError, EntryToBytesOptions,
+    ValueParseOptions, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
 };
 
 
@@ -84,9 +85,10 @@ pub enum DBEntry {
     // is the best we can do.
     ConversionData(DimensionedChunkPos, Vec<u8>),
 
-    // Not used, apparently, so Vec<u8> is the best we can do without more info.
-    CavesAndCliffsBlending(DimensionedChunkPos, Vec<u8>),
-    // Not used, apparently, so Vec<u8> is the best we can do without more info.
+    /// Full internal name is `GeneratedPreCavesAndCliffsBlending`
+    CavesAndCliffsBlending(DimensionedChunkPos, CavesAndCliffsBlending),
+    // Haven't managed to find a save file with this yet. Without more info, Vec<u8>
+    // is the best we can do.
     BlendingBiomeHeight(DimensionedChunkPos, Vec<u8>),
     BlendingData(DimensionedChunkPos, BlendingData),
 
@@ -96,42 +98,42 @@ pub enum DBEntry {
     //  Data not specific to a chunk
     // ================================
 
-    Actor(ActorID, NbtCompound),
+    Actor(ActorID, Actor),
 
     LevelChunkMetaDataDictionary(LevelChunkMetaDataDictionary),
 
-    AutonomousEntities(NbtCompound),
+    AutonomousEntities(NamedCompound),
 
-    LocalPlayer(NbtCompound),
-    Player(UUID, NbtCompound),
+    LocalPlayer(NamedCompound),
+    Player(UUID, NamedCompound),
     /// No longer used
-    LegacyPlayer(u64, NbtCompound),
-    PlayerServer(UUID, NbtCompound),
+    LegacyPlayer(u64, NamedCompound),
+    PlayerServer(UUID, NamedCompound),
 
-    VillageDwellers(Option<NamedDimension>, UUID, NbtCompound),
-    VillageInfo(    Option<NamedDimension>, UUID, NbtCompound),
-    VillagePOI(     Option<NamedDimension>, UUID, NbtCompound),
-    VillagePlayers( Option<NamedDimension>, UUID, NbtCompound),
-    VillageRaid(    Option<NamedDimension>, UUID, NbtCompound),
+    VillageDwellers(Option<NamedDimension>, UUID, NamedCompound),
+    VillageInfo(    Option<NamedDimension>, UUID, NamedCompound),
+    VillagePOI(     Option<NamedDimension>, UUID, NamedCompound),
+    VillagePlayers( Option<NamedDimension>, UUID, NamedCompound),
+    VillageRaid(    Option<NamedDimension>, UUID, NamedCompound),
 
-    Map(i64, NbtCompound),
-    Portals(NbtCompound),
+    Map(i64, NamedCompound),
+    Portals(NamedCompound),
 
-    StructureTemplate(NamespacedIdentifier, NbtCompound),
-    TickingArea(UUID, NbtCompound),
-    Scoreboard(NbtCompound),
-    WanderingTraderScheduler(NbtCompound),
+    StructureTemplate(NamespacedIdentifier, NamedCompound),
+    TickingArea(UUID, NamedCompound),
+    Scoreboard(NamedCompound),
+    WanderingTraderScheduler(NamedCompound),
 
-    BiomeData(NbtCompound),
-    MobEvents(NbtCompound),
+    BiomeData(NamedCompound),
+    MobEvents(NamedCompound),
 
-    Overworld(NbtCompound),
-    Nether(NbtCompound),
-    TheEnd(NbtCompound),
+    Overworld(NamedCompound),
+    Nether(NamedCompound),
+    TheEnd(NamedCompound),
 
-    PositionTrackingDB(u32, NbtCompound),
-    PositionTrackingLastId(NbtCompound),
-    BiomeIdsTable(NbtCompound),
+    PositionTrackingDB(u32, NamedCompound),
+    PositionTrackingLastId(NamedCompound),
+    BiomeIdsTable(NamedCompound),
 
     // Other encountered keys from old versions:
 
@@ -143,18 +145,18 @@ pub enum DBEntry {
     // idcounts   <- I've only heard of this, not seen this as a key.
 
     /// No longer used
-    MVillages(NbtCompound),
+    MVillages(NamedCompound),
     /// No longer used
-    Villages(NbtCompound),
+    Villages(NamedCompound),
     // LegacyVillageManager <- I think I saw some library include this. Probably NBT?
     // note that the raw key is, allegedly, "VillageManager"
 
     /// No longer used
-    Dimension0(NbtCompound),
+    Dimension0(NamedCompound),
     /// No longer used
-    Dimension1(NbtCompound),
+    Dimension1(NamedCompound),
     /// No longer used
-    Dimension2(NbtCompound),
+    Dimension2(NamedCompound),
 
     RawEntry {
         key:   Vec<u8>,
@@ -230,6 +232,7 @@ impl DBEntry {
         opts: EntryParseOptions,
     ) -> ValueParseResult {
         use ValueParseResult as V;
+        let opts = ValueParseOptions::from(opts);
 
         match key {
             DBKey::Version(chunk_pos) => {
@@ -287,35 +290,35 @@ impl DBEntry {
             }
             DBKey::BlockEntities(chunk_pos) => {
                 // Note that block entities definitely have some `ByteString`s
-                let compounds = ConcatenatedNbtCompounds::parse(value)
+                let compounds = ConcatenatedNbtCompounds::parse(value, opts)
                     .inspect_err(|err| log::warn!("Error parsing BlockEntities: {err}"));
                 if let Ok(compounds) = compounds {
                     return V::Parsed(Self::BlockEntities(chunk_pos, compounds));
                 }
             }
             DBKey::Entities(chunk_pos) => {
-                let compounds = ConcatenatedNbtCompounds::parse(value)
+                let compounds = ConcatenatedNbtCompounds::parse(value, opts)
                     .inspect_err(|err| log::warn!("Error parsing Entities: {err}"));
                 if let Ok(compounds) = compounds {
                     return V::Parsed(Self::Entities(chunk_pos, compounds));
                 }
             }
             DBKey::PendingTicks(chunk_pos) => {
-                let compounds = ConcatenatedNbtCompounds::parse(value)
+                let compounds = ConcatenatedNbtCompounds::parse(value, opts)
                     .inspect_err(|err| log::warn!("Error parsing PendingTicks: {err}"));
                 if let Ok(compounds) = compounds {
                     return V::Parsed(Self::PendingTicks(chunk_pos, compounds));
                 }
             }
             DBKey::RandomTicks(chunk_pos) => {
-                let compounds = ConcatenatedNbtCompounds::parse(value)
+                let compounds = ConcatenatedNbtCompounds::parse(value, opts)
                     .inspect_err(|err| log::warn!("Error parsing RandomTicks: {err}"));
                 if let Ok(compounds) = compounds {
                     return V::Parsed(Self::RandomTicks(chunk_pos, compounds));
                 }
             }
             DBKey::BorderBlocks(chunk_pos) => {
-                if let Some(border_blocks) = BorderBlocks::parse(value, opts.into()) {
+                if let Some(border_blocks) = BorderBlocks::parse(value, opts) {
                     return V::Parsed(Self::BorderBlocks(chunk_pos, border_blocks))
                 }
             }
@@ -359,8 +362,9 @@ impl DBEntry {
                 return V::Parsed(Self::ConversionData(chunk_pos, value.to_vec()));
             }
             DBKey::CavesAndCliffsBlending(chunk_pos) => {
-                log::warn!("Encountered CavesAndCliffsBlending value: {value:?}");
-                return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, value.to_vec()));
+                if let Some(blending) = CavesAndCliffsBlending::parse(value) {
+                    return V::Parsed(Self::CavesAndCliffsBlending(chunk_pos, blending));
+                }
             }
             DBKey::BlendingBiomeHeight(chunk_pos) => {
                 log::warn!("Encountered BlendingBiomeHeight value: {value:?}");
@@ -377,8 +381,12 @@ impl DBEntry {
                 }
             }
             DBKey::Actor(actor_id) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::Actor(actor_id, nbt));
+                let actor = Actor::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Actor NBT(s): {err}",
+                    ));
+                if let Ok(actor) = actor {
+                    return V::Parsed(Self::Actor(actor_id, actor));
                 }
             }
             DBKey::LevelChunkMetaDataDictionary => {
@@ -391,146 +399,250 @@ impl DBEntry {
                 }
             }
             DBKey::AutonomousEntities => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing AutonomousEntities: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::AutonomousEntities(nbt));
                 }
             }
             DBKey::LocalPlayer => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing LocalPlayer: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::LocalPlayer(nbt));
                 }
             }
             DBKey::Player(uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Player: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Player(uuid, nbt));
                 }
             }
             DBKey::LegacyPlayer(client_id) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing LegacyPlayer: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::LegacyPlayer(client_id, nbt));
                 }
             }
             DBKey::PlayerServer(uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing PlayerServer: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::PlayerServer(uuid, nbt));
                 }
             }
             DBKey::VillageDwellers(dim, uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::VillageDwellers(dim, uuid, nbt));
-                } else {
-                    // Note that `dim` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::VillageDwellers(dim, uuid));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::VillageDwellers(dim, uuid, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing VillageDwellers: {err}");
+                        // Note that `dim` is not Copy, so we can't rely on falling through
+                        // to the end of the function
+                        return V::UnrecognizedValue(DBKey::VillageDwellers(dim, uuid));
+                    }
                 }
             }
             DBKey::VillageInfo(dim, uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::VillageInfo(dim, uuid, nbt));
-                } else {
-                    // Note that `dim` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::VillageInfo(dim, uuid));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::VillageInfo(dim, uuid, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing VillageInfo: {err}");
+                        return V::UnrecognizedValue(DBKey::VillageInfo(dim, uuid));
+                    }
                 }
             }
             DBKey::VillagePOI(dim, uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::VillagePOI(dim, uuid, nbt));
-                } else {
-                    // Note that `dim` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::VillagePOI(dim, uuid));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::VillagePOI(dim, uuid, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing VillagePOI: {err}");
+                        return V::UnrecognizedValue(DBKey::VillagePOI(dim, uuid));
+                    }
                 }
             }
             DBKey::VillagePlayers(dim, uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::VillagePlayers(dim, uuid, nbt));
-                } else {
-                    // Note that `dim` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::VillagePlayers(dim, uuid));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::VillagePlayers(dim, uuid, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing VillagePlayers: {err}");
+                        return V::UnrecognizedValue(DBKey::VillagePlayers(dim, uuid));
+                    }
                 }
             }
             DBKey::VillageRaid(dim, uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::VillageRaid(dim, uuid, nbt));
-                } else {
-                    // Note that `dim` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::VillageRaid(dim, uuid));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::VillageRaid(dim, uuid, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing VillageRaid: {err}");
+                        return V::UnrecognizedValue(DBKey::VillageRaid(dim, uuid));
+                    }
                 }
             }
             DBKey::Map(map_id) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Map: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Map(map_id, nbt));
                 }
             }
             DBKey::Portals => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Portals: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Portals(nbt));
                 }
             }
             DBKey::StructureTemplate(identifier) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
-                    return V::Parsed(Self::StructureTemplate(identifier, nbt));
-                } else {
-                    // Note that `identifer` is not Copy, so we can't rely on falling through
-                    // to the end of the function
-                    return V::UnrecognizedValue(DBKey::StructureTemplate(identifier));
+                // Note that `dim` is not Copy, so we can't rely on falling through
+                // to the end of the function
+
+                match NamedCompound::parse(value, opts) {
+                    Ok(nbt) => {
+                        return V::Parsed(Self::StructureTemplate(identifier, nbt));
+                    }
+                    Err(err) => {
+                        log::warn!("Error parsing StructureTemplate: {err}");
+                        return V::UnrecognizedValue(DBKey::StructureTemplate(identifier));
+                    }
                 }
             }
             DBKey::TickingArea(uuid) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing TickingArea: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::TickingArea(uuid, nbt));
                 }
             }
             DBKey::Scoreboard => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Scoreboard: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Scoreboard(nbt));
                 }
             }
             DBKey::WanderingTraderScheduler => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing WanderingTraderScheduler: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::WanderingTraderScheduler(nbt));
                 }
             }
             DBKey::BiomeData => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing BiomeData: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::BiomeData(nbt));
                 }
             }
             DBKey::MobEvents => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing MobEvents: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::MobEvents(nbt));
                 }
             }
             DBKey::Overworld => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Overworld: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Overworld(nbt));
                 }
             }
             DBKey::Nether => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Nether: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Nether(nbt));
                 }
             }
             DBKey::TheEnd => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing TheEnd: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::TheEnd(nbt));
                 }
             }
             DBKey::PositionTrackingDB(id) => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing PositionTrackingDB: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::PositionTrackingDB(id, nbt));
                 }
             }
             DBKey::PositionTrackingLastId => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing PositionTrackingLastId: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::PositionTrackingLastId(nbt));
                 }
             }
             DBKey::BiomeIdsTable => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing BiomeIdsTable: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::BiomeIdsTable(nbt));
                 }
             }
@@ -545,27 +657,47 @@ impl DBEntry {
                 }
             }
             DBKey::MVillages => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing MVillages: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::MVillages(nbt));
                 }
             }
             DBKey::Villages => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Villages: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Villages(nbt));
                 }
             }
             DBKey::Dimension0 => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Dimension0: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Dimension0(nbt));
                 }
             }
             DBKey::Dimension1 => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Dimension1: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Dimension1(nbt));
                 }
             }
             DBKey::Dimension2 => {
-                if let Some(nbt) = NbtCompound::parse(value) {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Dimension2: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
                     return V::Parsed(Self::Dimension2(nbt));
                 }
             }
@@ -735,10 +867,10 @@ impl DBEntry {
             Self::SubchunkBlocks(.., blocks)            => blocks.to_bytes()?,
             Self::LegacyTerrain(.., terrain)            => terrain.to_bytes(),
             Self::LegacyExtraBlockData(.., blocks)      => blocks.to_bytes(opts)?,
-            Self::BlockEntities(.., compounds)          => compounds.to_bytes()?,
-            Self::Entities(.., compounds)               => compounds.to_bytes()?,
-            Self::PendingTicks(.., compounds)           => compounds.to_bytes()?,
-            Self::RandomTicks(.., compounds)            => compounds.to_bytes()?,
+            Self::BlockEntities(.., compounds)          => compounds.to_bytes(opts)?,
+            Self::Entities(.., compounds)               => compounds.to_bytes(opts)?,
+            Self::PendingTicks(.., compounds)           => compounds.to_bytes(opts)?,
+            Self::RandomTicks(.., compounds)            => compounds.to_bytes(opts)?,
             Self::BorderBlocks(.., blocks)              => blocks.to_bytes(opts),
             Self::HardcodedSpawners(.., spawners)       => spawners.to_bytes(opts)?,
             Self::AabbVolumes(.., volumes)              => volumes.to_bytes(opts)?,
@@ -748,43 +880,43 @@ impl DBEntry {
             Self::FinalizedState(.., state)             => state.to_bytes(),
             Self::BiomeState(.., state)                 => state.to_bytes(),
             Self::ConversionData(.., raw)               => raw.clone(),
-            Self::CavesAndCliffsBlending(.., raw)       => raw.clone(),
+            Self::CavesAndCliffsBlending(.., blending)  => blending.to_bytes(),
             Self::BlendingBiomeHeight(.., raw)          => raw.clone(),
             Self::BlendingData(.., blending_data)       => blending_data.to_bytes(),
             Self::ActorDigest(.., digest)               => digest.to_bytes(),
-            Self::Actor(.., nbt)                        => nbt.to_bytes()?,
+            Self::Actor(.., nbt)                        => nbt.to_bytes(opts)?,
             Self::LevelChunkMetaDataDictionary(dict)    => dict.to_bytes(opts)?,
-            Self::AutonomousEntities(nbt)               => nbt.to_bytes()?,
-            Self::LocalPlayer(nbt)                      => nbt.to_bytes()?,
-            Self::Player(.., nbt)                       => nbt.to_bytes()?,
-            Self::LegacyPlayer(.., nbt)                 => nbt.to_bytes()?,
-            Self::PlayerServer(.., nbt)                 => nbt.to_bytes()?,
-            Self::VillageDwellers(.., nbt)              => nbt.to_bytes()?,
-            Self::VillageInfo(.., nbt)                  => nbt.to_bytes()?,
-            Self::VillagePOI(.., nbt)                   => nbt.to_bytes()?,
-            Self::VillagePlayers(.., nbt)               => nbt.to_bytes()?,
-            Self::VillageRaid(.., nbt)                  => nbt.to_bytes()?,
-            Self::Map(.., nbt)                          => nbt.to_bytes()?,
-            Self::Portals(nbt)                          => nbt.to_bytes()?,
-            Self::StructureTemplate(.., nbt)            => nbt.to_bytes()?,
-            Self::TickingArea(.., nbt)                  => nbt.to_bytes()?,
-            Self::Scoreboard(nbt)                       => nbt.to_bytes()?,
-            Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes()?,
-            Self::BiomeData(nbt)                        => nbt.to_bytes()?,
-            Self::MobEvents(nbt)                        => nbt.to_bytes()?,
-            Self::Overworld(nbt)                        => nbt.to_bytes()?,
-            Self::Nether(nbt)                           => nbt.to_bytes()?,
-            Self::TheEnd(nbt)                           => nbt.to_bytes()?,
-            Self::PositionTrackingDB(.., nbt)           => nbt.to_bytes()?,
-            Self::PositionTrackingLastId(nbt)           => nbt.to_bytes()?,
-            Self::BiomeIdsTable(nbt)                    => nbt.to_bytes()?,
+            Self::AutonomousEntities(nbt)               => nbt.to_bytes(opts)?,
+            Self::LocalPlayer(nbt)                      => nbt.to_bytes(opts)?,
+            Self::Player(.., nbt)                       => nbt.to_bytes(opts)?,
+            Self::LegacyPlayer(.., nbt)                 => nbt.to_bytes(opts)?,
+            Self::PlayerServer(.., nbt)                 => nbt.to_bytes(opts)?,
+            Self::VillageDwellers(.., nbt)              => nbt.to_bytes(opts)?,
+            Self::VillageInfo(.., nbt)                  => nbt.to_bytes(opts)?,
+            Self::VillagePOI(.., nbt)                   => nbt.to_bytes(opts)?,
+            Self::VillagePlayers(.., nbt)               => nbt.to_bytes(opts)?,
+            Self::VillageRaid(.., nbt)                  => nbt.to_bytes(opts)?,
+            Self::Map(.., nbt)                          => nbt.to_bytes(opts)?,
+            Self::Portals(nbt)                          => nbt.to_bytes(opts)?,
+            Self::StructureTemplate(.., nbt)            => nbt.to_bytes(opts)?,
+            Self::TickingArea(.., nbt)                  => nbt.to_bytes(opts)?,
+            Self::Scoreboard(nbt)                       => nbt.to_bytes(opts)?,
+            Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes(opts)?,
+            Self::BiomeData(nbt)                        => nbt.to_bytes(opts)?,
+            Self::MobEvents(nbt)                        => nbt.to_bytes(opts)?,
+            Self::Overworld(nbt)                        => nbt.to_bytes(opts)?,
+            Self::Nether(nbt)                           => nbt.to_bytes(opts)?,
+            Self::TheEnd(nbt)                           => nbt.to_bytes(opts)?,
+            Self::PositionTrackingDB(.., nbt)           => nbt.to_bytes(opts)?,
+            Self::PositionTrackingLastId(nbt)           => nbt.to_bytes(opts)?,
+            Self::BiomeIdsTable(nbt)                    => nbt.to_bytes(opts)?,
             Self::FlatWorldLayers(layers)               => layers.to_bytes(),
             Self::LevelSpawnWasFixed(fixed)             => fixed.to_bytes(),
-            Self::MVillages(nbt)                        => nbt.to_bytes()?,
-            Self::Villages(nbt)                         => nbt.to_bytes()?,
-            Self::Dimension0(nbt)                       => nbt.to_bytes()?,
-            Self::Dimension1(nbt)                       => nbt.to_bytes()?,
-            Self::Dimension2(nbt)                       => nbt.to_bytes()?,
+            Self::MVillages(nbt)                        => nbt.to_bytes(opts)?,
+            Self::Villages(nbt)                         => nbt.to_bytes(opts)?,
+            Self::Dimension0(nbt)                       => nbt.to_bytes(opts)?,
+            Self::Dimension1(nbt)                       => nbt.to_bytes(opts)?,
+            Self::Dimension2(nbt)                       => nbt.to_bytes(opts)?,
             Self::RawEntry { value, .. }                => value.clone(),
             Self::RawValue { value, .. }                => value.clone(),
         })
@@ -818,15 +950,6 @@ impl DBEntry {
             }
             Self::ConversionData(chunk_pos, raw) => {
                 let key = DBKey::ConversionData(chunk_pos);
-                let key_bytes = key.to_bytes(opts.into());
-
-                Ok(EntryBytes {
-                    key:   key_bytes,
-                    value: raw,
-                })
-            }
-            Self::CavesAndCliffsBlending(chunk_pos, raw) => {
-                let key = DBKey::CavesAndCliffsBlending(chunk_pos);
                 let key_bytes = key.to_bytes(opts.into());
 
                 Ok(EntryBytes {

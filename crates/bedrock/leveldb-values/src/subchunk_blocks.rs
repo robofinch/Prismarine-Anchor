@@ -19,6 +19,7 @@ use crate::palettized_storage::{
 #[derive(Debug, Clone)]
 pub enum SubchunkBlocks {
     Legacy(Box<LegacySubchunkBlocks>),
+    V1(SubchunkBlocksV1),
     V8(SubchunkBlocksV8),
     V9(SubchunkBlocksV9),
 }
@@ -32,6 +33,7 @@ impl SubchunkBlocks {
 
         Ok(match version {
             0 | 2..=7 => Self::Legacy(Box::new(LegacySubchunkBlocks::parse(value)?)),
+            1 => Self::V1(SubchunkBlocksV1::parse(value)?),
             8 => Self::V8(SubchunkBlocksV8::parse(value)?),
             9 => Self::V9(SubchunkBlocksV9::parse(value)?),
             _ => return Err(SubchunkBlocksParseError::UnknownVersion(version)),
@@ -42,6 +44,7 @@ impl SubchunkBlocks {
     pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
         match self {
             Self::Legacy(blocks) => blocks.extend_serialized(bytes),
+            Self::V1(blocks) => blocks.extend_serialized(bytes)?,
             Self::V8(blocks) => blocks.extend_serialized(bytes)?,
             Self::V9(blocks) => blocks.extend_serialized(bytes)?,
         }
@@ -180,6 +183,88 @@ impl LegacySubchunkBlocks {
 }
 
 #[derive(Debug, Clone)]
+pub struct SubchunkBlocksV1(pub PalettizedStorage<NbtCompound>);
+
+impl SubchunkBlocksV1 {
+    pub fn parse(value: &[u8]) -> Result<Self, V1ParseError> {
+        if value.len() < 1 {
+            return Err(V1ParseError::HeaderTooShort);
+        }
+
+        let version = value[0];
+        if version != 1 {
+            return Err(V1ParseError::WrongVersion(version));
+        }
+
+        let mut reader = Cursor::new(&value[1..]);
+        let header = PaletteHeader::parse_header(&mut reader)?;
+
+        let block_layer = match header.palette_type {
+            PaletteType::Runtime => {
+                // Unlike with Data3D, only Persistent is usually used,
+                // and we only support that.
+                return Err(V1ParseError::RuntimePalette);
+            }
+            PaletteType::Persistent => {
+                let block_layer = PalettizedStorage::parse(
+                    &mut reader,
+                    header.bits_per_index,
+                    |reader, palette_len| {
+                        let mut compounds = Vec::new();
+                        let opts = IoOptions::bedrock_uncompressed();
+
+                        for _ in 0..palette_len {
+                            let (compound, _) = read_compound(reader, opts)?;
+                            compounds.push(compound);
+                        }
+
+                        Ok(compounds)
+                    },
+                )?;
+
+                match &block_layer {
+                    PalettizedStorage::Empty => {
+                        return Err(V1ParseError::EmptyPalette)
+                    }
+                    PalettizedStorage::Uniform(_) => {
+                        return Err(V1ParseError::UniformPalette)
+                    }
+                    PalettizedStorage::Palettized(_) => {
+                        block_layer
+                    }
+                }
+            }
+        };
+
+        if u64_equals_usize(reader.position(), reader.into_inner().len()) {
+            Ok(Self(block_layer))
+        } else {
+            Err(V1ParseError::NotAllRead)
+        }
+    }
+
+    /// The contents of `bytes` is unspecified if an error is returned.
+    #[inline]
+    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
+        bytes.push(1);
+
+        self.0.extend_serialized(
+            bytes,
+            PaletteType::Persistent,
+            true,
+            write_block_layers,
+        )
+    }
+
+    #[inline]
+    pub fn to_bytes(&self) -> Result<Vec<u8>, NbtIoError> {
+        let mut bytes = Vec::new();
+        self.extend_serialized(&mut bytes)?;
+        Ok(bytes)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SubchunkBlocksV8 {
     pub block_layers: Vec<PalettizedStorage<NbtCompound>>,
 }
@@ -302,7 +387,7 @@ impl SubchunkBlocksV9 {
 
         let num_layers = usize::from(value[1]);
         let y_index = value[2] as i8;
-        let layer_bytes = &value[2..];
+        let layer_bytes = &value[3..];
 
         let mut reader = Cursor::new(layer_bytes);
         let total_len = layer_bytes.len();
@@ -395,6 +480,8 @@ pub enum SubchunkBlocksParseError {
     #[error("error while parsing SubchunkBlocks: {0}")]
     Legacy(#[from] LegacyParseError),
     #[error("error while parsing SubchunkBlocks: {0}")]
+    V1(#[from] V1ParseError),
+    #[error("error while parsing SubchunkBlocks: {0}")]
     V8(#[from] V8ParseError),
     #[error("error while parsing SubchunkBlocks: {0}")]
     V9(#[from] V9ParseError),
@@ -406,6 +493,26 @@ pub enum LegacyParseError {
     InvalidVersion(u8),
     #[error("LegacySubchunkBlocks data can never have length {0}")]
     InvalidLength(usize),
+}
+
+#[derive(Error, Debug)]
+pub enum V1ParseError {
+    #[error("there was no version header for SubchunkBlocksV1")]
+    HeaderTooShort,
+    #[error("expected version 1 in the SubchunkBlocksV1 header, but read version {0}")]
+    WrongVersion(u8),
+    #[error(transparent)]
+    PaletteHeaderError(#[from] PaletteHeaderParseError),
+    #[error(transparent)]
+    PalettizedStorageError(#[from] PalettizedStorageParseError<NbtIoError>),
+    #[error("runtime palettes are not supported for SubchunkBlocksV1 data")]
+    RuntimePalette,
+    #[error("empty palettes are not supported for SubchunkBlocksV1 data")]
+    EmptyPalette,
+    #[error("uniform palettes are not supported for SubchunkBlocksV1 data")]
+    UniformPalette,
+    #[error("bytes were left over after parsing SubchunkBlocksV1 data")]
+    NotAllRead,
 }
 
 #[derive(Error, Debug)]

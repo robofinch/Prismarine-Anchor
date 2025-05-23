@@ -19,23 +19,29 @@ impl Checksums {
         let num_entries = usize::try_from(num_entries).ok()?;
 
         if value.len() != 4 + num_entries * 11 {
+            log::warn!(
+                "Checksums with {} entries (according to header) was expected \
+                 to have length {}, but had length {}",
+                num_entries,
+                4 + num_entries * 11,
+                value.len(),
+            );
             return None;
         }
 
         // We can process value in chunks of 11 bytes
-        let mut value = &value[4..];
-        let mut checksums = VecMap::with_capacity(num_entries);
-        for _ in 0..num_entries {
-            let tag           = value.subslice_to_array::<0, 2>();
-            let subtag        = value[2] as i8;
-            let checksum_hash = value.subslice_to_array::<3, 11>();
-            value = &value[11..];
-
-            checksums.insert(
-                ChecksumType::parse(u16::from_le_bytes(tag), subtag)?,
-                u64::from_le_bytes(checksum_hash),
-            );
-        }
+        let checksums = value[4..]
+            .chunks_exact(11)
+            .map(|checksum| {
+                let tag           = checksum.subslice_to_array::<0, 2>();
+                let subtag        = checksum[2] as i8;
+                let checksum_hash = checksum.subslice_to_array::<3, 11>();
+                Some((
+                    ChecksumType::parse(u16::from_le_bytes(tag), subtag)?,
+                    u64::from_le_bytes(checksum_hash),
+                ))
+            })
+            .collect::<Option<_>>()?;
 
         Some(Self(checksums))
     }

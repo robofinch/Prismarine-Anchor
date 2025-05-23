@@ -33,22 +33,22 @@ impl HardcodedSpawners {
         }
 
         // We can process value in chunks of 25 bytes
-        let mut value = &value[4..];
-        let mut hardcoded_spawners = Vec::with_capacity(num_entries);
-        for _ in 0..num_entries {
-            let volume = value.subslice_to_array::<0, 24>();
-            let spawner_type = value[24];
-            value = &value[25..];
+        let hardcoded_spawners = value[4..]
+            .chunks_exact(25)
+            .map(|spawner| {
+                let volume = spawner.subslice_to_array::<0, 24>();
+                let spawner_type = spawner[24];
 
-            let spawner_type = HardcodedSpawnerType::try_from(spawner_type)
-                .inspect_err(|()| log::warn!("Invalid HardcodedSpawnerType: {spawner_type}"))
-                .ok()?;
+                let spawner_type = HardcodedSpawnerType::try_from(spawner_type)
+                    .inspect_err(|()| log::warn!("Invalid HardcodedSpawnerType: {spawner_type}"))
+                    .ok()?;
 
-            hardcoded_spawners.push((
-                BlockVolume::parse(volume)?,
-                spawner_type,
-            ));
-        }
+                Some((
+                    BlockVolume::parse(volume)?,
+                    spawner_type,
+                ))
+            })
+            .collect::<Option<_>>()?;
 
         Some(Self(hardcoded_spawners))
     }

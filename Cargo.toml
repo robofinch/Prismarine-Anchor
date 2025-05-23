@@ -76,11 +76,15 @@ anyhow              = "1"
 bijective-enum-map  = "0.1.0"
 byteorder           = "1.5.0"
 cesu8               = "1.1.0"
+crossbeam           = "0.8.4"
+env_logger          = "0.11.8"
 flate2              = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
 float-cmp           = { version = "0.10.0", default-features = false, features = ["num-traits"] }
 getrandom           = { version = "0.2", default-features = false }
 indexmap            = { version = "2.7.1", features = ["serde"] }
 log                 = "0.4.27"
+nonmax              = "0.5.5"
+object-pool         = "0.6.0"
 proc-macro2         = "1"
 quote               = "1"
 rusty-leveldb       = { version = "3.0.2", default-features = false }
@@ -106,6 +110,7 @@ zip                 = { version = "2.5.0", default-features = false, features = 
                         "deflate-flate2", "flate2", "time"
                     ] }
 
+# rayon    = "1.10.0"
 # enum-map = "2.7.3"
 # smallvec = "1.14.0"
 

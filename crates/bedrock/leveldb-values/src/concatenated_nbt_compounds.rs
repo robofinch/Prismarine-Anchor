@@ -1,25 +1,24 @@
 use std::io::Cursor;
 
-use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};
-use prismarine_anchor_nbt::io::{NbtIoError, read_compound, write_compound};
+use prismarine_anchor_nbt::io::NbtIoError;
 use prismarine_anchor_util::u64_equals_usize;
+
+use crate::ValueToBytesOptions;
+use crate::{named_compound::NamedCompound, ValueParseOptions};
 
 
 #[derive(Debug, Clone)]
-pub struct ConcatenatedNbtCompounds(pub Vec<NbtCompound>);
+pub struct ConcatenatedNbtCompounds(pub Vec<NamedCompound>);
 
 impl ConcatenatedNbtCompounds {
-    pub fn parse(input: &[u8]) -> Result<Self, NbtIoError> {
+    pub fn parse(input: &[u8], opts: ValueParseOptions) -> Result<Self, NbtIoError> {
         let mut compounds = Vec::new();
 
         let input_len = input.len();
         let mut reader = Cursor::new(input);
 
         while !u64_equals_usize(reader.position(), input_len) {
-            let (nbt, _) = read_compound(
-                &mut reader,
-                IoOptions::bedrock_uncompressed(),
-            )?;
+            let nbt = NamedCompound::read(&mut reader, opts)?;
             compounds.push(nbt);
         }
 
@@ -27,20 +26,22 @@ impl ConcatenatedNbtCompounds {
     }
 
     #[inline]
-    pub fn extend_serialized(&self, bytes: &mut Vec<u8>) -> Result<(), NbtIoError> {
-        let mut writer = Cursor::new(bytes);
-
-        for compound in &self.0 {
-            write_compound(&mut writer, IoOptions::bedrock_uncompressed(), None, compound)?;
+    pub fn extend_serialized(
+        &self,
+        bytes: &mut Vec<u8>,
+        opts: ValueToBytesOptions,
+    ) -> Result<(), NbtIoError> {
+        for nbt in &self.0 {
+            nbt.extend_serialized(bytes, opts)?;
         }
 
         Ok(())
     }
 
     #[inline]
-    pub fn to_bytes(&self) -> Result<Vec<u8>, NbtIoError> {
+    pub fn to_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, NbtIoError> {
         let mut bytes = Vec::new();
-        self.extend_serialized(&mut bytes)?;
+        self.extend_serialized(&mut bytes, opts)?;
         Ok(bytes)
     }
 }

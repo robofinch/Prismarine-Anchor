@@ -13,7 +13,8 @@ use rusty_leveldb::{DB as LevelDB, env::Env, Status};
 use thiserror::Error;
 
 use prismarine_anchor_leveldb_entries::{
-    DBEntry, DBKey, EntryBytes, EntryParseOptions, EntryToBytesOptions, KeyToBytesOptions, ValueToBytesError
+    DBEntry, DBKey, EntryBytes, EntryParseOptions, EntryToBytesOptions,
+    KeyToBytesOptions, ValueToBytesError,
 };
 use prismarine_anchor_nbt::io as nbt_io;
 use prismarine_anchor_nbt::{NbtCompound, settings::IoOptions};

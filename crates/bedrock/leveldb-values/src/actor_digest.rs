@@ -10,19 +10,18 @@ pub struct ActorDigest(pub Vec<ActorID>);
 impl ActorDigest {
     pub fn parse(value: &[u8]) -> Option<Self> {
         if value.len() % 8 != 0 {
+            log::warn!("ActorDigest data wasn't a multiple of 8");
             return None;
         }
 
-        let mut actor_ids = Vec::with_capacity(value.len() / 8);
-
         // We can process `value` in 8-byte chunks
-        let mut value = value;
-        while !value.is_empty() {
-            let next_actor_id = value.subslice_to_array::<0, 8>();
-            value = &value[8..];
-
-            actor_ids.push(ActorID::parse(next_actor_id));
-        }
+        let actor_ids = value
+            .chunks_exact(8)
+            .map(|actor_id| {
+                let actor_id = actor_id.subslice_to_array::<0, 8>();
+                ActorID::parse(actor_id)
+            })
+            .collect();
 
         Some(Self(actor_ids))
     }

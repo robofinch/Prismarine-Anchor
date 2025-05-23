@@ -17,8 +17,8 @@ pub mod concatenated_nbt_compounds;
 pub mod heightmap;
 #[cfg(feature = "legacy_biome_data")]
 pub mod legacy_biome_data;
-#[cfg(feature = "nbt_compound_conversion")]
-pub mod nbt_compound_conversion;
+#[cfg(feature = "named_compound")]
+pub mod named_compound;
 #[cfg(feature = "palettized_storage")]
 pub mod palettized_storage;
 
@@ -52,10 +52,14 @@ pub mod metadata; // for both MetaDataHash and LevelChunkMetaDataDictionary
 pub mod finalized_state;
 #[cfg(feature = "biome_state")]
 pub mod biome_state;
+#[cfg(feature = "caves_and_cliffs_blending")]
+pub mod caves_and_cliffs_blending;
 #[cfg(feature = "blending_data")]
 pub mod blending_data;
 #[cfg(feature = "actor_digest")]
 pub mod actor_digest;
+#[cfg(feature = "actor")]
+pub mod actor;
 #[cfg(feature = "flat_world_layers")]
 pub mod flat_world_layers;
 #[cfg(feature = "level_spawn_was_fixed")]
@@ -105,18 +109,13 @@ pub enum DataFidelity {
     /// Preserve all data, including semantically unimportant data like padding bits, and preserves
     /// the order of all entries in likely-unordered key-value maps.
     ///
-    /// Currently, this only affects `AabbVolumes`, which in the `Semantic` fidelity is sorted
-    /// (in line with observed data from Minecraft saves), but in the future, the `Semantic`
-    /// setting *could* ignore semantically unimportant data.
-    ///
     /// NOTE: you may also need to enable the `preserve_order` feature of `prismarine-anchor-nbt`
     /// for this option to fully function.
-    // TODO: implement this for NBT *names*, and actually sort AabbVolumes
     BitPerfect,
     /// Preserve all semantically important data. Currently, padding bits in `PalettizedStorage`
     /// (when read/written from/to the packed index representation) and the order of entries
-    /// in most key-value maps is still preserved, except the entries in the maps of `AabbVolumes`
-    /// are sorted by key (in line with observed data from Minecraft saves).
+    /// in most key-value maps is still preserved, but when convenient, such information may
+    /// be ignored.
     Semantic,
 }
 

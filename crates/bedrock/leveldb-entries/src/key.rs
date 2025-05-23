@@ -100,6 +100,7 @@ pub enum DBKey {
     ConversionData(DimensionedChunkPos),
 
     // I might never know what `CavesAndCliffsBlending` and `BlendingBiomeHeight` are/do.
+    /// Full internal name is `GeneratedPreCavesAndCliffsBlending`
     CavesAndCliffsBlending(DimensionedChunkPos),
     BlendingBiomeHeight(DimensionedChunkPos),
     // I've managed to parse this.... sort of. Still don't know the details of what it does.

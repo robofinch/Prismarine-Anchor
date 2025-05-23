@@ -17,7 +17,10 @@ prismarine-anchor-util              = { workspace = true, features = ["print_deb
 prismarine-anchor-world             .workspace = true
 
 anyhow              .workspace = true
+crossbeam           .workspace = true
+env_logger          .workspace = true
 # flate2              .workspace = true
+object-pool         .workspace = true
 rusty-leveldb       .workspace = true
 subslice-to-array   .workspace = true
 # xxhash-rust         .workspace = true

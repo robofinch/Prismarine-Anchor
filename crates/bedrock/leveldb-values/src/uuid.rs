@@ -21,7 +21,7 @@ impl UUID {
 
         // Four hyphens, 32 hex digits which are ASCII and are one byte each
         if uuid.len() != 36 {
-            log::warn!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
+            log::info!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
             return None;
         }
 
@@ -29,7 +29,7 @@ impl UUID {
 
         // The above check doesn't exclude the chance of multibyte chars
         if uuid_chars.len() != 36 {
-            log::warn!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
+            log::info!("A presumed 8-4-4-4-12 hex digit UUID was not the correct length");
             return None;
         }
 
@@ -59,7 +59,7 @@ impl UUID {
         }
 
         convert(first, second, third, fourth, fifth_start, fifth_end)
-            .inspect_none(|| log::warn!("Failed to parse UUID: {uuid}"))
+            .inspect_none(|| log::info!("Failed to parse UUID: {uuid}"))
     }
 
     /// Extend the provided bytes with this UUID serialized into a byte string in the

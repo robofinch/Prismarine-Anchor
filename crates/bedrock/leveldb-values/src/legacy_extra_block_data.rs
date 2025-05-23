@@ -47,6 +47,13 @@ impl LegacyExtraBlockData {
         let num_entries = usize::try_from(num_entries).ok()?;
 
         if value.len() != 4 + num_entries * 6 {
+            log::warn!(
+                "LegacyExtraBlockData with {} entries (according to header) was expected \
+                 to have length {}, but had length {}",
+                num_entries,
+                4 + num_entries * 6,
+                value.len(),
+            );
             return None;
         }
 
