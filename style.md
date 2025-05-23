@@ -23,6 +23,10 @@
   (in particular, all structs and then all impls is fine,
   and having each struct be directly followed by its impls
   is also fine.)
+- When importing from a parent module, generally, only import items defined in that module;
+  don't use the parent module's own imports, and instead reimport items with their full paths.
+  The `prismarine-anchor-*-entries` crates are partial exceptions; they take advantage of parent
+  modules' `pub use` statements.
 - Imports (and public imports, respectively)
   are organized into the following groups:
   - `std` imports

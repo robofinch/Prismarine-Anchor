@@ -14,19 +14,19 @@ use rusty_leveldb::LdbIterator;
 use rusty_leveldb::PosixDiskEnv;
 
 use prismarine_anchor_leveldb_entries::{
-    DBEntry, DBKey, EntryParseOptions, EntryToBytesOptions,
+    DataFidelity, DBEntry, DBKey, EntryParseOptions, EntryToBytesOptions,
 };
-use prismarine_anchor_leveldb_values::{
-    aabb_volumes::AabbVolumes,
-    actor::Actor,
-    DataFidelity,
-    dimensioned_chunk_pos::DimensionedChunkPos,
-    metadata::LevelChunkMetaDataDictionary,
-    palettized_storage::PalettizedStorage,
-};
-use prismarine_anchor_leveldb_values::{
-    legacy_extra_block_data::{NbtPieces, SubchunkExtraBlockData, TerrainExtraBlockData},
-    subchunk_blocks::{SubchunkBlocks, SubchunkBlocksV9},
+use prismarine_anchor_leveldb_entries::entries::{
+    AabbVolumes,
+    Actor,
+    helpers::{
+        DimensionedChunkPos,
+        palettized_storage::PalettizedStorage,
+    },
+    LevelChunkMetaDataDictionary,
+    NbtPieces,
+    SubchunkExtraBlockData,
+    TerrainExtraBlockData,
 };
 use prismarine_anchor_mc_datatypes::version::{NumericVersion, VersionName};
 use prismarine_anchor_nbt::{io::read_compound, NbtList, settings::IoOptions};
@@ -69,6 +69,7 @@ fn main() {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_world(world_num: usize, world_path: String) {
     println!("Opening world {world_num} at {world_path}");
 

@@ -584,6 +584,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prismarine-anchor-bedrock-entries"
+version = "0.1.0"
+dependencies = [
+ "bijective-enum-map",
+ "prismarine-anchor-leveldb-entries",
+ "prismarine-anchor-mc-datatypes",
+ "prismarine-anchor-util",
+]
+
+[[package]]
 name = "prismarine-anchor-editor"
 version = "0.1.0"
 dependencies = [
@@ -593,7 +603,6 @@ dependencies = [
  "getrandom",
  "object-pool",
  "prismarine-anchor-leveldb-entries",
- "prismarine-anchor-leveldb-values",
  "prismarine-anchor-mc-datatypes",
  "prismarine-anchor-nbt",
  "prismarine-anchor-util",
@@ -604,18 +613,6 @@ dependencies = [
 
 [[package]]
 name = "prismarine-anchor-leveldb-entries"
-version = "0.1.0"
-dependencies = [
- "log",
- "prismarine-anchor-leveldb-values",
- "prismarine-anchor-mc-datatypes",
- "prismarine-anchor-nbt",
- "subslice-to-array",
- "thiserror",
-]
-
-[[package]]
-name = "prismarine-anchor-leveldb-values"
 version = "0.1.0"
 dependencies = [
  "bijective-enum-map",

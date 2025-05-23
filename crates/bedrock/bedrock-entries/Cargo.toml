@@ -1,0 +1,23 @@
+[package]
+name = "prismarine-anchor-bedrock-entries"
+authors = ["Finley Huggins"]
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+prismarine-anchor-leveldb-entries   = { workspace = true, features = ["entry"] }
+prismarine-anchor-mc-datatypes      .workspace = true
+prismarine-anchor-util              .workspace = true
+
+bijective-enum-map  .workspace = true
+
+[features]
+derive_standard = [
+    "prismarine-anchor-leveldb-entries/derive_standard",
+    "prismarine-anchor-mc-datatypes/derive_standard"
+]

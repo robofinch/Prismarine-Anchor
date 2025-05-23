@@ -10,16 +10,21 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
 prismarine-anchor-mc-datatypes      = { workspace = true, features = ["all"] }
-prismarine-anchor-nbt               .workspace = true
+prismarine-anchor-nbt               = { workspace = true, features = ["preserve_order"] }
+prismarine-anchor-util              .workspace = true
 
+bijective-enum-map  .workspace = true
+indexmap            .workspace = true
 log                 .workspace = true
+nonmax              .workspace = true
 subslice-to-array   .workspace = true
 thiserror           .workspace = true
+vecmap-rs           .workspace = true
+xxhash-rust         .workspace = true
+zerocopy            = { workspace = true, features = ["derive"] }
 
 [features]
-derive_standard = [
-    "prismarine-anchor-leveldb-values/derive_standard",
-    "prismarine-anchor-mc-datatypes/derive_standard"
-]
+derive_standard = ["prismarine-anchor-mc-datatypes/derive_standard"]
+key   = []
+entry = ["key"]

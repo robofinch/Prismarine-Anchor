@@ -1,37 +1,40 @@
-use prismarine_anchor_leveldb_values::{
-    aabb_volumes::AabbVolumes,
-    actor::Actor,
-    actor_digest::ActorDigest,
-    actor_digest_version::ActorDigestVersion,
-    actor_id::ActorID,
-    biome_state::BiomeState,
-    border_blocks::BorderBlocks,
-    blending_data::BlendingData,
-    caves_and_cliffs_blending::CavesAndCliffsBlending,
-    checksums::Checksums,
-    dimensioned_chunk_pos::DimensionedChunkPos,
-    chunk_version::ChunkVersion,
-    concatenated_nbt_compounds::ConcatenatedNbtCompounds,
-    data_2d::Data2D,
-    data_3d::Data3D,
-    finalized_state::FinalizedState,
-    flat_world_layers::FlatWorldLayers,
-    hardcoded_spawners::HardcodedSpawners,
-    legacy_data_2d::LegacyData2D,
-    legacy_extra_block_data::LegacyExtraBlockData,
-    legacy_terrain::LegacyTerrain,
-    level_spawn_was_fixed::LevelSpawnWasFixed,
-    metadata::LevelChunkMetaDataDictionary,
-    named_compound::NamedCompound,
-    subchunk_blocks::SubchunkBlocks,
-    uuid::UUID,
-};
 use prismarine_anchor_mc_datatypes::{dimensions::NamedDimension, identifier::NamespacedIdentifier};
 
+use crate::DBKey;
 use crate::{
-    key::DBKey, EntryBytes,
-    EntryParseOptions, EntryParseResult, EntryToBytesError, EntryToBytesOptions,
-    ValueParseOptions, ValueParseResult, ValueToBytesError, ValueToBytesOptions,
+    entries::{
+        AabbVolumes,
+        Actor,
+        ActorDigest,
+        ActorDigestVersionDbValue,
+        BiomeState,
+        BorderBlocks,
+        BlendingData,
+        CavesAndCliffsBlending,
+        Checksums,
+        Data2D,
+        Data3D,
+        FinalizedStateDbValue,
+        FlatWorldLayers,
+        HardcodedSpawners,
+        helpers::{ActorID, ConcatenatedNbtCompounds, DimensionedChunkPos, NamedCompound, UUID},
+        LegacyData2D,
+        LegacyExtraBlockData,
+        LegacyTerrain,
+        LegacyVersionDbValue,
+        LevelSpawnWasFixed,
+        LevelChunkMetaDataDictionary,
+        SubchunkBlocks,
+        VersionDbValue,
+    },
+    errors::{
+        EntryParseResult, EntryToBytesError,
+        ValueParseResult, ValueToBytesError,
+    },
+    interface::{
+        EntryBytes, EntryParseOptions, EntryToBytesOptions,
+        ValueParseOptions, ValueToBytesOptions,
+    },
 };
 
 
@@ -49,9 +52,9 @@ pub enum DBEntry {
     //  Chunk-specific data
     // ================================
 
-    Version(DimensionedChunkPos, ChunkVersion),
-    LegacyVersion(DimensionedChunkPos, ChunkVersion),
-    ActorDigestVersion(DimensionedChunkPos, ActorDigestVersion),
+    Version(DimensionedChunkPos, VersionDbValue),
+    LegacyVersion(DimensionedChunkPos, LegacyVersionDbValue),
+    ActorDigestVersion(DimensionedChunkPos, ActorDigestVersionDbValue),
 
     Data3D(DimensionedChunkPos, Box<Data3D>),
     Data2D(DimensionedChunkPos, Box<Data2D>),
@@ -78,7 +81,7 @@ pub enum DBEntry {
     MetaDataHash(DimensionedChunkPos, u64),
 
     GenerationSeed(DimensionedChunkPos, u64),
-    FinalizedState(DimensionedChunkPos, FinalizedState),
+    FinalizedState(DimensionedChunkPos, FinalizedStateDbValue),
     BiomeState(DimensionedChunkPos, BiomeState),
 
     // Haven't managed to find a save file with this yet. Without more info, Vec<u8>
@@ -117,23 +120,22 @@ pub enum DBEntry {
     VillageRaid(    Option<NamedDimension>, UUID, NamedCompound),
 
     Map(i64, NamedCompound),
-    Portals(NamedCompound),
-
     StructureTemplate(NamespacedIdentifier, NamedCompound),
-    TickingArea(UUID, NamedCompound),
+
     Scoreboard(NamedCompound),
-    WanderingTraderScheduler(NamedCompound),
+    TickingArea(UUID, NamedCompound),
 
     BiomeData(NamedCompound),
+    BiomeIdsTable(NamedCompound),
     MobEvents(NamedCompound),
+    Portals(NamedCompound),
+    PositionTrackingDB(u32, NamedCompound),
+    PositionTrackingLastId(NamedCompound),
+    WanderingTraderScheduler(NamedCompound),
 
     Overworld(NamedCompound),
     Nether(NamedCompound),
     TheEnd(NamedCompound),
-
-    PositionTrackingDB(u32, NamedCompound),
-    PositionTrackingLastId(NamedCompound),
-    BiomeIdsTable(NamedCompound),
 
     // Other encountered keys from old versions:
 
@@ -236,24 +238,18 @@ impl DBEntry {
 
         match key {
             DBKey::Version(chunk_pos) => {
-                if value.len() == 1 {
-                    if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
-                        return V::Parsed(Self::Version(chunk_pos, chunk_version));
-                    }
+                if let Some(chunk_version) = VersionDbValue::parse(value) {
+                    return V::Parsed(Self::Version(chunk_pos, chunk_version));
                 }
             }
             DBKey::LegacyVersion(chunk_pos) => {
-                if value.len() == 1 {
-                    if let Some(chunk_version) = ChunkVersion::parse(value[0]) {
-                        return V::Parsed(Self::LegacyVersion(chunk_pos, chunk_version));
-                    }
+                if let Some(chunk_version) = LegacyVersionDbValue::parse(value) {
+                    return V::Parsed(Self::LegacyVersion(chunk_pos, chunk_version));
                 }
             }
             DBKey::ActorDigestVersion(chunk_pos) => {
-                if value.len() == 1 {
-                    if let Ok(digest_version) = ActorDigestVersion::try_from(value[0]) {
-                        return V::Parsed(Self::ActorDigestVersion(chunk_pos, digest_version));
-                    }
+                if let Some(digest_version) = ActorDigestVersionDbValue::parse(value) {
+                    return V::Parsed(Self::ActorDigestVersion(chunk_pos, digest_version));
                 }
             }
             DBKey::Data3D(chunk_pos) => {
@@ -348,7 +344,7 @@ impl DBEntry {
                 }
             }
             DBKey::FinalizedState(chunk_pos) => {
-                if let Some(finalized_state) = FinalizedState::parse(value) {
+                if let Some(finalized_state) = FinalizedStateDbValue::parse(value) {
                     return V::Parsed(Self::FinalizedState(chunk_pos, finalized_state));
                 }
             }
@@ -524,15 +520,6 @@ impl DBEntry {
                     return V::Parsed(Self::Map(map_id, nbt));
                 }
             }
-            DBKey::Portals => {
-                let nbt = NamedCompound::parse(value, opts)
-                    .inspect_err(|err| log::warn!(
-                        "Error parsing Portals: {err}",
-                    ));
-                if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::Portals(nbt));
-                }
-            }
             DBKey::StructureTemplate(identifier) => {
                 // Note that `dim` is not Copy, so we can't rely on falling through
                 // to the end of the function
@@ -547,15 +534,6 @@ impl DBEntry {
                     }
                 }
             }
-            DBKey::TickingArea(uuid) => {
-                let nbt = NamedCompound::parse(value, opts)
-                    .inspect_err(|err| log::warn!(
-                        "Error parsing TickingArea: {err}",
-                    ));
-                if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::TickingArea(uuid, nbt));
-                }
-            }
             DBKey::Scoreboard => {
                 let nbt = NamedCompound::parse(value, opts)
                     .inspect_err(|err| log::warn!(
@@ -565,13 +543,13 @@ impl DBEntry {
                     return V::Parsed(Self::Scoreboard(nbt));
                 }
             }
-            DBKey::WanderingTraderScheduler => {
+            DBKey::TickingArea(uuid) => {
                 let nbt = NamedCompound::parse(value, opts)
                     .inspect_err(|err| log::warn!(
-                        "Error parsing WanderingTraderScheduler: {err}",
+                        "Error parsing TickingArea: {err}",
                     ));
                 if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::WanderingTraderScheduler(nbt));
+                    return V::Parsed(Self::TickingArea(uuid, nbt));
                 }
             }
             DBKey::BiomeData => {
@@ -583,6 +561,15 @@ impl DBEntry {
                     return V::Parsed(Self::BiomeData(nbt));
                 }
             }
+            DBKey::BiomeIdsTable => {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing BiomeIdsTable: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
+                    return V::Parsed(Self::BiomeIdsTable(nbt));
+                }
+            }
             DBKey::MobEvents => {
                 let nbt = NamedCompound::parse(value, opts)
                     .inspect_err(|err| log::warn!(
@@ -590,6 +577,42 @@ impl DBEntry {
                     ));
                 if let Ok(nbt) = nbt {
                     return V::Parsed(Self::MobEvents(nbt));
+                }
+            }
+            DBKey::Portals => {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing Portals: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
+                    return V::Parsed(Self::Portals(nbt));
+                }
+            }
+            DBKey::PositionTrackingDB(id) => {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing PositionTrackingDB: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
+                    return V::Parsed(Self::PositionTrackingDB(id, nbt));
+                }
+            }
+            DBKey::PositionTrackingLastId => {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing PositionTrackingLastId: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
+                    return V::Parsed(Self::PositionTrackingLastId(nbt));
+                }
+            }
+            DBKey::WanderingTraderScheduler => {
+                let nbt = NamedCompound::parse(value, opts)
+                    .inspect_err(|err| log::warn!(
+                        "Error parsing WanderingTraderScheduler: {err}",
+                    ));
+                if let Ok(nbt) = nbt {
+                    return V::Parsed(Self::WanderingTraderScheduler(nbt));
                 }
             }
             DBKey::Overworld => {
@@ -617,33 +640,6 @@ impl DBEntry {
                     ));
                 if let Ok(nbt) = nbt {
                     return V::Parsed(Self::TheEnd(nbt));
-                }
-            }
-            DBKey::PositionTrackingDB(id) => {
-                let nbt = NamedCompound::parse(value, opts)
-                    .inspect_err(|err| log::warn!(
-                        "Error parsing PositionTrackingDB: {err}",
-                    ));
-                if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::PositionTrackingDB(id, nbt));
-                }
-            }
-            DBKey::PositionTrackingLastId => {
-                let nbt = NamedCompound::parse(value, opts)
-                    .inspect_err(|err| log::warn!(
-                        "Error parsing PositionTrackingLastId: {err}",
-                    ));
-                if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::PositionTrackingLastId(nbt));
-                }
-            }
-            DBKey::BiomeIdsTable => {
-                let nbt = NamedCompound::parse(value, opts)
-                    .inspect_err(|err| log::warn!(
-                        "Error parsing BiomeIdsTable: {err}",
-                    ));
-                if let Ok(nbt) = nbt {
-                    return V::Parsed(Self::BiomeIdsTable(nbt));
                 }
             }
             DBKey::FlatWorldLayers => {
@@ -764,19 +760,19 @@ impl DBEntry {
             Self::VillagePlayers(dim, uuid, ..)     => DBKey::VillagePlayers(dim.clone(), *uuid),
             Self::VillageRaid(dim, uuid, ..)        => DBKey::VillageRaid(dim.clone(), *uuid),
             Self::Map(map_id, ..)                   => DBKey::Map(*map_id),
-            Self::Portals(..)                       => DBKey::Portals,
             Self::StructureTemplate(name, ..)       => DBKey::StructureTemplate(name.clone()),
-            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(*uuid),
             Self::Scoreboard(..)                    => DBKey::Scoreboard,
-            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
+            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(*uuid),
             Self::BiomeData(..)                     => DBKey::BiomeData,
+            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
             Self::MobEvents(..)                     => DBKey::MobEvents,
+            Self::Portals(..)                       => DBKey::Portals,
+            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(*id),
+            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
+            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
             Self::Overworld(..)                     => DBKey::Overworld,
             Self::Nether(..)                        => DBKey::Nether,
             Self::TheEnd(..)                        => DBKey::TheEnd,
-            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(*id),
-            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
-            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
             Self::FlatWorldLayers(..)               => DBKey::FlatWorldLayers,
             Self::LevelSpawnWasFixed(..)            => DBKey::LevelSpawnWasFixed,
             Self::MVillages(..)                     => DBKey::MVillages,
@@ -830,19 +826,19 @@ impl DBEntry {
             Self::VillagePlayers(dim, uuid, ..)     => DBKey::VillagePlayers(dim, uuid),
             Self::VillageRaid(dim, uuid, ..)        => DBKey::VillageRaid(dim, uuid),
             Self::Map(map_id, ..)                   => DBKey::Map(map_id),
-            Self::Portals(..)                       => DBKey::Portals,
             Self::StructureTemplate(name, ..)       => DBKey::StructureTemplate(name),
-            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(uuid),
             Self::Scoreboard(..)                    => DBKey::Scoreboard,
-            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
+            Self::TickingArea(uuid, ..)             => DBKey::TickingArea(uuid),
             Self::BiomeData(..)                     => DBKey::BiomeData,
+            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
             Self::MobEvents(..)                     => DBKey::MobEvents,
+            Self::Portals(..)                       => DBKey::Portals,
+            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(id),
+            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
+            Self::WanderingTraderScheduler(..)      => DBKey::WanderingTraderScheduler,
             Self::Overworld(..)                     => DBKey::Overworld,
             Self::Nether(..)                        => DBKey::Nether,
             Self::TheEnd(..)                        => DBKey::TheEnd,
-            Self::PositionTrackingDB(id, ..)        => DBKey::PositionTrackingDB(id),
-            Self::PositionTrackingLastId(..)        => DBKey::PositionTrackingLastId,
-            Self::BiomeIdsTable(..)                 => DBKey::BiomeIdsTable,
             Self::FlatWorldLayers(..)               => DBKey::FlatWorldLayers,
             Self::LevelSpawnWasFixed(..)            => DBKey::LevelSpawnWasFixed,
             Self::MVillages(..)                     => DBKey::MVillages,
@@ -858,9 +854,9 @@ impl DBEntry {
     pub fn to_value_bytes(&self, opts: ValueToBytesOptions) -> Result<Vec<u8>, ValueToBytesError> {
         #[expect(clippy::match_same_arms, reason = "clarity")]
         Ok(match self {
-            Self::Version(.., version)                  => vec![u8::from(*version)],
-            Self::LegacyVersion(.., version)            => vec![u8::from(*version)],
-            Self::ActorDigestVersion(.., version)       => vec![u8::from(*version)],
+            Self::Version(.., version)                  => version.to_bytes(),
+            Self::LegacyVersion(.., version)            => version.to_bytes(),
+            Self::ActorDigestVersion(.., version)       => version.to_bytes(),
             Self::Data3D(.., data)                      => data.to_bytes(),
             Self::Data2D(.., data)                      => data.to_bytes(),
             Self::LegacyData2D(.., data)                => data.to_bytes(),
@@ -897,19 +893,19 @@ impl DBEntry {
             Self::VillagePlayers(.., nbt)               => nbt.to_bytes(opts)?,
             Self::VillageRaid(.., nbt)                  => nbt.to_bytes(opts)?,
             Self::Map(.., nbt)                          => nbt.to_bytes(opts)?,
-            Self::Portals(nbt)                          => nbt.to_bytes(opts)?,
             Self::StructureTemplate(.., nbt)            => nbt.to_bytes(opts)?,
-            Self::TickingArea(.., nbt)                  => nbt.to_bytes(opts)?,
             Self::Scoreboard(nbt)                       => nbt.to_bytes(opts)?,
-            Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes(opts)?,
+            Self::TickingArea(.., nbt)                  => nbt.to_bytes(opts)?,
             Self::BiomeData(nbt)                        => nbt.to_bytes(opts)?,
+            Self::BiomeIdsTable(nbt)                    => nbt.to_bytes(opts)?,
             Self::MobEvents(nbt)                        => nbt.to_bytes(opts)?,
+            Self::Portals(nbt)                          => nbt.to_bytes(opts)?,
+            Self::PositionTrackingDB(.., nbt)           => nbt.to_bytes(opts)?,
+            Self::PositionTrackingLastId(nbt)           => nbt.to_bytes(opts)?,
+            Self::WanderingTraderScheduler(nbt)         => nbt.to_bytes(opts)?,
             Self::Overworld(nbt)                        => nbt.to_bytes(opts)?,
             Self::Nether(nbt)                           => nbt.to_bytes(opts)?,
             Self::TheEnd(nbt)                           => nbt.to_bytes(opts)?,
-            Self::PositionTrackingDB(.., nbt)           => nbt.to_bytes(opts)?,
-            Self::PositionTrackingLastId(nbt)           => nbt.to_bytes(opts)?,
-            Self::BiomeIdsTable(nbt)                    => nbt.to_bytes(opts)?,
             Self::FlatWorldLayers(layers)               => layers.to_bytes(),
             Self::LevelSpawnWasFixed(fixed)             => fixed.to_bytes(),
             Self::MVillages(nbt)                        => nbt.to_bytes(opts)?,

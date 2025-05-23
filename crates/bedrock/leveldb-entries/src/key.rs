@@ -2,18 +2,14 @@ use std::str;
 
 use subslice_to_array::SubsliceToArray as _;
 
-use prismarine_anchor_leveldb_values::{
-    actor_id::ActorID,
-    dimensioned_chunk_pos::DimensionedChunkPos,
-    uuid::UUID,
-};
 use prismarine_anchor_mc_datatypes::{
     dimensions::{NamedDimension, OverworldElision, VanillaDimension},
     identifier::{IdentifierParseOptions, NamespacedIdentifier},
 };
 
 
-use super::KeyToBytesOptions;
+use super::interface::KeyToBytesOptions;
+use super::entries::helpers::{ActorID, DimensionedChunkPos, UUID};
 
 
 /// The keys in a world's LevelDB database used by Minecraft Bedrock.
@@ -153,31 +149,29 @@ pub enum DBKey {
     VillageRaid(Option<NamedDimension>, UUID),
 
     Map(i64),
-    Portals,
-
     StructureTemplate(NamespacedIdentifier),
-    TickingArea(UUID),
+
     Scoreboard,
-    WanderingTraderScheduler,
+    TickingArea(UUID),
 
     // NBT data which effectively maps numeric biome IDs to floats indicating that
     // biome's snow accumulation (the maximum height of snow layers that can naturally
     // accumulate during snowfall), or so I think.
     // TODO: confirm this
     BiomeData,
+    BiomeIdsTable,
     // NBT with a few binary flags
     MobEvents,
+    Portals,
+    PositionTrackingDB(u32),
+    PositionTrackingLastId,
+    WanderingTraderScheduler,
 
     // data:
     // LimboEntities
     Overworld,
     Nether,
     TheEnd, // This one also has DragonFight
-
-    // New and exciting tags, with very little information about them
-    PositionTrackingDB(u32),
-    PositionTrackingLastId,
-    BiomeIdsTable,
 
     // Other encountered keys from very old versions:
 
@@ -221,7 +215,7 @@ impl DBKey {
     pub fn parse_recognized_key(raw_key: &[u8]) -> Option<Self> {
         // Try some common prefixes first
         if (raw_key.len() == 12 || raw_key.len() == 16) && raw_key.starts_with(b"digp") {
-            if let Ok(dimensioned_pos) = DimensionedChunkPos::try_from(&raw_key[4..]) {
+            if let Some(dimensioned_pos) = DimensionedChunkPos::parse(&raw_key[4..]) {
                 return Some(Self::ActorDigest(dimensioned_pos));
             }
         } else if raw_key.len() == 19 && raw_key.starts_with(b"actorprefix") {
@@ -249,8 +243,8 @@ impl DBKey {
             //    b's' == 115
             let tag = raw_key[raw_key.len() - 1];
             if ((43 <= tag && tag <= 65) && tag != 47) || tag == 118 || tag == 119 {
-                if let Ok(dimensioned_pos) =
-                    DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 1])
+                if let Some(dimensioned_pos) =
+                    DimensionedChunkPos::parse(&raw_key[..raw_key.len() - 1])
                 {
                     // These chunk key numeric values are hardcoded twice in this file,
                     // and a few are also in prismarine-anchor-leveldb-values/src/checksums.rs
@@ -291,8 +285,8 @@ impl DBKey {
             // Note that 47 is b'/', and that `scoreboard`, `dimension0`, and `dimension1`
             // would enter this `else if` block before failing this check.
             if raw_key[raw_key.len() - 2] == 47 {
-                if let Ok(dimensioned_pos) =
-                    DimensionedChunkPos::try_from(&raw_key[..raw_key.len() - 2])
+                if let Some(dimensioned_pos) =
+                    DimensionedChunkPos::parse(&raw_key[..raw_key.len() - 2])
                 {
                     return Some(Self::SubchunkBlocks(
                         dimensioned_pos,
@@ -394,13 +388,13 @@ impl DBKey {
                 "~local_player"                 => Self::LocalPlayer,
                 "LevelChunkMetaDataDictionary"  => Self::LevelChunkMetaDataDictionary,
                 "AutonomousEntities"            => Self::AutonomousEntities,
-                "portals"                       => Self::Portals,
                 "scoreboard"                    => Self::Scoreboard,
-                "schedulerWT"                   => Self::WanderingTraderScheduler,
                 "BiomeData"                     => Self::BiomeData,
-                "mobevents"                     => Self::MobEvents,
-                "PositionTrackDB-LastId"        => Self::PositionTrackingLastId,
                 "BiomeIdsTable"                 => Self::BiomeIdsTable,
+                "mobevents"                     => Self::MobEvents,
+                "portals"                       => Self::Portals,
+                "PositionTrackDB-LastId"        => Self::PositionTrackingLastId,
+                "schedulerWT"                   => Self::WanderingTraderScheduler,
                 "game_flatworldlayers"          => Self::FlatWorldLayers,
                 "LevelSpawnWasFixed"            => Self::LevelSpawnWasFixed,
                 "mVillages"                     => Self::MVillages,
@@ -568,10 +562,6 @@ impl DBKey {
                 bytes.extend(format!("{map_id}").as_bytes());
                 return;
             }
-            &Self::Portals => {
-                bytes.extend(b"portals");
-                return;
-            }
             Self::StructureTemplate(identifier) => {
                 let identifier_len = identifier.namespace.len() + identifier.path.len() + 1;
 
@@ -582,38 +572,30 @@ impl DBKey {
                 bytes.extend(identifier.path.as_bytes());
                 return;
             }
+            &Self::Scoreboard => {
+                bytes.extend(b"scoreboard");
+                return;
+            }
             &Self::TickingArea(uuid) => {
                 bytes.reserve(b"tickingarea_".len() + 36);
                 bytes.extend(b"tickingarea_");
                 uuid.extend_serialized(bytes);
                 return;
             }
-            &Self::Scoreboard => {
-                bytes.extend(b"scoreboard");
-                return;
-            }
-            &Self::WanderingTraderScheduler => {
-                bytes.extend(b"schedulerWT");
-                return;
-            }
             &Self::BiomeData => {
                 bytes.extend(b"BiomeData");
+                return;
+            }
+            &Self::BiomeIdsTable => {
+                bytes.extend(b"BiomeIdsTable");
                 return;
             }
             &Self::MobEvents => {
                 bytes.extend(b"mobevents");
                 return;
             }
-            &Self::Overworld => {
-                bytes.extend(VanillaDimension::Overworld.to_bedrock_name().as_bytes());
-                return;
-            }
-            &Self::Nether => {
-                bytes.extend(VanillaDimension::Nether.to_bedrock_name().as_bytes());
-                return;
-            }
-            &Self::TheEnd => {
-                bytes.extend(VanillaDimension::End.to_bedrock_name().as_bytes());
+            &Self::Portals => {
+                bytes.extend(b"portals");
                 return;
             }
             &Self::PositionTrackingDB(id) => {
@@ -628,8 +610,20 @@ impl DBKey {
                 bytes.extend(b"PositionTrackDB-LastId");
                 return;
             }
-            &Self::BiomeIdsTable => {
-                bytes.extend(b"BiomeIdsTable");
+            &Self::WanderingTraderScheduler => {
+                bytes.extend(b"schedulerWT");
+                return;
+            }
+            &Self::Overworld => {
+                bytes.extend(VanillaDimension::Overworld.to_bedrock_name().as_bytes());
+                return;
+            }
+            &Self::Nether => {
+                bytes.extend(VanillaDimension::Nether.to_bedrock_name().as_bytes());
+                return;
+            }
+            &Self::TheEnd => {
+                bytes.extend(VanillaDimension::End.to_bedrock_name().as_bytes());
                 return;
             }
             &Self::FlatWorldLayers => {

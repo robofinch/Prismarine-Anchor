@@ -2,6 +2,8 @@
 //! for small Rust-specific tasks.
 
 mod char_conversion;
+// Exports a small macro
+mod declare_and_pub_use;
 mod inspect_none;
 mod lock_or_panic;
 mod u64_equals_usize;

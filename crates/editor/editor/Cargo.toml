@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 prismarine-anchor-leveldb-entries   .workspace = true
-prismarine-anchor-leveldb-values    = { workspace = true, features = ["all"] }
 prismarine-anchor-mc-datatypes      = { workspace = true, features = ["all"] }
 prismarine-anchor-nbt               = { workspace = true, features = ["preserve_order"] }
 prismarine-anchor-util              = { workspace = true, features = ["print_debug"] }

@@ -26,15 +26,15 @@ Notable dependencies, sources, and inspirations include:
 * `rusty-leveldb`, whose MCPE example and MemEnv struct were helpful, as well as their
   main functionality as a LevelDB crate.
 * Project Lodestone, an ambitious project similar to this one, but with many contributors.
-  Lodestone's documentation greatly aided in the development of the `leveldb-values` crate.
+  Lodestone's documentation greatly aided in the development of the `leveldb-entries` crate.
   Hopefully, some of the work here will also help Lodestone (whether as a dependency or
   copying-and-pasting and adding a notice).
 * minecraft.wiki and wiki.bedrock.dev provide large amounts of information, helpful for the NBT
-  parser, `leveldb-entries`, `leveldb-values`, and more.
-* Rufus Atticus (and his `rbedrock` library) have been helpful for the `leveldb-values` crate.
-* LeviLamina's header files have greatly aided in the `leveldb-entries` and `leveldb-values` crates.
-* Past me, who has provided so many old Bedrock Edition saves, invaluable for understanding
-  Bedrock Edition save formats.
+  parser, `leveldb-entries`, and more.
+* Rufus Atticus (and his `rbedrock` library) and LeviLamina's header files, which have very
+  helpful for the `leveldb-entries` crate.
+* Past me, who has provided so many old Bedrock Edition saves, which are invaluable for
+  understanding Bedrock Edition save formats.
 
 ## License
 
