@@ -1,0 +1,22 @@
+[package]
+name         = "crawl-worlds"
+authors      = ["Finley Huggins"]
+description  = "Crawl through all Minecraft: Bedrock Edition worlds in a given file"
+readme       = "README.md"
+version      = "0.1.0"
+edition      .workspace = true
+rust-version .workspace = true
+license      .workspace = true
+
+[dependencies]
+prismarine-anchor-leveldb-entries   = { workspace = true, features = ["derive_standard"] }
+prismarine-anchor-mc-datatypes      .workspace = true
+prismarine-anchor-nbt               = { workspace = true, features = ["preserve_order"] }
+prismarine-anchor-util              = { workspace = true, features = ["print_debug"] }
+# Unstable
+prismarine-anchor-world             .workspace = true
+
+crossbeam           .workspace = true
+env_logger          .workspace = true
+object-pool         .workspace = true
+rusty-leveldb       = { workspace = true, features = ["fs"] }

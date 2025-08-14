@@ -15,8 +15,8 @@ Correctness and thoroughness is a priority.
 * The crates the crates in `crates/cross-platform` are not specific to any version of Minecraft.
 * The crates in the `crates/unstable` folder can be more or less ignored.
 
-Also, the current `prismarine-anchor-editor` binary produced is solely for development
-and testing.
+See `examples/crawl-worlds` for a binary that can crawl through every MCBE world whose directory
+path it is passed.
 
 ## Sources
 

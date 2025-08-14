@@ -7,28 +7,3 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-prismarine-anchor-leveldb-entries   .workspace = true
-prismarine-anchor-mc-datatypes      .workspace = true
-prismarine-anchor-nbt               = { workspace = true, features = ["preserve_order"] }
-prismarine-anchor-util              = { workspace = true, features = ["print_debug"] }
-
-# Unstable
-prismarine-anchor-world             .workspace = true
-
-anyhow              .workspace = true
-crossbeam           .workspace = true
-env_logger          .workspace = true
-# flate2              .workspace = true
-object-pool         .workspace = true
-rusty-leveldb       .workspace = true
-subslice-to-array   .workspace = true
-# xxhash-rust         .workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# We don't directly use this, but our deps do, and it needs to have the js feature enabled.
-# In particular, rusty-leveldb and unicode_names2 do, via rand and phf.
-getrandom = { workspace = true, features = ["js"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# Need PosixDiskEnv when not on wasm32
-rusty-leveldb = { workspace = true, features = ["fs"] }
