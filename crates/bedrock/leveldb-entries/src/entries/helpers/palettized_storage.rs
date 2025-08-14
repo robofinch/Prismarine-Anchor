@@ -244,10 +244,6 @@ impl<T> PalettizedStorage<T> {
                 write_palette_to_vec(slice::from_ref(value), bytes)?;
             }
             Self::Palettized(palettized) => {
-                let bits_per_index = u8::from(palettized.bits_per_index);
-                let palette_version = 1;
-                let header = (bits_per_index << 1) | palette_version;
-
                 let palette_len = palettized.palette_len();
                 let (_, packed_indices, palette) = palettized.packed();
 
@@ -260,7 +256,7 @@ impl<T> PalettizedStorage<T> {
                     bytes.reserve(reserve_len);
                 }
 
-                bytes.push(header);
+                bytes.push(u8::from(header));
                 // write_le_u32s is infallible
                 write_le_u32s(packed_indices.as_slice(), bytes).unwrap();
                 bytes.extend(palette_len.to_le_bytes());
